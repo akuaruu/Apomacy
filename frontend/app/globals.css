@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-apomacy-900: #021024;
-  --color-apomacy-800: #052659;
+  --color-apomacy-900: #021024; /* Sangat gelap (untuk teks utama/footer) */
+  --color-apomacy-800: #052659; /* Biru gelap (untuk Navbar/Header) */
   --color-apomacy-500: #5483B3;
-  --color-apomacy-300: #7DA0CA;
-  --color-apomacy-100: #C1E8FF;
+  --color-apomacy-300: #7DA0CA; /* Biru terang (untuk border/hover) */
+  --color-apomacy-100: #C1E8FF; /* Paling terang (untuk background aksen/card) */
 
   --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-  background-color: #ffffff; //jaga jaga klo butuh untuk defaul bg putih
+  background-color: #ffffff; /* jaga jaga klo butuh untuk defaul bg putih */
 }
