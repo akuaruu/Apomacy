@@ -122,11 +122,11 @@ frontend/
 
 ## 👥 Tim Pengembang (Maintained by)
 
-  Member 1: [https://github.com/akuaruu](https://github.com/akuaruu)
-  Member 2: [https://github.com/CupidStrom](https://github.com/CupidStrom)
-  Member 3: [https://github.com/dzulmanromiealfikrhi](https://github.com/dzulmanromiealfikrhi)
-  Member 4: [https://github.com/NakishiSelviar](https://github.com/NakishiSelviar)
-  Member 5: [https://github.com/RexZone01](https://github.com/RexZone01)
+- Member 1: [https://github.com/akuaruu](https://github.com/akuaruu)
+- Member 2: [https://github.com/CupidStrom](https://github.com/CupidStrom)
+- Member 3: [https://github.com/dzulmanromiealfikrhi](https://github.com/dzulmanromiealfikrhi)
+- Member 4: [https://github.com/NakishiSelviar](https://github.com/NakishiSelviar)
+- Member 5: [https://github.com/RexZone01](https://github.com/RexZone01)
 
 ## 📄 Lisensi
 
