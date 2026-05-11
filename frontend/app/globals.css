@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-apomacy-900: #021024; /* Sangat gelap (untuk teks utama/footer) */
-  --color-apomacy-800: #052659; /* Biru gelap (untuk Navbar/Header) */
-  --color-apomacy-500: #5483B3;
-  --color-apomacy-300: #7DA0CA; /* Biru terang (untuk border/hover) */
-  --color-apomacy-100: #C1E8FF; /* Paling terang (untuk background aksen/card) */
+  --color-apomacy-teal: #5CC0C3;       /* Warna Utama/Aksen: Tombol, Harga, Sukses */
+  --color-apomacy-blue: #14387D;       /* Warna Sekunder: Judul, Border */
+  --color-apomacy-dark: #021024;       /* Teks Utama */
+  --color-apomacy-muted-blue: #5176A6; /* Teks Sekunder */
+  --color-apomacy-border: #E5E5E5;     /* Border Abu-abu */
+  --color-apomacy-light-blue: #C2ECEB; /* Background Kartu/Aksen */
+  --color-apomacy-white: #FFFFFF;      /* Latar Belakang Utama */
+  --color-apomacy-danger: #FF4C4C;     /* Tombol Logout / Bahaya */
 
   --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-  background-color: #ffffff; /* jaga jaga klo butuh untuk defaul bg putih */
+  background-color: #FFFFFF;
 }
