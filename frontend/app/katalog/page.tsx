@@ -1,97 +1,160 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { fetchMockProducts } from "@/lib/dummyData";
+import { useState, useMemo } from "react";
+import PromoBanner from "@/components/ui/PromoBanner";
+import CategoryPill from "@/components/shared/CategoryPill";
+import ProductCard from "@/components/shared/ProductCard";
+import SectionHeader from "@/components/ui/Header";
+import { products, categories } from "@/lib/Data";
+import { Product } from "@/lib/index";
+import { useCart } from "@/context/CartContext";
+
+const SORT_OPTIONS = [
+    { value: "popular", label: "Most Popular" },
+    { value: "price-asc", label: "Price: Low to High" },
+    { value: "price-desc", label: "Price: High to Low" },
+    { value: "rating", label: "Top Rated" },
+];
+
+const ITEMS_PER_PAGE = 10;
 
 export default function KatalogPage() {
-    const [products, setProducts] = useState<any[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [search, setSearch] = useState<string>("");
+    const [activeCategory, setActiveCategory] = useState("all");
+    const [sortBy, setSortBy] = useState("popular");
+    const [currentPage, setCurrentPage] = useState(1);
 
-    useEffect(() => {
-        const loadData = async () => {
-            const data = await fetchMockProducts();
-            setProducts(data as any[]);
-            setLoading(false);
-        };
-        loadData();
+    // Gunakan fungsi dari Global Context, bukan useState lokal lagi
+    const { addToCart } = useCart();
+
+    const topSellingProducts = useMemo(() => {
+        return [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 5);
     }, []);
 
-    const filteredProducts = products.filter((item) =>
-        item.name.toLowerCase().includes(search.toLowerCase())
+    const latestProducts = useMemo(() => {
+        const newItems = products.filter(p => p.badge === "new");
+        return newItems.length > 0 ? newItems.slice(0, 5) : products.slice(-5);
+    }, []);
+
+    const filteredCatalog = useMemo(() => {
+        let result = activeCategory === "all"
+            ? products
+            : products.filter((p) => p.category === activeCategory);
+
+        switch (sortBy) {
+            case "price-asc":
+                return [...result].sort((a, b) => a.price - b.price);
+            case "price-desc":
+                return [...result].sort((a, b) => b.price - a.price);
+            case "rating":
+                return [...result].sort((a, b) => b.rating - a.rating);
+            default:
+                return [...result].sort((a, b) => b.reviewCount - a.reviewCount);
+        }
+    }, [activeCategory, sortBy]);
+
+    const totalPages = Math.ceil(filteredCatalog.length / ITEMS_PER_PAGE);
+    const paginatedCatalog = filteredCatalog.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
     );
 
+    const handleCategoryChange = (id: string) => {
+        setActiveCategory(id);
+        setCurrentPage(1);
+    };
+
     return (
-        <div className="min-h-screen bg-white text-apomacy-dark font-sans">
-            <header className="bg-white border-b border-apomacy-border py-4 px-4 md:px-8 shadow-sm sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto flex justify-between items-center">
-                    <Link href="/">
-                        <h1 className="text-2xl md:text-3xl font-bold text-apomacy-teal cursor-pointer">
-                            Apomacy
-                        </h1>
-                    </Link>
-                    <button
-                        onClick={() => alert("Simulasi: Berhasil Logout")}
-                        className="px-5 py-2 bg-apomacy-danger text-white text-base rounded-full hover:bg-red-600 transition-colors shadow-sm"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </header>
+        <div className="min-h-screen bg-apomacy-bg">
+            <main className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6 lg:px-8 flex flex-col gap-10">
 
-            <main className="max-w-6xl mx-auto px-4 py-8">
-                <form
-                    className="mb-8 flex flex-col sm:flex-row gap-4 justify-center"
-                    onSubmit={(e) => e.preventDefault()}
-                >
-                    <input
-                        type="text"
-                        placeholder="Cari nama obat..."
-                        className="w-full md:w-1/2 px-4 py-2 text-base border border-apomacy-border rounded-lg focus:outline-none focus:ring-2 focus:ring-apomacy-teal bg-white text-apomacy-dark"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                <section>
+                    <PromoBanner
+                        badge="-20% OFF WEEKEND SALE"
+                        title="Premium Healthcare & Wellness Essentials"
+                        subtitle="Discover top-tier medical supplies, daily vitamins, and personal care products trusted by professionals."
+                        ctaLabel="Shop Now"
+                        ctaHref="/katalog"
                     />
-                    <button
-                        type="submit"
-                        className="px-6 py-2 bg-apomacy-teal text-white text-base rounded-lg hover:bg-apomacy-blue transition-colors shadow-sm"
-                    >
-                        Cari
-                    </button>
-                </form>
-
-                {loading ? (
-                    <div className="flex justify-center items-center h-64">
-                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-apomacy-teal"></div>
-                        <span className="ml-3 text-base text-apomacy-muted-blue">Mengambil data produk...</span>
+                    <div className="mt-4 flex justify-center gap-2">
+                        <span className="h-2 w-6 rounded-full bg-apomacy-primary"></span>
+                        <span className="h-2 w-2 rounded-full bg-outline-variant"></span>
+                        <span className="h-2 w-2 rounded-full bg-outline-variant"></span>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {filteredProducts.map((product) => (
-                            <Link href={`/katalog/${product.id}`} key={product.id}>
-                                <div className="bg-white border border-apomacy-border rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col h-full">
-                                    <div className="bg-apomacy-light-blue h-48 w-full flex justify-center items-center">
-                                        <img src={product.image} alt={product.name} className="h-32 object-contain mix-blend-multiply" />
-                                    </div>
-                                    <div className="p-4 flex flex-col flex-grow">
-                                        <span className="text-xs text-apomacy-blue font-semibold mb-1 uppercase tracking-wider">{product.category}</span>
-                                        <h2 className="text-lg font-bold text-apomacy-dark leading-tight mb-2 h-14 overflow-hidden">{product.name}</h2>
-                                        <div className="mt-auto flex justify-between items-center border-t border-apomacy-border pt-3">
-                                            <span className="text-lg font-bold text-apomacy-teal">Rp {product.price.toLocaleString('id-ID')}</span>
-                                            <span className="text-xs text-apomacy-muted-blue">Stok: {product.stock}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Link>
+                </section>
+
+                <section>
+                    <SectionHeader title="Top Selling" viewAllHref="/katalog?sort=popular" />
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                        {topSellingProducts.map((product) => (
+                            <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
+                                <ProductCard product={product} onAddToCart={addToCart} />
+                            </div>
                         ))}
                     </div>
-                )}
+                </section>
 
-                {!loading && filteredProducts.length === 0 && (
-                    <div className="text-center py-12 text-apomacy-muted-blue text-base">
-                        Obat yang kamu cari tidak ditemukan.
+                <section>
+                    <SectionHeader title="Latest Arrivals" viewAllHref="/katalog?badge=new" />
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                        {latestProducts.map((product) => (
+                            <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
+                                <ProductCard product={product} onAddToCart={addToCart} />
+                            </div>
+                        ))}
                     </div>
-                )}
+                </section>
+
+                <section>
+                    <SectionHeader title="All Products" />
+
+                    <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant pb-4">
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                            {categories.map((cat) => (
+                                <CategoryPill
+                                    key={cat.id}
+                                    label={cat.name}
+                                    count={cat.count}
+                                    isActive={activeCategory === cat.id}
+                                    onClick={() => handleCategoryChange(cat.id)}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-sm text-on-surface-variant">Sort:</span>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-apomacy-primary/30 cursor-pointer"
+                            >
+                                {SORT_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <span className="text-sm text-outline hidden sm:inline-block">
+                                {filteredCatalog.length} produk
+                            </span>
+                        </div>
+                    </div>
+
+                    {paginatedCatalog.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                            {paginatedCatalog.map((product) => (
+                                <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    onAddToCart={addToCart}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-white py-20 text-center">
+                            <p className="text-base font-semibold text-on-surface">Produk tidak ditemukan</p>
+                        </div>
+                    )}
+                </section>
             </main>
         </div>
     );
