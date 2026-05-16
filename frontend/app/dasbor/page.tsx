@@ -48,16 +48,6 @@ export default function DasborPage() {
               Proses
             </span>
           </div>
-          
-          <div className="flex justify-between items-center py-3 border-b border-apomacy-border last:border-0">
-            <div>
-              <p className="font-medium text-apomacy-dark">Konsultasi dengan dr. Budi</p>
-              <p className="text-sm text-apomacy-muted-blue">18 Okt 2023 - Selesai</p>
-            </div>
-            <span className="px-3 py-1 bg-apomacy-teal/20 text-apomacy-teal text-xs font-bold rounded-full">
-              Selesai
-            </span>
-          </div>
         </div>
       </div>
     </div>

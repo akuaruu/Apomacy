@@ -26,13 +26,13 @@ const riwayatKonsultasi = [
   },
   {
     id: "KNS-260305-088",
-    dokter: "dr. Budi Santoso",
+    dokter: "dr. Indah Kusumaningrum ",
     spesialisasi: "Dokter Umum",
     tanggal: "05 Mar 2026",
     waktu: "19:00 - 19:15 WIB",
     status: "Dibatalkan",
     media: "Video Call",
-    foto: "https://api.dicebear.com/7.x/avataaars/svg?seed=DokterBudi&backgroundColor=c0aede"
+    foto: "/indahkus.png"
   }
 ];
 

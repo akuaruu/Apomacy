@@ -86,17 +86,7 @@ export default function DasborLayout({ children }: { children: React.ReactNode }
             Riwayat Pesanan Obat
           </Link>
 
-          <Link 
-            href="/dasbor/konsultasi" 
-            className={`block px-4 py-3 rounded-lg transition ${
-              pathname === '/dasbor/konsultasi' 
-                ? 'bg-white/10 text-white font-medium' 
-                : 'text-apomacy-light-blue hover:text-white hover:bg-apomacy-muted-blue/50'
-            }`}
-          >
-            Riwayat Konsultasi
-          </Link>
-
+ 
           <Link 
             href="/dasbor/faq" 
             className={`block px-4 py-3 rounded-lg transition ${
