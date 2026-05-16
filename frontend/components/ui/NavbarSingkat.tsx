@@ -8,7 +8,7 @@ export default function NavbarSingkat() {
 
         {/* Bagian Kiri: Logo Asli Apomacy */}
         <Link
-          href="/"
+          href="./katalog"
           className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
         >
           <Image

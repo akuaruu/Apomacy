@@ -36,8 +36,11 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
             {/* Layer 1: White Top Bar */}
             <div className="bg-white shadow-sm">
                 <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-6 px-4 lg:px-8">
-                    <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="Apomacy Home">
-
+                    <Link
+                        href="./katalog"
+                        className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
+                        aria-label="Apomacy Home"
+                    >
                         <Image
                             src="/image/logo_apomacy.png"
                             alt="Logo Apomacy"
@@ -45,10 +48,9 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             height={40}
                             className="object-contain"
                         />
-
-                        <div className="flex flex-col leading-none">
-                            <span className="text-[26px] font-semibold tracking-widest text-apomacy-primary">Apomacy</span>
-                        </div>
+                        <span className="text-xl font-black tracking-[-0.02em]">
+                            Apomacy
+                        </span>
                     </Link>
 
                     <div className="flex flex-1 items-stretch overflow-hidden rounded-full border border-apomacy-ice focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
