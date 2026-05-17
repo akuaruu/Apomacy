@@ -14,6 +14,11 @@ export default function NavbarWrapper() {
         return null;
     }
 
+       // Sembunyyin navbar di path admin
+    if (pathname.startsWith("/dasbor") || pathname === "/dashboard") {
+        return null;
+    }
+
     // cuman gunain navbar singkat uuntuk keranjang dan checkout
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
         return <NavbarSingkat />;
