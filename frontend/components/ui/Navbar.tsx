@@ -7,13 +7,13 @@ import { useState } from "react";
 interface NavCategory {
     label: string;
     href: string;
+    isPromo?: boolean;
 }
 
 const navCategories: NavCategory[] = [
-    { label: "OBAT", href: "/katalog?cat=medication" },
-    { label: "KEBUGARAN", href: "/katalog?cat=vitamins" },
-    { label: "PERLENGKAPAN", href: "/katalog?cat=covid" },
-    { label: "PROMO", href: "/katalog?badge=sale" },
+    { label: "PRODUK BARU", href: "/katalog?badge=new" },
+    { label: "PROMO", href: "/katalog?badge=sale", isPromo: true },
+    { label: "TENTANG KAMI", href: "#" },
 ];
 
 interface NavbarProps {
@@ -33,11 +33,14 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
     return (
         <header className="sticky top-0 z-50 w-full">
-            {/* Layer 1: White Top Bar */}
+            {/* Navbar LAyer 1 : warna putih */}
             <div className="bg-white shadow-sm">
                 <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-6 px-4 lg:px-8">
-                    <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="Apomacy Home">
-
+                    <Link
+                        href="/katalog"
+                        className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
+                        aria-label="Apomacy Home"
+                    >
                         <Image
                             src="/image/logo_apomacy.png"
                             alt="Logo Apomacy"
@@ -56,7 +59,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search for medicines, wellness products..."
+                            placeholder="Cari obat, vitamin, atau produk kesehatan..."
                             className="min-w-0 flex-1 bg-white px-5 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none"
                         />
                         <button className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
@@ -92,33 +95,37 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                 </div>
             </div>
 
-            {/* Layer 2: Primary Blue Bottom Bar */}
+            {/* Navbar layer 2 : wawrna biru */}
             <div className="bg-apomacy-primary">
                 <div className="mx-auto flex h-11 max-w-screen-xl items-center px-4 lg:px-8">
-                    <div className="relative">
+                    <div className="relative h-full">
                         <button
                             onClick={() => setCategoryMenuOpen(!categoryMenuOpen)}
-                            className="flex h-11 items-center gap-2 bg-apomacy-teal px-4 text-sm font-semibold text-white transition-colors hover:bg-apomacy-teal/90"
+                            className="flex h-full items-center gap-2 bg-apomacy-teal px-5 text-sm font-semibold text-white transition-colors hover:bg-apomacy-teal/90"
                         >
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                             <span className="hidden sm:inline">Shop By Categories</span>
                         </button>
+
                         {categoryMenuOpen && (
-                            <div className="absolute left-0 top-full z-50 min-w-56 rounded-b-xl bg-white py-1 shadow-xl ring-1 ring-black/5">
+                            <div className="absolute left-0 top-full z-50 min-w-64 rounded-b-xl bg-white py-2 shadow-xl ring-1 ring-black/5 border-t border-gray-100">
                                 {[
-                                    { label: "Vitamin & Suplemen", href: "/katalog?cat=vitamins" },
-                                    { label: "Obat-obatan", href: "/katalog?cat=medication" },
-                                    { label: "Skincare", href: "/katalog?cat=skincare" },
-                                    { label: "Ibu & Bayi", href: "/katalog?cat=baby" },
-                                    { label: "Perlindungan Covid", href: "/katalog?cat=covid" },
+                                    { label: "Pereda Nyeri & Demam", href: "/katalog?cat=pereda-nyeri" },
+                                    { label: "Batuk & Flu", href: "/katalog?cat=batuk-flu" },
+                                    { label: "Pencernaan & Lambung", href: "/katalog?cat=pencernaan" },
+                                    { label: "Vitamin & Suplemen", href: "/katalog?cat=vitamin" },
+                                    { label: "P3K & Antiseptik", href: "/katalog?cat=p3k" },
+                                    { label: "Ibu & Anak", href: "/katalog?cat=ibu-anak" },
+                                    { label: "Skincare & Perawatan Diri", href: "/katalog?cat=perawatan-diri" },
+                                    { label: "Herbal & Tradisional", href: "/katalog?cat=herbal" }
                                 ].map((item) => (
                                     <Link
                                         key={item.href}
                                         href={item.href}
                                         onClick={() => setCategoryMenuOpen(false)}
-                                        className="block px-4 py-2.5 text-sm text-apomacy-dark transition-colors hover:bg-apomacy-bg hover:text-apomacy-primary"
+                                        className="block px-5 py-3 text-sm font-medium text-apomacy-dark transition-colors hover:bg-apomacy-primary/10 hover:text-apomacy-primary"
                                     >
                                         {item.label}
                                     </Link>
@@ -127,16 +134,30 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                         )}
                     </div>
 
-                    <div className="mx-3 hidden h-5 w-px bg-white/20 lg:block" />
+                    <div className="mx-4 hidden h-5 w-px bg-white/20 lg:block" />
 
-                    <nav className="hidden items-center gap-1 lg:flex">
+                    {/* 3Lgoic untuk ngerender navbar */}
+                    <nav className="hidden items-center gap-2 lg:flex">
                         {navCategories.map((cat) => (
                             <Link
                                 key={cat.href}
                                 href={cat.href}
-                                className="rounded px-3 py-1.5 text-sm font-semibold uppercase tracking-wide text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+                                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:bg-white/15 ${cat.isPromo
+                                    ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]"
+                                    : "text-white/90 hover:text-white"
+                                    }`}
                             >
-                                {cat.label}
+                                {/*  */}
+                                {cat.isPromo && (
+                                    <Image
+                                        src="/Deal.png"
+                                        alt="Promo"
+                                        width={16}
+                                        height={16}
+                                        className="object-contain"
+                                    />
+                                )}
+                                <span>{cat.label}</span>
                             </Link>
                         ))}
                     </nav>
@@ -147,7 +168,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                         <svg className="h-4 w-4 text-apomacy-ice" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
-                        <span className="text-xs font-medium text-apomacy-ice/80">Free Shipping on Orders Rp 100.000</span>
+                        <span className="text-xs font-medium text-apomacy-ice/90">Gratis Ongkir Order diatas Rp 150.000</span>
                     </div>
                 </div>
             </div>

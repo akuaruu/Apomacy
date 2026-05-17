@@ -1,20 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image"; // Wajib ditambahkan agar Next.js bisa me-render gambar
 import { Product } from "@/lib";
 import { formatRupiah } from "@/lib/Data";
 
-interface ProductCardProps {
-    product: Product;
-    onAddToCart?: (product: Product) => void;
+// Kita tambahkan opsi 'image' agar bisa membaca data API
+interface ExtendedProduct extends Product {
+    image?: string;
 }
 
-const badgeConfig: Record<NonNullable<Product["badge"]>, { label: string; classes: string }> = {
+interface ProductCardProps {
+    product: ExtendedProduct;
+    onAddToCart?: (product: ExtendedProduct) => void;
+}
+
+const badgeConfig: Record<string, { label: string; classes: string }> = {
     sale: { label: "SALE", classes: "bg-discount-red text-white" },
     new: { label: "NEW", classes: "bg-apomacy-teal text-white" },
     popular: { label: "POPULAR", classes: "bg-amber-500 text-white" },
 };
-
 
 function ProductImagePlaceholder({ category, name }: { category: string; name: string }) {
     const palettes: Record<string, { bg: string; accent: string }> = {
@@ -63,9 +68,25 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
 
     return (
         <div className="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white transition-shadow duration-200 hover:shadow-md">
-            {/* Image */}
-            <Link href={`/katalog/${product.id}`} className="relative block aspect-square overflow-hidden bg-white">
-                <ProductImagePlaceholder category={product.category} name={product.name} />
+
+            <Link href={`/katalog/${product.id}`} className="relative block aspect-square overflow-hidden bg-white p-2">
+
+                {/* INI KUNCI UTAMANYA: Cek apakah ada link gambar, jika ada pakai <Image>, jika tidak pakai Placeholder */}
+                {product.image ? (
+                    <div className="relative h-full w-full">
+                        <Image
+                            src={product.image}
+                            alt={product.name}
+                            fill
+                            unoptimized={true} // Wajib agar proxy wsrv.nl jalan
+                            className="object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110"
+                            sizes="(max-width: 768px) 100vw, 20vw"
+                        />
+                    </div>
+                ) : (
+                    <ProductImagePlaceholder category={product.category} name={product.name} />
+                )}
+
                 {badge && (
                     <span className={`absolute left-2 top-2 rounded px-2 py-0.5 text-[10px] font-bold ${badge.classes}`}>
                         {badge.label}
@@ -80,8 +101,6 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
 
             {/* Content */}
             <div className="flex flex-1 flex-col p-3">
-
-                {/* Title */}
                 <Link href={`/katalog/${product.id}`}>
                     <h3 className="mb-1 line-clamp-2 text-sm font-medium leading-snug text-apomacy-muted transition-colors hover:text-apomacy-primary">
                         {product.name}
@@ -104,7 +123,6 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
                     </span>
                 </div>
 
-                {/* CTA Button - outline style, turns solid on hover per DESIGN.md */}
                 <button
                     onClick={() => onAddToCart?.(product)}
                     disabled={!product.inStock}
@@ -117,5 +135,4 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
     );
 }
 
-// Re-export prop types for external use
 export type { ProductCardProps };
