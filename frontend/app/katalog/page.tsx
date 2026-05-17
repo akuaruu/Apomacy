@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import axios from "axios";
 import PromoBanner from "@/components/ui/PromoBanner";
-import CategoryPill from "@/components/shared/CategoryPill";
 import ProductCard from "@/components/shared/ProductCard";
 import SectionHeader from "@/components/ui/Header";
-import { products, categories } from "@/lib/Data";
-import { Product } from "@/lib/index";
 import { useCart } from "@/context/CartContext";
 
 const SORT_OPTIONS = [
@@ -16,52 +14,102 @@ const SORT_OPTIONS = [
     { value: "rating", label: "Top Rated" },
 ];
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 export default function KatalogPage() {
-    const [activeCategory, setActiveCategory] = useState("all");
     const [sortBy, setSortBy] = useState("popular");
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Gunakan fungsi dari Global Context, bukan useState lokal lagi
+    // State eksklusif untuk data API
+    const [apiProducts, setApiProducts] = useState<any[]>([]);
+    const [isLoadingAPI, setIsLoadingAPI] = useState(true);
+    const [apiError, setApiError] = useState<string | null>(null);
+
     const { addToCart } = useCart();
 
-    const topSellingProducts = useMemo(() => {
-        return [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 5);
+    useEffect(() => {
+        const fetchApiData = async () => {
+            try {
+                setIsLoadingAPI(true);
+                setApiError(null);
+
+                const apiUrl = "https://api.npoint.io/68d5bfcf641eb545455a";
+                const response = await axios.get(`${apiUrl}?t=${new Date().getTime()}`);
+
+                const mappedApiData = response.data.map((item: any, index: number) => {
+                    let badge = undefined;
+                    let originalPrice = undefined;
+
+                    // Logika Labeling Otomatis
+                    if (index % 7 === 0) {
+                        badge = "sale";
+                        originalPrice = Math.round(item.price * 1.25);
+                    } else if (index % 5 === 1) {
+                        badge = "new";
+                    } else if (index % 6 === 2) {
+                        badge = "popular";
+                    }
+
+                    return {
+                        id: `api-${item.id}`,
+                        name: item.title,
+                        price: item.price,
+                        originalPrice: originalPrice,
+                        category: item.category,
+                        image: item.image,
+                        inStock: true,
+                        reviewCount: Math.floor(Math.random() * 500) + 10,
+                        rating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1),
+                        badge: badge,
+                    };
+                });
+
+                setApiProducts(mappedApiData);
+            } catch (error: any) {
+                console.error("Gagal memuat API:", error);
+                // Menangkap Error 429 agar layarnya tidak merah
+                if (error.response && error.response.status === 429) {
+                    setApiError("Terlalu banyak permintaan ke Server API (Error 429). Mohon tunggu 1-2 menit lalu refresh halaman ini.");
+                } else {
+                    setApiError("Gagal mengambil data dari server mitra.");
+                }
+            } finally {
+                setIsLoadingAPI(false);
+            }
+        };
+
+        fetchApiData();
     }, []);
+
+    const topSellingProducts = useMemo(() => {
+        return [...apiProducts].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 5);
+    }, [apiProducts]);
 
     const latestProducts = useMemo(() => {
-        const newItems = products.filter(p => p.badge === "new");
-        return newItems.length > 0 ? newItems.slice(0, 5) : products.slice(-5);
-    }, []);
+        const newItems = apiProducts.filter(p => p.badge === "new");
+        return newItems.length > 0 ? newItems.slice(0, 5) : apiProducts.slice(0, 5);
+    }, [apiProducts]);
 
-    const filteredCatalog = useMemo(() => {
-        let result = activeCategory === "all"
-            ? products
-            : products.filter((p) => p.category === activeCategory);
-
+    const sortedCatalog = useMemo(() => {
+        let result = [...apiProducts];
         switch (sortBy) {
-            case "price-asc":
-                return [...result].sort((a, b) => a.price - b.price);
-            case "price-desc":
-                return [...result].sort((a, b) => b.price - a.price);
-            case "rating":
-                return [...result].sort((a, b) => b.rating - a.rating);
-            default:
-                return [...result].sort((a, b) => b.reviewCount - a.reviewCount);
+            case "price-asc": return result.sort((a, b) => a.price - b.price);
+            case "price-desc": return result.sort((a, b) => b.price - a.price);
+            case "rating": return result.sort((a, b) => b.rating - a.rating);
+            default: return result.sort((a, b) => b.reviewCount - a.reviewCount);
         }
-    }, [activeCategory, sortBy]);
+    }, [apiProducts, sortBy]);
 
-    const totalPages = Math.ceil(filteredCatalog.length / ITEMS_PER_PAGE);
-    const paginatedCatalog = filteredCatalog.slice(
+    const totalPages = Math.ceil(sortedCatalog.length / ITEMS_PER_PAGE);
+
+    const paginatedCatalog = sortedCatalog.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
     );
 
-    const handleCategoryChange = (id: string) => {
-        setActiveCategory(id);
+    useEffect(() => {
         setCurrentPage(1);
-    };
+    }, [sortBy]);
 
     return (
         <div className="min-h-screen bg-apomacy-bg">
@@ -75,52 +123,53 @@ export default function KatalogPage() {
                         ctaLabel="Shop Now"
                         ctaHref="/katalog"
                     />
-                    <div className="mt-4 flex justify-center gap-2">
-                        <span className="h-2 w-6 rounded-full bg-apomacy-primary"></span>
-                        <span className="h-2 w-2 rounded-full bg-outline-variant"></span>
-                        <span className="h-2 w-2 rounded-full bg-outline-variant"></span>
-                    </div>
                 </section>
 
-                <section>
-                    <SectionHeader title="Top Selling" viewAllHref="/katalog?sort=popular" />
-                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                        {topSellingProducts.map((product) => (
-                            <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
-                                <ProductCard product={product} onAddToCart={addToCart} />
-                            </div>
-                        ))}
+                {apiError && (
+                    <div className="rounded-xl border border-discount-red bg-discount-red/10 p-6 text-center text-discount-red font-bold">
+                        {apiError}
                     </div>
-                </section>
+                )}
 
-                <section>
-                    <SectionHeader title="Latest Arrivals" viewAllHref="/katalog?badge=new" />
-                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                        {latestProducts.map((product) => (
-                            <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
-                                <ProductCard product={product} onAddToCart={addToCart} />
+                {!isLoadingAPI && !apiError && apiProducts.length > 0 && (
+                    <>
+                        <section>
+                            <SectionHeader title="Top Selling" viewAllHref="/katalog?sort=popular" />
+                            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                                {topSellingProducts.map((product) => (
+                                    <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
+                                        <ProductCard product={product} onAddToCart={addToCart} />
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                </section>
+                        </section>
+
+                        <section>
+                            <SectionHeader title="Latest Arrivals" viewAllHref="/katalog?badge=new" />
+                            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                                {latestProducts.map((product) => (
+                                    <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
+                                        <ProductCard product={product} onAddToCart={addToCart} />
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    </>
+                )}
 
                 <section>
                     <SectionHeader title="All Products" />
 
                     <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant pb-4">
-                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                            {categories.map((cat) => (
-                                <CategoryPill
-                                    key={cat.id}
-                                    label={cat.name}
-                                    count={cat.count}
-                                    isActive={activeCategory === cat.id}
-                                    onClick={() => handleCategoryChange(cat.id)}
-                                />
-                            ))}
+                        <div className="flex-1">
+                            <h3 className="text-lg font-bold text-apomacy-dark">Our Collection</h3>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-sm font-medium text-outline hidden sm:inline-block">
+                                {apiProducts.length} produk
+                            </span>
+                            <div className="h-4 w-px bg-outline-variant hidden sm:block"></div>
                             <span className="text-sm text-on-surface-variant">Sort:</span>
                             <select
                                 value={sortBy}
@@ -133,28 +182,55 @@ export default function KatalogPage() {
                                     </option>
                                 ))}
                             </select>
-                            <span className="text-sm text-outline hidden sm:inline-block">
-                                {filteredCatalog.length} produk
-                            </span>
                         </div>
                     </div>
 
-                    {paginatedCatalog.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                            {paginatedCatalog.map((product) => (
-                                <ProductCard
-                                    key={product.id}
-                                    product={product}
-                                    onAddToCart={addToCart}
-                                />
-                            ))}
+                    {isLoadingAPI ? (
+                        <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-outline-variant bg-white">
+                            <div className="h-10 w-10 animate-spin rounded-full border-4 border-apomacy-bg border-t-apomacy-primary"></div>
+                            <p className="mt-4 text-sm font-bold text-apomacy-dark">Memuat Katalog Produk...</p>
                         </div>
-                    ) : (
+                    ) : paginatedCatalog.length > 0 ? (
+                        <>
+                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                                {paginatedCatalog.map((product) => (
+                                    <ProductCard
+                                        key={product.id}
+                                        product={product}
+                                        onAddToCart={addToCart}
+                                    />
+                                ))}
+                            </div>
+
+                            {totalPages > 1 && (
+                                <div className="mt-10 flex justify-center items-center gap-4">
+                                    <button
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        className="px-5 py-2.5 border border-outline-variant rounded-lg font-bold text-sm text-apomacy-dark transition-colors hover:bg-apomacy-bg disabled:opacity-50 disabled:hover:bg-transparent"
+                                    >
+                                        &larr; Prev
+                                    </button>
+                                    <span className="px-4 py-2 text-sm font-bold text-apomacy-primary bg-apomacy-primary/10 rounded-lg">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    <button
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        className="px-5 py-2.5 border border-outline-variant rounded-lg font-bold text-sm text-apomacy-dark transition-colors hover:bg-apomacy-bg disabled:opacity-50 disabled:hover:bg-transparent"
+                                    >
+                                        Next &rarr;
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    ) : !apiError && (
                         <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-white py-20 text-center">
                             <p className="text-base font-semibold text-on-surface">Produk tidak ditemukan</p>
                         </div>
                     )}
                 </section>
+
             </main>
         </div>
     );
