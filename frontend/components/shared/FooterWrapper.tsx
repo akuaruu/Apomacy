@@ -16,7 +16,9 @@ export default function FooterWrapper() {
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
         return <FooterSingkat />;
     }
-
+    if (pathname === "/kasir/member" || pathname === "/keranjang/checkout") {
+        return <FooterSingkat />;
+    }
     // Default Footer
     return <Footer />;
 
