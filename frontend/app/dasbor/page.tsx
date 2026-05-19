@@ -39,7 +39,7 @@ export default function DasborPage() {
       
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-apomacy-blue">Ringkasan Dasbor</h1>
+        <h1 className="text-3xl font-bold text-apomacy-blue">RINGKASAN DASBOR</h1>
         <p className="text-apomacy-muted-blue mt-1">Pantau aktivitas kesehatan dan pesanan obat Anda di sini.</p>
       </div>
 
