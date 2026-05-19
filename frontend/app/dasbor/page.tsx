@@ -23,7 +23,7 @@ export default function DasborPage() {
   // Mengambil data saat halaman dasbor pertama kali dimuat
   useEffect(() => {
     // Mengambil 10 data dari Public API menggunakan Axios
-    axios.get('https://jsonplaceholder.typicode.com/users')
+    axios.get('https://api.npoint.io/648230eb35c3f451bde8')
       .then((response) => {
         setMitraApotek(response.data); // Menyimpan data dari API
         setLoading(false); // Mematikan efek loading

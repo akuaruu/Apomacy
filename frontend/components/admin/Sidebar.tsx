@@ -22,10 +22,16 @@ export default function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <aside className="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col bg-apomacy-dark shadow-xl">
+        <aside className="fixed inset-y-0 left-0 z-40 flex w-65 flex-col bg-apomacy-dark shadow-xl">
             <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/10 px-6">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1.5 shadow-md">
-                    <Image src="/image/logo_apomacy.png" alt="Logo" width={36} height={36} className="object-contain" />
+                    <Image
+                        src="/image/logo_apomacy.png"
+                        alt="Logo"
+                        width={36}
+                        height={36}
+                        className="object-contain w-auto h-auto" // <-- Tambahkan w-auto h-auto di sini
+                    />
                 </div>
                 <div className="flex flex-col">
                     <span className="text-xl font-black tracking-widest text-white leading-none">Apomacy</span>
