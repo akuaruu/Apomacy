@@ -82,7 +82,7 @@ export default function Home() {
                    <h3 className="text-2xl font-bold mb-3">Tele-Consultation</h3>
                    <p className="text-primary-100 text-sm leading-relaxed">Speak with a certified pharmacist or health expert instantly via video call.</p>
                  </div>
-                 <button className="w-full bg-primary-300 hover:bg-primary-200 text-white py-3.5 rounded-xl font-medium transition-colors mt-10 shadow-inner">Start Call</button>
+                 <button type="button" suppressHydrationWarning className="w-full bg-primary-300 hover:bg-primary-200 text-white py-3.5 rounded-xl font-medium transition-colors mt-10 shadow-inner">Start Call</button>
               </div>
               
               <div className="bg-white border border-gray-100 p-8 rounded-3xl shadow-sm flex flex-col justify-center">
@@ -149,7 +149,7 @@ export default function Home() {
             </div>
             <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 items-center">
               <input type="email" placeholder="Your email address" className="px-5 py-3.5 rounded-xl w-full sm:w-80 bg-white text-gray-900 focus:outline-none text-sm" />
-              <button className="bg-primary-200 hover:bg-primary-300 text-primary-500 hover:text-white px-8 py-3.5 rounded-xl font-semibold transition-colors whitespace-nowrap text-sm">Subscribe</button>
+              <button type="button" className="bg-primary-200 hover:bg-primary-300 text-primary-500 hover:text-white px-8 py-3.5 rounded-xl font-semibold transition-colors whitespace-nowrap text-sm">Subscribe</button>
             </div>
          </div>
       </section>
