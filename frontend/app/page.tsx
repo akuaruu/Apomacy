@@ -2,6 +2,27 @@ import Link from "next/link";
 import { ArrowRight, FileText, HeartPulse, Clock, Sparkles, ShieldCheck, Gauge, Headset, Pill } from "lucide-react";
 import React from "react";
 
+const CORE_FEATURES = [
+  {
+    icon: <ShieldCheck size={24} />,
+    title: "Terjamin Keasliannya",
+    description: "Semua obat bersumber langsung dari produsen resmi dengan jaminan keaslian 100%.",
+    iconBg: "bg-primary-500 text-white"
+  },
+  {
+    icon: <Gauge size={24} />,
+    title: "Pengiriman Kilat",
+    description: "Jaringan logistik kami memastikan obat-obatan yang sensitif terhadap suhu sampai di tangan Anda dalam kondisi prima dengan cepat.",
+    iconBg: "bg-primary-100 text-primary-500"
+  },
+  {
+    icon: <Headset size={24} />,
+    title: "Dukungan Ahli 24/7",
+    description: "Butuh bantuan mengenai dosis obat Anda? Tim dukungan dan apoteker kami tersedia sepanjang waktu demi ketenangan pikiran Anda.",
+    iconBg: "bg-[#052659] text-white"
+  }
+];
+
 export default function Home() {
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -75,7 +96,7 @@ export default function Home() {
                  <Link href="/katalog" className="font-semibold text-primary-500 flex items-center gap-2 group-hover:gap-3 transition-all text-sm">Kelola Sekarang <ArrowRight size={16} /></Link>
                  <div className="absolute -bottom-12 -right-12 text-gray-100 group-hover:text-primary-50 transition-colors pointer-events-none">
                     <Pill size={280} strokeWidth={1} />
-                 </div>
+                  </div>
               </div>
               <div className="bg-primary-400 text-white p-10 rounded-3xl flex flex-col justify-between shadow-lg shadow-primary-400/20">
                  <div>
@@ -116,27 +137,15 @@ export default function Home() {
       {/* Features - Certifications */}
       <section className="bg-linear-to-br from-[#f8faff] to-[#e6f2fb] py-24 px-10">
          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
-            <div className="flex flex-col items-center">
-               <div className="w-14 h-14 bg-primary-500 rounded-full flex items-center justify-center text-white mb-6 shadow-sm">
-                 <ShieldCheck size={24} />
+            {CORE_FEATURES.map((feature, idx) => (
+               <div key={idx} className="flex flex-col items-center">
+                  <div className={`w-14 h-14 ${feature.iconBg} rounded-full flex items-center justify-center mb-6 shadow-sm`}>
+                     {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-primary-500 mb-3">{feature.title}</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed px-4">{feature.description}</p>
                </div>
-               <h3 className="text-xl font-bold text-primary-500 mb-3">Terjamin Keasliannya</h3>
-               <p className="text-xs text-gray-500 leading-relaxed px-4">Semua obat bersumber langsung dari produsen resmi dengan jaminan keaslian 100%.</p>
-            </div>
-            <div className="flex flex-col items-center">
-               <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center text-primary-500 mb-6 shadow-sm">
-                 <Gauge size={24} />
-               </div>
-               <h3 className="text-xl font-bold text-primary-500 mb-3">Pengiriman Kilat</h3>
-               <p className="text-xs text-gray-500 leading-relaxed px-4">Jaringan logistik kami memastikan obat-obatan yang sensitif terhadap suhu sampai di tangan Anda dalam kondisi prima dengan cepat.</p>
-            </div>
-            <div className="flex flex-col items-center">
-               <div className="w-14 h-14 bg-[#052659] rounded-full flex items-center justify-center text-white mb-6 shadow-sm">
-                 <Headset size={24} />
-               </div>
-               <h3 className="text-xl font-bold text-primary-500 mb-3">Dukungan Ahli 24/7</h3>
-               <p className="text-xs text-gray-500 leading-relaxed px-4">Butuh bantuan mengenai dosis obat Anda? Tim dukungan dan apoteker kami tersedia sepanjang waktu demi ketenangan pikiran Anda.</p>
-            </div>
+            ))}
          </div>
       </section>
 

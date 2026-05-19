@@ -1,6 +1,100 @@
 import React from 'react';
-import Link from 'next/link';
 import { ArrowRight, Eye, Thermometer, Heart, Package, CheckCircle2, Shield, PieChart, Users } from 'lucide-react';
+
+const VISION_VALUES = [
+  {
+    icon: <Eye size={24} className="text-[#052659]" />,
+    title: "Aksesibilitas Utama",
+    description: "Kami percaya perawatan kesehatan berkualitas tidak boleh menjadi kemewahan yang dibatasi oleh lokasi. Dengan mendigitalisasi pengalaman apotek, kami menghadirkan perawatan esensial bagi masyarakat pedesaan maupun perkotaan tanpa hambatan.",
+    bgClass: "bg-[#e6f2fb] text-[#021024] md:col-span-2 flex flex-col justify-between overflow-hidden relative group p-8 md:p-10 rounded-[2rem]",
+    extraElement: (
+      <div className="mt-8 relative z-10 flex justify-center">
+         <div className="w-64 h-32 bg-white rounded-t-3xl border-t-8 border-x-8 border-[#021024] flex justify-center overflow-hidden relative shadow-lg">
+            <div className="w-1/3 h-4 bg-[#021024] rounded-b-xl absolute top-0"></div>
+            <div className="mt-6 w-full px-4 flex flex-col gap-2">
+               <div className="w-full h-24 bg-[#e6f2fb] rounded-lg flex items-center justify-center">
+                  <Users className="text-[#7DA0CA]" size={32} />
+               </div>
+            </div>
+         </div>
+      </div>
+    )
+  },
+  {
+    icon: <Thermometer size={24} className="text-[#7DA0CA]" />,
+    title: "Presisi Klinis",
+    description: "Setiap resep obat diverifikasi melalui protokol pemeriksaan ganda yang ketat, memadukan akurasi bantuan AI dengan pengawasan apoteker ahli untuk memastikan keamanan mutlak.",
+    bgClass: "bg-[#021024] text-white flex flex-col justify-between p-8 md:p-10 rounded-[2rem] space-y-8",
+    extraElement: (
+      <div className="bg-white/5 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+        <h4 className="font-bold text-white text-sm">99.9% Akurasi</h4>
+        <p className="text-[10px] text-gray-400 mt-1">dalam pengiriman resep obat</p>
+      </div>
+    )
+  },
+  {
+    icon: <Heart size={24} className="text-[#021024]" />,
+    title: "Dukungan Penuh Empati",
+    description: "Lebih dari sekadar logistik, kami menghadirkan sentuhan kemanusiaan. Apoteker berlisensi kami siap melayani konsultasi virtual, menawarkan kehangatan dan keahlian saat Anda paling membutuhkannya.",
+    bgClass: "bg-[#a7c5ea] text-[#021024] flex flex-col space-y-4 p-8 md:p-10 rounded-[2rem]"
+  },
+  {
+    icon: null,
+    title: "Inventaris Lebih Cerdas",
+    description: "Pelacakan langsung secara real-time dan penyediaan stok prediktif memastikan kami memiliki apa yang Anda butuhkan, bahkan sebelum Anda menyadari persediaan Anda mulai menipis.",
+    bgClass: "bg-[#f4f8fb] text-[#021024] md:col-span-2 flex items-center justify-between group p-8 md:p-10 rounded-[2rem]",
+    extraElement: (
+      <div className="hidden md:flex items-center justify-center p-6 text-gray-300 group-hover:text-[#a7c5ea] transition-colors shrink-0">
+         <Package size={64} strokeWidth={1.5} />
+      </div>
+    )
+  }
+];
+
+const WHY_CHOOSE_ITEMS = [
+  {
+    icon: <CheckCircle2 size={20} />,
+    title: "Pengiriman Langsung ke Rumah",
+    description: "Pengiriman pada hari yang sama untuk obat-obatan darurat dan pengiriman terjadwal untuk perawatan penyakit kronis."
+  },
+  {
+    icon: <Shield size={20} />,
+    title: "Brankas Data yang Aman",
+    description: "Catatan kesehatan Anda dilindungi dengan enkripsi setara perbankan dan kepatuhan standar HIPAA yang ketat."
+  },
+  {
+    icon: <PieChart size={20} />,
+    title: "Transparansi Harga",
+    description: "Tanpa biaya tersembunyi. Kami bekerja sama dengan berbagai penyedia asuransi utama untuk memastikan Anda mendapatkan tarif terbaik."
+  }
+];
+
+const EXPERTS = [
+  {
+    name: "Dr. Sarah Chen",
+    role: "Chief Medical Officer",
+    image: "/image/expert_sarah.png",
+    description: "Mantan kepala Farmasi Klinis dengan pengalaman lebih dari 15 tahun di bidang pengobatan personal."
+  },
+  {
+    name: "Marcus Thorne",
+    role: "Head of Operations",
+    image: "/image/expert_marcus.png",
+    description: "Pakar logistik yang berdedikasi tinggi untuk menyempurnakan pengantaran layanan ke pintu rumah Anda."
+  },
+  {
+    name: "Elena Rodriguez",
+    role: "Lead Pharmacist",
+    image: "/image/expert_elena.png",
+    description: "Spesialis dalam farmakologi geriatri dan manajemen kondisi kesehatan kronis."
+  },
+  {
+    name: "David Park",
+    role: "CTO",
+    image: "/image/expert_david.png",
+    description: "Merancang platform berbasis AI yang aman dan canggih untuk memberdayakan Apomacy."
+  }
+];
 
 export default function AboutPage() {
   return (
@@ -47,64 +141,16 @@ export default function AboutPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* Accessibility First */}
-            <div className="md:col-span-2 bg-[#e6f2fb] rounded-[2rem] p-8 md:p-10 flex flex-col justify-between overflow-hidden relative group">
-              <div className="space-y-4 relative z-10">
-                <Eye size={24} className="text-[#052659]" />
-                <h3 className="text-2xl font-bold text-[#021024]">Aksesibilitas Utama</h3>
-                <p className="text-sm text-gray-600 max-w-md leading-relaxed">
-                  Kami percaya perawatan kesehatan berkualitas tidak boleh menjadi kemewahan yang dibatasi oleh lokasi. Dengan mendigitalisasi pengalaman apotek, kami menghadirkan perawatan esensial bagi masyarakat pedesaan maupun perkotaan tanpa hambatan.
-                </p>
+            {VISION_VALUES.map((item, idx) => (
+              <div key={idx} className={item.bgClass}>
+                <div className="space-y-4 max-w-md relative z-10">
+                  {item.icon}
+                  <h3 className="text-2xl font-bold">{item.title}</h3>
+                  <p className="text-sm leading-relaxed opacity-90">{item.description}</p>
+                </div>
+                {item.extraElement}
               </div>
-              <div className="mt-8 relative z-10 flex justify-center">
-                 <div className="w-64 h-32 bg-white rounded-t-3xl border-t-8 border-x-8 border-[#021024] flex justify-center overflow-hidden relative shadow-lg">
-                    <div className="w-1/3 h-4 bg-[#021024] rounded-b-xl absolute top-0"></div>
-                    <div className="mt-6 w-full px-4 flex flex-col gap-2">
-                       <div className="w-full h-24 bg-[#e6f2fb] rounded-lg flex items-center justify-center">
-                          <Users className="text-[#7DA0CA]" size={32} />
-                       </div>
-                    </div>
-                 </div>
-              </div>
-            </div>
-
-            {/* Clinical Precision */}
-            <div className="bg-[#021024] rounded-[2rem] p-8 md:p-10 flex flex-col justify-between text-white space-y-8">
-               <div className="space-y-4">
-                 <Thermometer size={24} className="text-[#7DA0CA]" />
-                 <h3 className="text-2xl font-bold">Presisi Klinis</h3>
-                 <p className="text-sm text-gray-300 leading-relaxed">
-                   Setiap resep obat diverifikasi melalui protokol pemeriksaan ganda yang ketat, memadukan akurasi bantuan AI dengan pengawasan apoteker ahli untuk memastikan keamanan mutlak.
-                 </p>
-               </div>
-               <div className="bg-white/5 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
-                 <h4 className="font-bold text-white text-sm">99.9% Akurasi</h4>
-                 <p className="text-[10px] text-gray-400 mt-1">dalam pengiriman resep obat</p>
-               </div>
-            </div>
-
-            {/* Empathetic Support */}
-            <div className="bg-[#a7c5ea] rounded-[2rem] p-8 md:p-10 flex flex-col space-y-4 text-[#021024]">
-               <Heart size={24} className="text-[#021024]" />
-               <h3 className="text-2xl font-bold">Dukungan Penuh Empati</h3>
-               <p className="text-sm leading-relaxed text-gray-800">
-                 Lebih dari sekadar logistik, kami menghadirkan sentuhan kemanusiaan. Apoteker berlisensi kami siap melayani konsultasi virtual, menawarkan kehangatan dan keahlian saat Anda paling membutuhkannya.
-               </p>
-            </div>
-
-            {/* Smarter Inventory */}
-            <div className="md:col-span-2 bg-[#f4f8fb] rounded-[2rem] p-8 md:p-10 flex items-center justify-between group">
-               <div className="space-y-4 max-w-md">
-                 <h3 className="text-2xl font-bold text-[#021024]">Inventaris Lebih Cerdas</h3>
-                 <p className="text-sm text-gray-500 leading-relaxed">
-                   Pelacakan langsung secara real-time dan penyediaan stok prediktif memastikan kami memiliki apa yang Anda butuhkan, bahkan sebelum Anda menyadari persediaan Anda mulai menipis.
-                 </p>
-               </div>
-               <div className="hidden md:flex items-center justify-center p-6 text-gray-300 group-hover:text-[#a7c5ea] transition-colors">
-                  <Package size={64} strokeWidth={1.5} />
-               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -116,35 +162,17 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold text-[#021024]">Mengapa Memilih Apomacy?</h2>
             
             <div className="space-y-8">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#e6f2fb] text-[#052659] flex items-center justify-center shrink-0">
-                    <CheckCircle2 size={20} />
+              {WHY_CHOOSE_ITEMS.map((item, idx) => (
+                <div key={idx} className="flex gap-4">
+                  <div className="w-10 h-10 rounded-full bg-[#e6f2fb] text-[#052659] flex items-center justify-center shrink-0 shadow-xs">
+                    {item.icon}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-[#021024] mb-1 text-sm">{item.title}</h4>
+                    <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-[#021024] mb-1 text-sm">Pengiriman Langsung ke Rumah</h4>
-                  <p className="text-xs text-gray-500 leading-relaxed">Pengiriman pada hari yang sama untuk obat-obatan darurat dan pengiriman terjadwal untuk perawatan penyakit kronis.</p>
-                </div>
-              </div>
-              
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#e6f2fb] text-[#052659] flex items-center justify-center shrink-0">
-                    <Shield size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-[#021024] mb-1 text-sm">Brankas Data yang Aman</h4>
-                  <p className="text-xs text-gray-500 leading-relaxed">Catatan kesehatan Anda dilindungi dengan enkripsi setara perbankan dan kepatuhan standar HIPAA yang ketat.</p>
-                </div>
-              </div>
-              
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#e6f2fb] text-[#052659] flex items-center justify-center shrink-0">
-                    <PieChart size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-[#021024] mb-1 text-sm">Transparansi Harga</h4>
-                  <p className="text-xs text-gray-500 leading-relaxed">Tanpa biaya tersembunyi. Kami bekerja sama dengan berbagai penyedia asuransi utama untuk memastikan Anda mendapatkan tarif terbaik.</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
           
@@ -167,69 +195,22 @@ export default function AboutPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-             {/* Card 1 */}
-             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-               <div className="h-48 w-full bg-gray-200">
-                 <img src="/image/expert_sarah.png" alt="Sarah Chen" className="w-full h-full object-cover" />
-               </div>
-               <div className="p-5 space-y-3">
-                 <div>
-                   <h4 className="font-bold text-[#021024] text-sm">Dr. Sarah Chen</h4>
-                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">Chief Medical Officer</p>
-                 </div>
-                 <p className="text-[11px] text-gray-500 leading-relaxed">
-                   Mantan kepala Farmasi Klinis dengan pengalaman lebih dari 15 tahun di bidang pengobatan personal.
-                 </p>
-               </div>
-             </div>
-
-             {/* Card 2 */}
-             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-               <div className="h-48 w-full bg-gray-200">
-                 <img src="/image/expert_marcus.png" alt="Marcus Thorne" className="w-full h-full object-cover" />
-               </div>
-               <div className="p-5 space-y-3">
-                 <div>
-                   <h4 className="font-bold text-[#021024] text-sm">Marcus Thorne</h4>
-                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">Head of Operations</p>
-                 </div>
-                 <p className="text-[11px] text-gray-500 leading-relaxed">
-                   Pakar logistik yang berdedikasi tinggi untuk menyempurnakan pengantaran layanan ke pintu rumah Anda.
-                 </p>
-               </div>
-             </div>
-
-             {/* Card 3 */}
-             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-               <div className="h-48 w-full bg-gray-200">
-                 <img src="/image/expert_elena.png" alt="Elena Rodriguez" className="w-full h-full object-cover" />
-               </div>
-               <div className="p-5 space-y-3">
-                 <div>
-                   <h4 className="font-bold text-[#021024] text-sm">Elena Rodriguez</h4>
-                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">Lead Pharmacist</p>
-                 </div>
-                 <p className="text-[11px] text-gray-500 leading-relaxed">
-                   Spesialis dalam farmakologi geriatri dan manajemen kondisi kesehatan kronis.
-                 </p>
-               </div>
-             </div>
-
-             {/* Card 4 */}
-             <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-               <div className="h-48 w-full bg-gray-200">
-                 <img src="/image/expert_david.png" alt="David Park" className="w-full h-full object-cover" />
-               </div>
-               <div className="p-5 space-y-3">
-                 <div>
-                   <h4 className="font-bold text-[#021024] text-sm">David Park</h4>
-                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">CTO</p>
-                 </div>
-                 <p className="text-[11px] text-gray-500 leading-relaxed">
-                   Merancang platform berbasis AI yang aman dan canggih untuk memberdayakan Apomacy.
-                 </p>
-               </div>
-             </div>
+            {EXPERTS.map((expert, idx) => (
+              <div key={idx} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-48 w-full bg-gray-200">
+                  <img src={expert.image} alt={expert.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="p-5 space-y-3">
+                  <div>
+                    <h4 className="font-bold text-[#021024] text-sm">{expert.name}</h4>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">{expert.role}</p>
+                  </div>
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    {expert.description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -238,7 +219,7 @@ export default function AboutPage() {
       <section className="px-10 pb-24">
         <div className="max-w-6xl mx-auto bg-[#021024] rounded-[2rem] p-12 md:py-16 text-center text-white relative overflow-hidden shadow-xl">
           <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold">Siap untuk Pengalaman Apotek yang Lebih Baik?</h2>
+            <h2 className="text-3xl font-bold">Siap untuk Pengalaman Apotek yang Lebih Better?</h2>
             <p className="text-gray-300 text-sm">
               Bergabunglah bersama ribuan pengguna yang telah mempermudah perjalanan kesehatan mereka bersama Apomacy.
             </p>
