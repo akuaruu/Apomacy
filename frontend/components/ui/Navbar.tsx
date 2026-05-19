@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation"; // TAMBAHAN PENTING
 
 interface NavCategory {
     label: string;
@@ -24,6 +25,7 @@ interface NavbarProps {
 export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+    const router = useRouter(); // INISIALISASI ROUTER
 
     const formattedTotal = new Intl.NumberFormat("id-ID", {
         style: "currency",
@@ -31,9 +33,17 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
         minimumFractionDigits: 0,
     }).format(cartTotal);
 
+    // FUNGSI UNTUK MENANGANI PENCARIAN
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (searchQuery.trim()) {
+            router.push(`/katalog?q=${encodeURIComponent(searchQuery)}`);
+            setSearchQuery(""); // Reset kolom setelah mencari
+        }
+    };
+
     return (
         <header className="sticky top-0 z-50 w-full">
-            {/* Navbar LAyer 1 : warna putih */}
             <div className="bg-white shadow-sm">
                 <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-6 px-4 lg:px-8">
                     <Link
@@ -41,19 +51,12 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                         className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
                         aria-label="Apomacy Home"
                     >
-                        <Image
-                            src="/image/logo_apomacy.png"
-                            alt="Logo Apomacy"
-                            width={40}
-                            height={40}
-                            className="object-contain"
-                        />
-                        <span className="text-xl font-black tracking-[-0.02em]">
-                            Apomacy
-                        </span>
+                        <Image src="/image/logo_apomacy.png" alt="Logo Apomacy" width={40} height={40} className="object-contain" />
+                        <span className="text-xl font-black tracking-[-0.02em]">Apomacy</span>
                     </Link>
 
-                    <div className="flex flex-1 items-stretch overflow-hidden rounded-full border border-apomacy-ice focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
+                    {/* DIUBAH MENJADI FORM AGAR BISA TEKAN ENTER */}
+                    <form onSubmit={handleSearch} className="flex flex-1 items-stretch overflow-hidden rounded-full border border-apomacy-ice focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
                         <input
                             type="text"
                             value={searchQuery}
@@ -61,10 +64,10 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             placeholder="Cari obat, vitamin, atau produk kesehatan..."
                             className="min-w-0 flex-1 bg-white px-5 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none"
                         />
-                        <button className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
+                        <button type="submit" className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
                             SEARCH
                         </button>
-                    </div>
+                    </form>
 
                     <div className="flex shrink-0 items-center gap-5">
                         <Link href="/akun" className="hidden items-center gap-1.5 text-apomacy-dark transition-colors hover:text-apomacy-primary sm:flex">
@@ -94,7 +97,6 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                 </div>
             </div>
 
-            {/* Navbar layer 2 : wawrna biru */}
             <div className="bg-apomacy-primary">
                 <div className="mx-auto flex h-11 max-w-screen-xl items-center px-4 lg:px-8">
                     <div className="relative h-full">
@@ -135,27 +137,14 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
                     <div className="mx-4 hidden h-5 w-px bg-white/20 lg:block" />
 
-                    {/* 3Lgoic untuk ngerender navbar */}
                     <nav className="hidden items-center gap-2 lg:flex">
                         {navCategories.map((cat) => (
                             <Link
                                 key={cat.href}
                                 href={cat.href}
-                                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:bg-white/15 ${cat.isPromo
-                                    ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]"
-                                    : "text-white/90 hover:text-white"
-                                    }`}
+                                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:bg-white/15 ${cat.isPromo ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]" : "text-white/90 hover:text-white"}`}
                             >
-                                {/*  */}
-                                {cat.isPromo && (
-                                    <Image
-                                        src="/Deal.png"
-                                        alt="Promo"
-                                        width={16}
-                                        height={16}
-                                        className="object-contain"
-                                    />
-                                )}
+                                {cat.isPromo && <Image src="/Deal.png" alt="Promo" width={16} height={16} className="object-contain" />}
                                 <span>{cat.label}</span>
                             </Link>
                         ))}
