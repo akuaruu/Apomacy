@@ -7,17 +7,23 @@ import FooterSingkat from "@/components/ui/FooterSingkat";
 export default function FooterWrapper() {
     const pathname = usePathname();
 
-    // Sembunyyin Footer di path admin
-    if (pathname.startsWith("/admin") || pathname === "/dashboard") {
+    if (!pathname) return null;
+
+    // Sembunyikan Footer di path admin dan halaman login/register
+    if (
+        pathname.startsWith("/admin") ||
+        pathname === "/dashboard" ||
+        pathname === "/login" ||
+        pathname === "/register"
+    ) {
         return null;
     }
 
-    // cuman gunain Footer singkat uuntuk keranjang dan checkout
-    if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
+    // Gunakan Footer singkat untuk keranjang, checkout, dan kasir member
+    if (pathname === "/keranjang" || pathname === "/keranjang/checkout" || pathname === "/kasir/member") {
         return <FooterSingkat />;
     }
 
-    // Default Footer
+    // Default Footer (Digunakan pada homepage, about, katalog, dll)
     return <Footer />;
-
 }

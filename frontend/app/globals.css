@@ -3,6 +3,7 @@
 /* Kode lainnya di bawah sini jika ada */
 
 @theme {
+  /* ── Apomacy Design Tokens ── */
   --color-apomacy-dark: #001d39;
   --color-apomacy-primary: #0a4174;
   --color-apomacy-muted: #49769f;
@@ -16,6 +17,14 @@
   --color-apomacy-white: #FFFFFF;
   --color-apomacy-danger: #FF4C4C;
 
+  /* ── finalpw_uts Primary Palette ── */
+  --color-primary-100: #C1E8FF;
+  --color-primary-200: #7DA0CA;
+  --color-primary-300: #5483B3;
+  --color-primary-400: #052659;
+  --color-primary-500: #021024;
+
+  /* ── Surface / Material tokens ── */
   --color-surface: #f9f9fe;
   --color-surface-dim: #d9dade;
   --color-surface-container-lowest: #ffffff;
@@ -48,4 +57,10 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
   --radius-full: 9999px;
+}
+
+body {
+  background: #fafafa;
+  color: #021024;
+  @apply antialiased min-h-screen flex flex-col;
 }

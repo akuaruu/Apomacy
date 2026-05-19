@@ -12,6 +12,7 @@ export interface Product {
     inStock: boolean;
     description?: string;
     benefits?: string[];
+    image?: string;
 }
 
 export interface Category {
