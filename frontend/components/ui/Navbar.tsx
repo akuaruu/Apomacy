@@ -59,12 +59,13 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                     <form onSubmit={handleSearch} className="flex flex-1 items-stretch overflow-hidden rounded-full border border-apomacy-ice focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
                         <input
                             type="text"
+                            suppressHydrationWarning
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Cari obat, vitamin, atau produk kesehatan..."
                             className="min-w-0 flex-1 bg-white px-5 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none"
                         />
-                        <button type="submit" className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
+                        <button type="submit" suppressHydrationWarning className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
                             SEARCH
                         </button>
                     </form>
@@ -101,6 +102,8 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                 <div className="mx-auto flex h-11 max-w-screen-xl items-center px-4 lg:px-8">
                     <div className="relative h-full">
                         <button
+                            type="button"
+                            suppressHydrationWarning
                             onClick={() => setCategoryMenuOpen(!categoryMenuOpen)}
                             className="flex h-full items-center gap-2 bg-apomacy-teal px-5 text-sm font-semibold text-white transition-colors hover:bg-apomacy-teal/90"
                         >

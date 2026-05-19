@@ -148,8 +148,8 @@ export default function Home() {
               <p className="text-primary-100 text-sm leading-relaxed">Join our health newsletter for professional tips, medicine availability updates, and exclusive wellness offers.</p>
             </div>
             <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4 items-center">
-              <input type="email" placeholder="Your email address" className="px-5 py-3.5 rounded-xl w-full sm:w-80 bg-white text-gray-900 focus:outline-none text-sm" />
-              <button type="button" className="bg-primary-200 hover:bg-primary-300 text-primary-500 hover:text-white px-8 py-3.5 rounded-xl font-semibold transition-colors whitespace-nowrap text-sm">Subscribe</button>
+              <input type="email" suppressHydrationWarning placeholder="Your email address" className="px-5 py-3.5 rounded-xl w-full sm:w-80 bg-white text-gray-900 focus:outline-none text-sm" />
+              <button type="button" suppressHydrationWarning className="bg-primary-200 hover:bg-primary-300 text-primary-500 hover:text-white px-8 py-3.5 rounded-xl font-semibold transition-colors whitespace-nowrap text-sm">Subscribe</button>
             </div>
          </div>
       </section>
