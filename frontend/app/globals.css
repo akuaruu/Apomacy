@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Kode lainnya di bawah sini jika ada */
+
 @theme {
   /* ── Apomacy Design Tokens ── */
   --color-apomacy-dark: #001d39;
@@ -8,6 +10,12 @@
   --color-apomacy-teal: #4e8ea2;
   --color-apomacy-ice: #bdd8e9;
   --color-apomacy-bg: #f8fafc;
+
+  --color-apomacy-blue: #14387D;
+  --color-apomacy-light-blue: #C2ECEB;
+  --color-apomacy-border: #E5E5E5;
+  --color-apomacy-white: #FFFFFF;
+  --color-apomacy-danger: #FF4C4C;
 
   /* ── finalpw_uts Primary Palette ── */
   --color-primary-100: #C1E8FF;
