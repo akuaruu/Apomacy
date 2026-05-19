@@ -21,7 +21,7 @@ export default function Footer() {
                         </div>
 
                         <p className="mt-6 max-w-md text-center leading-relaxed text-apomacy-ice sm:max-w-xs sm:text-left">
-                            Your trusted digital pharmacy in Indonesia. Providing premium healthcare, daily vitamins, and wellness essentials directly to your door.
+                            Apotek digital terpercaya Anda di Indonesia. Menyediakan perawatan kesehatan premium, vitamin harian, dan kebutuhan kebugaran langsung ke pintu rumah Anda.
                         </p>
 
                         <ul className="mt-8 flex justify-center gap-6 sm:justify-start md:gap-8">
@@ -56,77 +56,77 @@ export default function Footer() {
 
                     <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4 lg:col-span-2">
                         <div className="text-center sm:text-left">
-                            <p className="text-lg font-bold text-white">About Us</p>
+                            <p className="text-lg font-bold text-white">Tentang Kami</p>
 
                             <ul className="mt-8 space-y-4 text-sm">
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Company History
+                                        Sejarah Perusahaan
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Meet the Team
+                                        Tim Kami
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Licenses & Certifications
+                                        Lisensi & Sertifikasi
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Careers
+                                        Karir
                                     </Link>
                                 </li>
                             </ul>
                         </div>
 
                         <div className="text-center sm:text-left">
-                            <p className="text-lg font-bold text-white">Our Services</p>
+                            <p className="text-lg font-bold text-white">Layanan Kami</p>
 
                             <ul className="mt-8 space-y-4 text-sm">
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Instant Delivery
+                                        Pengiriman Instan
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Prescription Refill
+                                        Penebusan Resep Obat
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Telemedicine
+                                        Telemedisin
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Health Checkups
+                                        Pemeriksaan Kesehatan
                                     </Link>
                                 </li>
                             </ul>
                         </div>
 
                         <div className="text-center sm:text-left">
-                            <p className="text-lg font-bold text-white">Helpful Links</p>
+                            <p className="text-lg font-bold text-white">Tautan Bermanfaat</p>
 
                             <ul className="mt-8 space-y-4 text-sm">
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        FAQs
+                                        FAQ
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="text-apomacy-ice transition hover:text-white" href="#">
-                                        Support
+                                        Bantuan & Dukungan
                                     </Link>
                                 </li>
                                 <li>
                                     <Link className="group flex justify-center gap-1.5 sm:justify-start" href="#">
                                         <span className="text-apomacy-ice transition group-hover:text-white">
-                                            Live Chat
+                                            Obrolan Langsung
                                         </span>
                                         <span className="relative flex h-2 w-2">
                                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-apomacy-teal opacity-75"></span>
@@ -138,7 +138,7 @@ export default function Footer() {
                         </div>
 
                         <div className="text-center sm:text-left">
-                            <p className="text-lg font-bold text-white">Contact Us</p>
+                            <p className="text-lg font-bold text-white">Hubungi Kami</p>
 
                             <ul className="mt-8 space-y-4 text-sm">
                                 <li>
@@ -174,13 +174,13 @@ export default function Footer() {
                 <div className="mt-12 border-t border-white/20 pt-6">
                     <div className="text-center sm:flex sm:justify-between sm:text-left">
                         <p className="text-sm text-apomacy-ice">
-                            <span className="block sm:inline">All rights reserved.</span>
+                            <span className="block sm:inline">Hak cipta dilindungi undang-undang.</span>
                             <Link className="inline-block text-white underline transition hover:text-apomacy-ice ml-1" href="#">
-                                Terms &amp; Conditions
+                                Syarat &amp; Ketentuan
                             </Link>
                             <span className="mx-2">&middot;</span>
                             <Link className="inline-block text-white underline transition hover:text-apomacy-ice" href="#">
-                                Privacy Policy
+                                Kebijakan Privasi
                             </Link>
                         </p>
 
