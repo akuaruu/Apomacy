@@ -14,13 +14,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  AlertTriangle,
-  CheckCircle2,
   MapPin,
   Phone,
   Mail,
   UserCircle,
 } from "lucide-react";
+import ModalConfirm from "@/components/shared/ModalConfirm";
+import Toast from "@/components/shared/Toast";
 
 export default function SupplierPage() {
   const [supplierList, setSupplierList] = useState<any[]>([]);
@@ -30,7 +30,7 @@ export default function SupplierPage() {
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [mode, setMode] = useState<"tambah" | "edit" | null>(null);
 
-  // POP UP MODAL & TOAST DINAMIS
+  // Modal & Toast
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     title: "",
@@ -58,7 +58,7 @@ export default function SupplierPage() {
     status: "Aktif",
   });
 
-  // FUNGSI PEMANGGIL TOAST
+  // Toast
   const showToast = (
     message: string,
     type: "success" | "error" = "success",
@@ -67,7 +67,7 @@ export default function SupplierPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // FETCH API MENGGUNAKAN AXIOS
+  // API FETCH
   const fetchSupplierData = async () => {
     setIsLoading(true);
     try {
@@ -90,7 +90,7 @@ export default function SupplierPage() {
     fetchSupplierData();
   }, []);
 
-  // FORM HANDLERS
+  // Form Handlers
   const handleClearForm = () => {
     setFormData({
       kode: "",
@@ -151,11 +151,11 @@ export default function SupplierPage() {
     setFormData({ ...formData, telepon: cleanDigits });
   };
 
-  // HANDLER SIMPAN (VALIDASI KETAT)
+  // Handler yang divalidasi
   const handleSaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Validasi Wajib Isi
+    // 1. Validasi Data
     if (
       !formData.kode.trim() ||
       !formData.nama.trim() ||
@@ -219,7 +219,7 @@ export default function SupplierPage() {
     setIsModalOpen(true);
   };
 
-  // EKSEKUSI DATA (SETELAH KLIK YA DI MODAL)
+  // Eksekusi aksi setelah konfirmasi di modal
   const executeAction = () => {
     if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
       const finalData = { ...formData };
@@ -247,13 +247,10 @@ export default function SupplierPage() {
     handleClearForm();
   };
 
-  // ==========================================
-  // FILTERING OMNI-SEARCH & PAGINATION
-  // ==========================================
+  // Searching & Pagination
   const filteredList = supplierList.filter((s) => {
     const q = search.toLowerCase();
 
-    // Pencocokan string ke semua field yang relevan
     return (
       s.nama?.toLowerCase().includes(q) ||
       s.kode?.toLowerCase().includes(q) ||
@@ -280,7 +277,7 @@ export default function SupplierPage() {
       {/* Header */}
       <div className="text-center py-4">
         <h1 className="text-2xl font-black tracking-widest text-apomacy-dark uppercase">
-          Daftar Rekanan Supplier
+          Daftar Supplier
         </h1>
         <p className="mt-1 text-sm text-apomacy-muted font-medium">
           Kelola data vendor, distributor, dan penyuplai obat apotek Anda.
@@ -523,7 +520,7 @@ export default function SupplierPage() {
               </div>
             </div>
 
-            {/* Baris Bawah: Alamat Lengkap */}
+            {/* Alamat Lengkap */}
             <div className="border-t border-outline-variant/30 pt-4">
               <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
                 Alamat Lengkap Perusahaan
@@ -688,75 +685,16 @@ export default function SupplierPage() {
         </div>
       </div>
 
-      {/* OVERLAY MODAL KONFIRMASI GLOBAL */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 px-4">
-          <div className="bg-white rounded-3xl p-7 max-w-md w-full shadow-2xl scale-in-95 animate-in zoom-in duration-200">
-            <div className="flex items-center gap-4 mb-5">
-              <div
-                className={`p-3.5 rounded-full shrink-0 ${modalConfig.type === "hapus" || modalConfig.type === "batal" ? "bg-red-100 text-red-600" : "bg-apomacy-primary/10 text-apomacy-primary"}`}
-              >
-                {modalConfig.type === "hapus" ||
-                modalConfig.type === "batal" ? (
-                  <AlertTriangle size={28} strokeWidth={2.5} />
-                ) : (
-                  <Save size={28} strokeWidth={2.5} />
-                )}
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-apomacy-dark uppercase tracking-wide">
-                  {modalConfig.title}
-                </h3>
-              </div>
-            </div>
+      <ModalConfirm
+        isOpen={isModalOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={executeAction}
+        onCancel={() => setIsModalOpen(false)}
+      />
 
-            <p className="text-sm font-medium text-outline mb-8 leading-relaxed">
-              {modalConfig.message}
-            </p>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-outline-variant/40">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-xl border border-outline-variant bg-white px-5 py-2.5 text-xs font-bold text-apomacy-dark hover:bg-surface-container-low transition-colors"
-              >
-                Kembali
-              </button>
-              <button
-                onClick={executeAction}
-                className={`rounded-xl px-6 py-2.5 text-xs font-bold text-white shadow-md transition-colors flex items-center gap-2 ${
-                  modalConfig.type === "hapus" || modalConfig.type === "batal"
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-apomacy-primary hover:bg-apomacy-dark"
-                }`}
-              >
-                {modalConfig.type === "hapus"
-                  ? "Ya, Hapus Data"
-                  : modalConfig.type === "batal"
-                    ? "Ya, Batalkan"
-                    : "Ya, Simpan"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TOAST NOTIFICATION */}
-      {toast && (
-        <div
-          className={`fixed top-10 right-10 z-[200] text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-5 fade-in duration-300 max-w-md ${toast.type === "error" ? "bg-red-600" : "bg-green-600"}`}
-        >
-          <div className="shrink-0">
-            {toast.type === "error" ? (
-              <AlertTriangle size={24} strokeWidth={2.5} />
-            ) : (
-              <CheckCircle2 size={24} strokeWidth={2.5} />
-            )}
-          </div>
-          <p className="text-sm font-bold tracking-wide leading-snug">
-            {toast.message}
-          </p>
-        </div>
-      )}
+      <Toast toast={toast} />
     </div>
   );
 }

@@ -1,34 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import {
-  Search,
-  Plus,
-  Trash2,
-  Save,
-  X,
-  ChevronDown,
   Lock,
   ShoppingCart,
-  FileText,
   PackagePlus,
-  AlertTriangle,
   CheckCircle2,
   Pencil,
+  Trash2,
+  Plus,
+  Save,
 } from "lucide-react";
 
+// Import komponen UI
+import SearchableSelect from "@/components/shared/SearchableSelect";
+import SearchableObatSelect from "@/components/shared/SearchableObatSelect";
+import Toast from "@/components/shared/Toast";
+import ModalConfirm from "@/components/shared/ModalConfirm";
+
 export default function RestockPage() {
-  // =====================================
-  // STATE MASTER DATA (Dari API)
-  // =====================================
+  // Master Data State
   const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
   const [obatOptions, setObatOptions] = useState<any[]>([]);
   const [isLoadingMaster, setIsLoadingMaster] = useState(true);
 
-  // =====================================
-  // STATE HEADER (Faktur & Supplier)
-  // =====================================
+  // Header State
   const [headerData, setHeaderData] = useState({
     noTerima: "",
     tanggal: new Date().toISOString().split("T")[0],
@@ -36,9 +33,7 @@ export default function RestockPage() {
     noFaktur: "",
   });
 
-  // =====================================
-  // STATE FORM ITEM (Input Detail Obat)
-  // =====================================
+  // Default State
   const [formItem, setFormItem] = useState({
     obat: null as any,
     hargaBeli: 0,
@@ -46,18 +41,13 @@ export default function RestockPage() {
     expired: "",
   });
 
-  // Penanda status jika sedang dalam mode Edit baris tabel
   const [editingItemKode, setEditingItemKode] = useState<string | null>(null);
-
-  // =====================================
-  // STATE CART, MODAL & TOAST DINAMIS
-  // =====================================
   const [cartItems, setCartItems] = useState<any[]>([]);
 
-  // Konfigurasi Dinamis Modal Pop-up
+  // Modal & Toast
   const [modalConfig, setModalConfig] = useState({
     isOpen: false,
-    type: "process" as "process" | "reset" | "deleteRow",
+    type: "tambah",
     title: "",
     message: "",
     targetId: "",
@@ -68,9 +58,7 @@ export default function RestockPage() {
     type: "success" | "error";
   } | null>(null);
 
-  // =====================================
-  // LIFECYCLE & FETCH API
-  // =====================================
+  // API FETCH
   useEffect(() => {
     generateNoTerima();
     fetchMasterData();
@@ -79,16 +67,11 @@ export default function RestockPage() {
   const fetchMasterData = async () => {
     setIsLoadingMaster(true);
     try {
-      // Mengambil data obat dan supplier secara bersamaan (paralel)
       const [resObat, resSupplier] = await Promise.all([
         axios.get("https://api.npoint.io/b6965231a2d369815479"),
         axios.get("https://api.npoint.io/f39f256e6c10202dbe42"),
       ]);
-
-      // Set data obat
       setObatOptions(resObat.data);
-
-      // Set data supplier (kita hanya ambil 'nama' nya saja untuk dropdown string)
       const supplierNames = resSupplier.data.map((sup: any) => sup.nama);
       setSupplierOptions(supplierNames);
     } catch (error) {
@@ -117,7 +100,6 @@ export default function RestockPage() {
     }));
   };
 
-  // FUNGSI PEMANGGIL TOAST
   const showToast = (
     message: string,
     type: "success" | "error" = "success",
@@ -126,7 +108,6 @@ export default function RestockPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // HANDLERS INPUT
   const handleNumberChange = (field: string, val: string) => {
     const cleanDigits = val.replace(/\D/g, "");
     setFormItem({
@@ -135,11 +116,7 @@ export default function RestockPage() {
     });
   };
 
-  // =========================================================================
-  // LOGIKA PENAMBAHAN / PENYUNTINGAN ITEM KERANJANG (VALIDASI KETAT)
-  // =========================================================================
   const handleAddToCart = () => {
-    // Validasi Tunggal: Cek seluruh form secara bersamaan
     if (
       !headerData.supplier ||
       !headerData.noFaktur.trim() ||
@@ -155,7 +132,6 @@ export default function RestockPage() {
     }
 
     if (editingItemKode) {
-      // MODE UPDATE/EDIT
       setCartItems(
         cartItems.map((item) =>
           item.kode === editingItemKode
@@ -175,17 +151,15 @@ export default function RestockPage() {
       showToast("Perubahan data item berhasil disimpan.", "success");
       cancelEditItem();
     } else {
-      // MODE TAMBAH BARU & CEK DUPLIKASI
       const existingIndex = cartItems.findIndex(
         (item) => item.kode === formItem.obat.kode,
       );
       if (existingIndex >= 0) {
         return showToast(
-          "Data obat sudah terdapat di dalam daftar. Silakan gunakan fitur edit pada baris tabel untuk mengubah jumlah atau harga.",
+          "Data obat sudah terdapat di dalam daftar. Silakan gunakan fitur edit pada baris tabel.",
           "error",
         );
       }
-
       const newItem = {
         kode: formItem.obat.kode,
         nama: formItem.obat.nama,
@@ -222,9 +196,7 @@ export default function RestockPage() {
     setEditingItemKode(null);
   };
 
-  // =====================================
-  // TRIGGER MODAL POP-UP
-  // =====================================
+  // Validasi
   const requestProcess = () => {
     if (cartItems.length === 0)
       return showToast(
@@ -233,7 +205,7 @@ export default function RestockPage() {
       );
     setModalConfig({
       isOpen: true,
-      type: "process",
+      type: "tambah",
       targetId: "",
       title: "Konfirmasi Restock",
       message: `Apakah Anda yakin ingin memproses penerimaan barang ini? Stok sebanyak ${cartItems.length} jenis obat akan otomatis ditambahkan ke database.`,
@@ -243,7 +215,7 @@ export default function RestockPage() {
   const requestReset = () => {
     setModalConfig({
       isOpen: true,
-      type: "reset",
+      type: "batal",
       targetId: "",
       title: "Konfirmasi Reset Form",
       message:
@@ -254,19 +226,16 @@ export default function RestockPage() {
   const requestDeleteRow = (kode: string, nama: string) => {
     setModalConfig({
       isOpen: true,
-      type: "deleteRow",
+      type: "hapus",
       targetId: kode,
       title: "Hapus Item Obat",
       message: `Apakah Anda yakin ingin menghapus data ${nama} dari daftar penerimaan sementara ini?`,
     });
   };
 
-  // =====================================
-  // EKSEKUSI NYATA DARI MODAL POP-UP
-  // =====================================
+  // Eksekusi aksi setelah konfirmasi di modal
   const executeModalAction = () => {
-    if (modalConfig.type === "process") {
-      // Logika POST data backend ada di sini nantinya
+    if (modalConfig.type === "tambah") {
       console.log("RESTOCK PROCESSED:", {
         header: headerData,
         items: cartItems,
@@ -277,10 +246,10 @@ export default function RestockPage() {
         "Berhasil! Data restock telah diproses dan disimpan ke sistem.",
         "success",
       );
-    } else if (modalConfig.type === "reset") {
+    } else if (modalConfig.type === "batal") {
       handleClearAll();
       showToast("Formulir berhasil dikosongkan.", "success");
-    } else if (modalConfig.type === "deleteRow") {
+    } else if (modalConfig.type === "hapus") {
       setCartItems(
         cartItems.filter((item) => item.kode !== modalConfig.targetId),
       );
@@ -295,7 +264,6 @@ export default function RestockPage() {
 
   return (
     <div className="p-8 space-y-6 max-w-[1400px] mx-auto pb-10">
-      {/* Header Title */}
       <div className="text-center py-4 mb-2">
         <h1 className="text-2xl font-black tracking-widest text-apomacy-dark uppercase">
           Manajemen Restock Obat
@@ -305,7 +273,6 @@ export default function RestockPage() {
         </p>
       </div>
 
-      {/* MAIN UNIFIED FORM CARD */}
       <div className="rounded-3xl border border-outline-variant bg-white p-6 shadow-md relative">
         <div className="flex justify-between items-center mb-6 border-b border-outline-variant/50 pb-3">
           <h3 className="text-sm font-black uppercase tracking-widest text-apomacy-dark">
@@ -313,7 +280,7 @@ export default function RestockPage() {
           </h3>
         </div>
 
-        {/* 1. SECTION HEADER */}
+        {/* Header */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start mb-8">
           <div>
             <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
@@ -376,7 +343,7 @@ export default function RestockPage() {
           </div>
         </div>
 
-        {/* 2. SECTION INPUT OBAT */}
+        {/* Section Input Data */}
         <div
           className={`border rounded-2xl p-5 mb-8 transition-colors ${editingItemKode ? "bg-apomacy-primary/5 border-apomacy-primary/40" : "bg-surface-container-low/30 border-outline-variant"}`}
         >
@@ -398,7 +365,7 @@ export default function RestockPage() {
               <SearchableObatSelect
                 options={obatOptions}
                 value={formItem.obat}
-                onChange={(val) => setFormItem({ ...formItem, obat: val })}
+                onChange={(val: any) => setFormItem({ ...formItem, obat: val })}
                 disabled={editingItemKode !== null || isLoadingMaster}
                 placeholder={
                   isLoadingMaster ? "Memuat..." : "Pilih / Cari Obat..."
@@ -448,7 +415,6 @@ export default function RestockPage() {
             </div>
           </div>
 
-          {/* Action Buttons (Tambah / Edit) */}
           <div className="flex justify-end mt-5 gap-3">
             {editingItemKode && (
               <button
@@ -473,7 +439,7 @@ export default function RestockPage() {
           </div>
         </div>
 
-        {/* 3. SECTION TABEL CART */}
+        {/* Tabel Sementara */}
         <div className="rounded-2xl border border-outline-variant bg-white overflow-hidden mb-6">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -557,7 +523,7 @@ export default function RestockPage() {
           </div>
         </div>
 
-        {/* 4. SECTION FOOTER TOTAL & TOMBOL SIMPAN */}
+        {/* Footer Total */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-t border-outline-variant/50 pt-5">
           <div className="flex items-center gap-6">
             <div>
@@ -589,299 +555,24 @@ export default function RestockPage() {
             <button
               onClick={requestProcess}
               disabled={cartItems.length === 0}
-              className={`flex-1 md:flex-none rounded-xl px-8 py-3 text-sm font-black tracking-wide uppercase transition-all flex items-center justify-center gap-2 ${
-                cartItems.length > 0
-                  ? "bg-apomacy-primary text-white shadow-md hover:bg-apomacy-dark"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-              }`}
+              className={`flex-1 md:flex-none rounded-xl px-8 py-3 text-sm font-black tracking-wide uppercase transition-all flex items-center justify-center gap-2 ${cartItems.length > 0 ? "bg-apomacy-primary text-white shadow-md hover:bg-apomacy-dark" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}
             >
-              <CheckCircle2 size={18} strokeWidth={2.5} />
-              Proses & Update Stok
+              <CheckCircle2 size={18} strokeWidth={2.5} /> Proses & Update Stok
             </button>
           </div>
         </div>
       </div>
 
-      {/* MODAL KONFIRMASI DINAMIS (OVERLAY) */}
-      {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 px-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl scale-in-95 animate-in zoom-in duration-200">
-            <div className="flex items-center gap-4 mb-6">
-              <div
-                className={`p-4 rounded-full shrink-0 ${modalConfig.type === "process" ? "bg-apomacy-primary/10 text-apomacy-primary" : "bg-red-100 text-red-600"}`}
-              >
-                <AlertTriangle size={28} strokeWidth={2.5} />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-apomacy-dark uppercase tracking-wide">
-                  {modalConfig.title}
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-sm font-medium text-outline mb-6 leading-relaxed">
-              {modalConfig.message}
-            </p>
-
-            {modalConfig.type === "process" && (
-              <div className="bg-surface-container-low p-4 rounded-2xl mb-8 flex justify-between items-center border border-outline-variant/50">
-                <span className="text-xs font-bold text-outline uppercase tracking-wider">
-                  Total Tagihan
-                </span>
-                <span className="text-lg font-black text-apomacy-dark">
-                  Rp {grandTotal.toLocaleString("id-ID")}
-                </span>
-              </div>
-            )}
-
-            <div
-              className={`flex justify-end gap-3 pt-4 border-t border-outline-variant/40 ${modalConfig.type !== "process" ? "mt-8" : ""}`}
-            >
-              <button
-                onClick={() =>
-                  setModalConfig({ ...modalConfig, isOpen: false })
-                }
-                className="rounded-xl border border-outline-variant bg-white px-6 py-2.5 text-sm font-bold text-apomacy-dark hover:bg-surface-container-low transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                onClick={executeModalAction}
-                className={`rounded-xl px-8 py-2.5 text-sm font-bold text-white shadow-md transition-colors ${
-                  modalConfig.type === "process"
-                    ? "bg-apomacy-primary hover:bg-apomacy-dark"
-                    : "bg-red-600 hover:bg-red-700"
-                }`}
-              >
-                {modalConfig.type === "process"
-                  ? "Proses Sekarang"
-                  : "Ya, Hapus"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TOAST NOTIFICATION (DINAMIS) */}
-      {toast && (
-        <div
-          className={`fixed top-10 right-10 z-[200] text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-5 fade-in duration-300 max-w-sm ${toast.type === "error" ? "bg-red-600" : "bg-green-600"}`}
-        >
-          <div className="shrink-0">
-            {toast.type === "error" ? (
-              <AlertTriangle size={24} strokeWidth={2.5} />
-            ) : (
-              <CheckCircle2 size={24} strokeWidth={2.5} />
-            )}
-          </div>
-          <p className="text-sm font-bold tracking-wide leading-snug">
-            {toast.message}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
-// KOMPONEN REUSABLE
-// ──────────────────────────────────────────────────────────────
-
-interface SearchableSelectProps {
-  options: string[];
-  value: string;
-  onChange: (val: string) => void;
-  placeholder: string;
-  disabled?: boolean;
-}
-
-function SearchableSelect({
-  options,
-  value,
-  onChange,
-  placeholder,
-  disabled = false,
-}: SearchableSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const filteredOptions = options.filter((opt) =>
-    opt.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      )
-        setIsOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative w-full">
-      <div
-        onClick={() => {
-          if (!disabled) {
-            setIsOpen(!isOpen);
-            if (!isOpen) setSearchTerm("");
-          }
-        }}
-        className={`w-full px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-75" : "bg-surface-container-low border-outline-variant text-apomacy-dark cursor-pointer focus-within:ring-4 focus-within:ring-apomacy-primary/10 focus-within:border-apomacy-primary"}`}
-      >
-        <span className={value ? "" : "text-outline/60"}>
-          {value || placeholder}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`text-outline transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-        />
-      </div>
-
-      {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-2 bg-white border border-outline-variant rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="p-2 border-b border-outline-variant/50 bg-surface-container-low/50">
-            <input
-              type="text"
-              autoFocus
-              placeholder="Ketik untuk mencari..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-bold text-apomacy-dark bg-white border border-outline-variant rounded-xl outline-none focus:border-apomacy-primary"
-            />
-          </div>
-          <ul className="max-h-48 overflow-y-auto p-1">
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((opt) => (
-                <li
-                  key={opt}
-                  onClick={() => {
-                    onChange(opt);
-                    setIsOpen(false);
-                  }}
-                  className={`px-4 py-2.5 text-xs font-bold text-apomacy-dark cursor-pointer transition-colors rounded-lg hover:bg-apomacy-primary/10 ${value === opt ? "bg-apomacy-primary text-white hover:bg-apomacy-dark" : ""}`}
-                >
-                  {opt}
-                </li>
-              ))
-            ) : (
-              <li className="px-4 py-3 text-xs font-medium text-outline text-center">
-                Data tidak ditemukan
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SearchableObatSelect({
-  options,
-  value,
-  onChange,
-  disabled = false,
-  placeholder = "Pilih / Cari Obat...",
-}: any) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const filteredOptions = options.filter(
-    (opt: any) =>
-      opt.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opt.kode.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      )
-        setIsOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative w-full h-full">
-      <div
-        onClick={() => {
-          if (!disabled) {
-            setIsOpen(!isOpen);
-            if (!isOpen) setSearchTerm("");
-          }
-        }}
-        className={`w-full h-full min-h-[42px] px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "border-outline-variant bg-white text-apomacy-dark cursor-pointer focus-within:ring-4 focus-within:ring-apomacy-primary/10 focus-within:border-apomacy-primary"}`}
-      >
-        {value ? (
-          <span
-            className={`flex items-center gap-2 ${disabled ? "opacity-70" : ""}`}
-          >
-            {disabled && <Lock size={12} />}
-            <span className="text-[10px] font-mono font-black text-apomacy-primary bg-apomacy-primary/10 px-2 py-0.5 rounded-md border border-apomacy-primary/20">
-              {value.kode}
-            </span>
-            {value.nama}
-          </span>
-        ) : (
-          <span className="text-outline/60">{placeholder}</span>
-        )}
-        <ChevronDown
-          size={16}
-          className={`text-outline transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-        />
-      </div>
-
-      {isOpen && !disabled && (
-        <div className="absolute z-50 w-full md:w-[400px] mt-2 bg-white border border-outline-variant rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="p-2 border-b border-outline-variant/50 bg-surface-container-low/50">
-            <input
-              type="text"
-              autoFocus
-              placeholder="Cari Kode atau Nama Obat..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-bold text-apomacy-dark bg-white border border-outline-variant rounded-xl outline-none focus:border-apomacy-primary"
-            />
-          </div>
-          <ul className="max-h-60 overflow-y-auto p-1">
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((opt: any) => (
-                <li
-                  key={opt.kode}
-                  onClick={() => {
-                    onChange(opt);
-                    setIsOpen(false);
-                  }}
-                  className={`px-4 py-2.5 text-xs cursor-pointer transition-colors rounded-lg hover:bg-apomacy-primary/10 ${value?.kode === opt.kode ? "bg-apomacy-primary/10" : ""}`}
-                >
-                  <div className="flex flex-col gap-1">
-                    <span
-                      className={`font-black ${value?.kode === opt.kode ? "text-apomacy-primary" : "text-apomacy-dark"}`}
-                    >
-                      {opt.nama}
-                    </span>
-                    <span className="font-mono text-[10px] font-bold text-outline">
-                      {opt.kode}
-                    </span>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="px-4 py-4 text-xs font-medium text-outline text-center">
-                Data obat tidak ditemukan
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
+      {/* Panggil komponen Modal dan Toast */}
+      <ModalConfirm
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={executeModalAction}
+        onCancel={() => setModalConfig({ ...modalConfig, isOpen: false })}
+      />
+      <Toast toast={toast} />
     </div>
   );
 }
