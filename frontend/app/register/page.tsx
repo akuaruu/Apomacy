@@ -1,14 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { User, Mail, Phone, Calendar, Lock, Zap, History, BellRing, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Phone, Calendar, Lock, Zap, History, BellRing, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="flex-grow bg-transparent flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="flex-grow bg-transparent flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl w-full mb-4 flex justify-start">
+        <Link href="/" className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary-500 transition-colors font-medium">
+          <ArrowLeft size={16} /> Kembali ke Beranda
+        </Link>
+      </div>
       <div className="max-w-6xl w-full flex flex-col md:flex-row gap-10 items-center">
         
         {/* Left Side - Info */}

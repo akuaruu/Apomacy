@@ -3,15 +3,19 @@
 import { usePathname } from "next/navigation";
 import Footer from "@/components/ui/Footer";
 import FooterSingkat from "@/components/ui/FooterSingkat";
-import FooterLanding from "@/components/ui/FooterLanding";
 
 export default function FooterWrapper() {
     const pathname = usePathname();
 
     if (!pathname) return null;
 
-    // Sembunyikan Footer di path admin
-    if (pathname.startsWith("/admin") || pathname === "/dashboard") {
+    // Sembunyikan Footer di path admin dan halaman login/register
+    if (
+        pathname.startsWith("/admin") ||
+        pathname === "/dashboard" ||
+        pathname === "/login" ||
+        pathname === "/register"
+    ) {
         return null;
     }
 
@@ -20,10 +24,6 @@ export default function FooterWrapper() {
         return <FooterSingkat />;
     }
 
-    // Gunakan Footer landing untuk homepage, login, register, about
-    if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/about") {
-        return <FooterLanding />;
-    }
-    // Default Footer
+    // Default Footer (Digunakan pada homepage, about, katalog, dll)
     return <Footer />;
 }
