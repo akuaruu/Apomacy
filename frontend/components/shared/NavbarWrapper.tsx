@@ -10,6 +10,8 @@ export default function NavbarWrapper() {
     const pathname = usePathname();
     const { cartCount, cartTotal } = useCart();
 
+    if (!pathname) return null;
+
     // Sembunyikan navbar di path admin
     if (pathname.startsWith("/admin") || pathname === "/dashboard") {
         return null;

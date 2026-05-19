@@ -8,6 +8,8 @@ import FooterLanding from "@/components/ui/FooterLanding";
 export default function FooterWrapper() {
     const pathname = usePathname();
 
+    if (!pathname) return null;
+
     // Sembunyikan Footer di path admin
     if (pathname.startsWith("/admin") || pathname === "/dashboard") {
         return null;
