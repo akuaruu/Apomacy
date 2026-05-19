@@ -12,12 +12,15 @@ export default function NavbarWrapper() {
 
     if (!pathname) return null;
 
-    // Sembunyikan navbar di path admin
-    if (pathname.startsWith("/admin") || pathname === "/dashboard") {
-        return null;
-    }
-
-    if (pathname.startsWith("/kasir/member") || pathname === "/kasir") {
+    // Sembunyikan navbar di path admin, kasir, dan login/register
+    if (
+        pathname.startsWith("/admin") ||
+        pathname === "/dashboard" ||
+        pathname === "/login" ||
+        pathname === "/register" ||
+        pathname.startsWith("/kasir/member") ||
+        pathname === "/kasir"
+    ) {
         return null;
     }
     // Gunakan navbar singkat untuk keranjang dan checkout
