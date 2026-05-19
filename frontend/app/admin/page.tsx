@@ -128,7 +128,7 @@ function TopSellingMedicine() {
 
 
 
-// ini bagian Dashboard aja san
+// ini bagian Dashboard aja san( iya )
 export default function DashboardPage() {
     return (
         <div className="p-8 space-y-8 max-w-[1400px] mx-auto pb-10">

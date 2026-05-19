@@ -15,6 +15,9 @@ export default function NavbarWrapper() {
         return null;
     }
 
+    if (pathname.startsWith("/kasir/member") || pathname === "/kasir") {
+        return null;
+    }
     // Gunakan navbar singkat untuk keranjang dan checkout
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
         return <NavbarSingkat />;

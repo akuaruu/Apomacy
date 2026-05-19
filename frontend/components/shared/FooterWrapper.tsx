@@ -13,8 +13,8 @@ export default function FooterWrapper() {
         return null;
     }
 
-    // Gunakan Footer singkat untuk keranjang dan checkout
-    if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
+    // Gunakan Footer singkat untuk keranjang, checkout, dan kasir member
+    if (pathname === "/keranjang" || pathname === "/keranjang/checkout" || pathname === "/kasir/member") {
         return <FooterSingkat />;
     }
 
@@ -22,7 +22,6 @@ export default function FooterWrapper() {
     if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/about") {
         return <FooterLanding />;
     }
-
     // Default Footer
     return <Footer />;
 }

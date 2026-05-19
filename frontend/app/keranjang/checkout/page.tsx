@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image"; // Wajib import komponen Image Next.js
 import { formatRupiah } from "@/lib/Data";
 import { useCart } from "@/context/CartContext";
 
@@ -12,6 +13,7 @@ export default function CheckoutPage() {
     const [method, setMethod] = useState<'delivery' | 'pickup'>('delivery');
     const [payment, setPayment] = useState("qris");
 
+    // Hanya ambil item yang dipilih (dicentang) di halaman keranjang
     const checkoutItems = cartItems.filter(i => selectedIds.includes(i.product.id));
 
     const subtotal = cartTotal;
@@ -110,11 +112,28 @@ export default function CheckoutPage() {
                     <div className="max-h-60 overflow-y-auto pr-2 space-y-4 mb-6 scrollbar-hide">
                         {checkoutItems.map(item => (
                             <div key={item.product.id} className="flex gap-3 items-center">
-                                <div className="w-12 h-12 bg-surface-container-low rounded-lg flex-shrink-0 flex items-center justify-center">
-                                    <svg className="h-6 w-6 text-outline-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                    </svg>
+
+                                {/* --- BAGIAN GAMBAR YANG DIPERBARUI --- */}
+                                <div className="relative w-12 h-12 bg-white border border-outline-variant rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden p-1">
+                                    {(item.product as any).image ? (
+                                        <Image
+                                            src={(item.product as any).image}
+                                            alt={item.product.name}
+                                            fill
+                                            unoptimized={true}
+                                            className="object-contain mix-blend-multiply p-1"
+                                            sizes="48px"
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center bg-surface-container-low">
+                                            <svg className="h-6 w-6 text-outline-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                            </svg>
+                                        </div>
+                                    )}
                                 </div>
+                                {/* ------------------------------------- */}
+
                                 <div className="flex-1 text-xs">
                                     <p className="font-bold text-apomacy-dark line-clamp-1">{item.product.name}</p>
                                     <p className="text-outline">Qty: {item.quantity}</p>

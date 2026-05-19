@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { formatRupiah } from "@/lib/Data";
 import { useCart } from "@/context/CartContext";
 
@@ -83,17 +84,31 @@ export default function KeranjangPage() {
                                                 className="h-5 w-5 shrink-0 rounded-md border-gray-300 text-apomacy-primary focus:ring-apomacy-primary focus:ring-offset-0 cursor-pointer accent-apomacy-primary transition-all"
                                             />
 
-                                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-container-low">
-                                                <div className="flex h-full w-full items-center justify-center">
-                                                    <svg className="h-10 w-10 text-outline-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                                    </svg>
-                                                </div>
+                                            {/* BAGIAN GAMBAR YANG DIPERBARUI */}
+                                            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-white border border-outline-variant p-1">
+                                                {item.product.image ? (
+                                                    <Image
+                                                        src={item.product.image}
+                                                        alt={item.product.name}
+                                                        fill
+                                                        unoptimized={true}
+                                                        className="object-contain mix-blend-multiply p-1"
+                                                        sizes="80px"
+                                                    />
+                                                ) : (
+                                                    <div className="flex h-full w-full items-center justify-center bg-surface-container-low">
+                                                        <svg className="h-10 w-10 text-outline-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                                        </svg>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="flex flex-1 flex-col justify-between gap-2">
                                                 <div>
-                                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-apomacy-teal">{item.product.brand}</p>
+                                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-apomacy-teal">
+                                                        {item.product.category || item.product.brand}
+                                                    </p>
                                                     <Link href={`/katalog/${item.product.id}`} className="text-sm font-medium text-on-surface hover:text-apomacy-primary line-clamp-2">
                                                         {item.product.name}
                                                     </Link>
