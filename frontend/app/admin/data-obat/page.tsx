@@ -10,16 +10,16 @@ import {
   Trash2,
   Save,
   X,
-  ImageIcon,
   Upload,
-  ChevronDown,
-  Lock,
   ChevronLeft,
   ChevronRight,
   Loader2,
-  AlertTriangle,
-  CheckCircle2,
 } from "lucide-react";
+
+// Import komponen UI
+import SearchableSelect from "@/components/shared/SearchableSelect";
+import Toast from "@/components/shared/Toast";
+import ModalConfirm from "@/components/shared/ModalConfirm";
 
 export default function DataObatPage() {
   const [obatList, setObatList] = useState<any[]>([]);
@@ -29,9 +29,7 @@ export default function DataObatPage() {
   const [selectedObat, setSelectedObat] = useState<any>(null);
   const [mode, setMode] = useState<"tambah" | "edit" | null>(null);
 
-  // ==========================================
-  // POP UP MODAL & TOAST DINAMIS
-  // ==========================================
+  // Modal & Toast
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     title: "",
@@ -43,9 +41,7 @@ export default function DataObatPage() {
     type: "success" | "error";
   } | null>(null);
 
-  // ==========================================
-  // PAGINATION & DATA MASTER
-  // ==========================================
+  // Pagination dan Master Data
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
 
@@ -112,9 +108,7 @@ export default function DataObatPage() {
     dosis: "",
   });
 
-  // ==========================================
-  // FUNGSI PEMANGGIL TOAST
-  // ==========================================
+  // Toast
   const showToast = (
     message: string,
     type: "success" | "error" = "success",
@@ -123,9 +117,7 @@ export default function DataObatPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ==========================================
   // API FETCH
-  // ==========================================
   const fetchObatData = async () => {
     setIsLoading(true);
     try {
@@ -148,9 +140,7 @@ export default function DataObatPage() {
     fetchObatData();
   }, []);
 
-  // ==========================================
-  // FORM HANDLERS
-  // ==========================================
+  // Form Handlers
   const handleClearForm = () => {
     setFormData({
       kode: "",
@@ -179,7 +169,6 @@ export default function DataObatPage() {
     setMode(null);
   };
 
-  // Konfirmasi Batal Form
   const handleCancelForm = () => {
     setModalConfig({
       title: "Konfirmasi Pembatalan",
@@ -210,7 +199,6 @@ export default function DataObatPage() {
       }
       return;
     }
-
     setMode(actionMode);
     if (actionMode === "tambah") {
       handleClearForm();
@@ -263,13 +251,10 @@ export default function DataObatPage() {
     setIsAddingCategory(false);
   };
 
-  // ==========================================
-  // VALIDASI KETAT SEBELUM SIMPAN
-  // ==========================================
+  // Validasi sebelum submit
   const handleSaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Validasi Wajib Isi Semua Kolom
     if (
       !formData.kode.trim() ||
       !formData.nama.trim() ||
@@ -290,8 +275,6 @@ export default function DataObatPage() {
       );
       return;
     }
-
-    // 2. Validasi Angka & Media
     if (formData.hargaJual <= 0) {
       showToast("Gagal! Harga Jual harus lebih dari 0.", "error");
       return;
@@ -301,14 +284,11 @@ export default function DataObatPage() {
       return;
     }
 
-    // 3. Validasi Duplikasi (Kode atau Nama)
     const isDuplicate = obatList.some((item) => {
       const isSameKode =
         item.kode.toUpperCase() === formData.kode.trim().toUpperCase();
       const isSameNama =
         item.nama.toLowerCase() === formData.nama.trim().toLowerCase();
-
-      // Pengecualian: Jika mode edit, abaikan data dirinya sendiri
       if (mode === "edit" && selectedObat) {
         return (isSameKode || isSameNama) && item.kode !== selectedObat.kode;
       }
@@ -323,7 +303,6 @@ export default function DataObatPage() {
       return;
     }
 
-    // Lolos semua validasi -> Tampilkan Modal Konfirmasi
     setModalConfig({
       title:
         mode === "tambah" ? "Konfirmasi Tambah Data" : "Konfirmasi Edit Data",
@@ -336,13 +315,10 @@ export default function DataObatPage() {
     setIsModalOpen(true);
   };
 
-  // ==========================================
-  // EKSEKUSI DATA (SETELAH KLIK 'YA' DI MODAL)
-  // ==========================================
+  // Eksekusi aksi setelah konfirmasi di modal
   const executeAction = () => {
     if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
       const finalData = { ...formData, gambar: imagePreview };
-
       if (modalConfig.type === "tambah") {
         setObatList([finalData, ...obatList]);
         setCurrentPage(1);
@@ -359,20 +335,13 @@ export default function DataObatPage() {
       setObatList(obatList.filter((item) => item.kode !== selectedObat.kode));
       showToast("Data obat berhasil dihapus dari sistem.", "success");
     }
-
-    // Jika tipe "batal", murni tutup modal dan clear form
     setIsModalOpen(false);
     handleClearForm();
   };
 
-  // ==========================================
-  // FILTERING OMNI-SEARCH & PAGINATION
-  // ==========================================
+  // Searching dan Pagination
   const filteredObatList = obatList.filter((o) => {
-    // Ubah search term ke huruf kecil
     const q = search.toLowerCase();
-
-    // Kembalikan true jika search term cocok dengan HAMPIR SEMUA fields
     return (
       o.kode?.toLowerCase().includes(q) ||
       o.nama?.toLowerCase().includes(q) ||
@@ -381,7 +350,6 @@ export default function DataObatPage() {
       o.supplier?.toLowerCase().includes(q) ||
       o.stok?.toString().includes(q) ||
       o.hargaJual?.toString().includes(q) ||
-      // Logika khusus untuk array kategori (mengecek jika ada salah satu tag yg cocok)
       (Array.isArray(o.kategori) &&
         o.kategori.some((cat: string) => cat.toLowerCase().includes(q)))
     );
@@ -390,7 +358,6 @@ export default function DataObatPage() {
   const totalPages = Math.ceil(filteredObatList.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-
   const currentItems = filteredObatList.slice(
     indexOfFirstItem,
     indexOfLastItem,
@@ -408,7 +375,7 @@ export default function DataObatPage() {
         </h1>
       </div>
 
-      {/* Bar Pencarian */}
+      {/* Searchbar */}
       <div className="flex gap-4 items-center bg-white p-4 rounded-2xl border border-outline-variant shadow-sm">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-3.5 h-4 w-4 text-outline" />
@@ -464,7 +431,7 @@ export default function DataObatPage() {
         </button>
       </div>
 
-      {/* Area Form Dinamis */}
+      {/* Form Dinamis */}
       {mode && (
         <div className="rounded-3xl border border-outline-variant bg-white p-6 shadow-md relative animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-6 border-b border-outline-variant/50 pb-3">
@@ -568,7 +535,7 @@ export default function DataObatPage() {
                         key={tag}
                         className="inline-flex items-center gap-1 bg-apomacy-primary/10 text-apomacy-primary text-[11px] font-black px-2.5 py-1 rounded-lg"
                       >
-                        {tag}
+                        {tag}{" "}
                         <button
                           type="button"
                           onClick={() => handleRemoveCategoryTag(tag)}
@@ -773,7 +740,7 @@ export default function DataObatPage() {
               </div>
             </div>
 
-            {/* Baris Bawah: Textarea */}
+            {/* Textarea */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-outline-variant/30 pt-4">
               <div>
                 <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
@@ -960,180 +927,16 @@ export default function DataObatPage() {
         </div>
       </div>
 
-      {/* OVERLAY MODAL KONFIRMASI GLOBAL (MODERN STYLE) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 px-4">
-          <div className="bg-white rounded-3xl p-7 max-w-md w-full shadow-2xl scale-in-95 animate-in zoom-in duration-200">
-            <div className="flex items-center gap-4 mb-5">
-              <div
-                className={`p-3.5 rounded-full shrink-0 ${modalConfig.type === "hapus" || modalConfig.type === "batal" ? "bg-red-100 text-red-600" : "bg-apomacy-primary/10 text-apomacy-primary"}`}
-              >
-                {modalConfig.type === "hapus" ||
-                modalConfig.type === "batal" ? (
-                  <AlertTriangle size={28} strokeWidth={2.5} />
-                ) : (
-                  <Save size={28} strokeWidth={2.5} />
-                )}
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-apomacy-dark uppercase tracking-wide">
-                  {modalConfig.title}
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-sm font-medium text-outline mb-8 leading-relaxed">
-              {modalConfig.message}
-            </p>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-outline-variant/40">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-xl border border-outline-variant bg-white px-5 py-2.5 text-xs font-bold text-apomacy-dark hover:bg-surface-container-low transition-colors"
-              >
-                Kembali
-              </button>
-              <button
-                onClick={executeAction}
-                className={`rounded-xl px-6 py-2.5 text-xs font-bold text-white shadow-md transition-colors flex items-center gap-2 ${
-                  modalConfig.type === "hapus" || modalConfig.type === "batal"
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-apomacy-primary hover:bg-apomacy-dark"
-                }`}
-              >
-                {modalConfig.type === "hapus"
-                  ? "Ya, Hapus Data"
-                  : modalConfig.type === "batal"
-                    ? "Ya, Batalkan"
-                    : "Ya, Simpan"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TOAST NOTIFICATION DINAMIS */}
-      {toast && (
-        <div
-          className={`fixed top-10 right-10 z-[200] text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-5 fade-in duration-300 max-w-md ${toast.type === "error" ? "bg-red-600" : "bg-green-600"}`}
-        >
-          <div className="shrink-0">
-            {toast.type === "error" ? (
-              <AlertTriangle size={24} strokeWidth={2.5} />
-            ) : (
-              <CheckCircle2 size={24} strokeWidth={2.5} />
-            )}
-          </div>
-          <p className="text-sm font-bold tracking-wide leading-snug">
-            {toast.message}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
-// KOMPONEN REUSABLE
-// ──────────────────────────────────────────────────────────────
-
-interface SearchableSelectProps {
-  options: string[];
-  value: string;
-  onChange: (val: string) => void;
-  placeholder: string;
-  disabled?: boolean;
-}
-
-function SearchableSelect({
-  options,
-  value,
-  onChange,
-  placeholder,
-  disabled = false,
-}: SearchableSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const filteredOptions = options.filter((opt) =>
-    opt.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative w-full">
-      <div
-        onClick={() => {
-          if (!disabled) {
-            setIsOpen(!isOpen);
-            if (!isOpen) setSearchTerm("");
-          }
-        }}
-        className={`w-full px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-75" : "bg-surface-container-low border-outline-variant text-apomacy-dark cursor-pointer focus-within:border-apomacy-primary focus-within:ring-4 focus-within:ring-apomacy-primary/10"}`}
-      >
-        <span
-          className={
-            value
-              ? "text-apomacy-dark"
-              : "text-outline/60 flex items-center gap-1.5"
-          }
-        >
-          {disabled && <Lock size={12} className="text-gray-400" />}
-          {value || placeholder}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`text-outline transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-        />
-      </div>
-
-      {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-1.5 bg-white border border-outline-variant rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-          <div className="p-2 border-b border-outline-variant/50 bg-gray-50">
-            <input
-              type="text"
-              autoFocus
-              placeholder="Ketik untuk mencari..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs font-bold text-apomacy-dark bg-white border border-outline-variant rounded-lg outline-none focus:border-apomacy-primary"
-            />
-          </div>
-          <ul className="max-h-40 overflow-y-auto divide-y divide-gray-50 p-1">
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((opt) => (
-                <li
-                  key={opt}
-                  onClick={() => {
-                    onChange(opt);
-                    setIsOpen(false);
-                  }}
-                  className={`px-4 py-2 text-xs font-bold text-apomacy-dark cursor-pointer transition-colors rounded-lg hover:bg-apomacy-primary/10 ${value === opt ? "bg-apomacy-primary text-white hover:bg-apomacy-dark" : ""}`}
-                >
-                  {opt}
-                </li>
-              ))
-            ) : (
-              <li className="px-4 py-3 text-xs font-medium text-outline text-center">
-                Data tidak ditemukan
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
+      {/* Panggil komponen Modal dan Toast */}
+      <ModalConfirm
+        isOpen={isModalOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        onConfirm={executeAction}
+        onCancel={() => setIsModalOpen(false)}
+      />
+      <Toast toast={toast} />
     </div>
   );
 }
