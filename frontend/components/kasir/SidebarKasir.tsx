@@ -8,9 +8,11 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
+    { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/kasir/dashboard" },
     { label: "Data Obat", icon: <Pill size={18} />, href: "/kasir/data-obat" },
     { label: "Member", icon: <Users size={18} />, href: "/kasir/member" },
     { label: "Transaksi", icon: <Receipt size={18} />, href: "/kasir/transaksi" },
+    
     
 ];
 
@@ -30,7 +32,7 @@ export default function SidebarKasir() {
             </div>
             <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1.5 scrollbar-hide">
                 {NAV_ITEMS.map((item) => {
-                    // Cek apakah URL saat ini sama dengan href menu
+                    
                     const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                     return (
                         <a key={item.label} href={item.href} className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${isActive ? "bg-apomacy-primary text-white shadow-md shadow-apomacy-primary/20" : "text-apomacy-ice hover:bg-white/10 hover:text-white"}`}>

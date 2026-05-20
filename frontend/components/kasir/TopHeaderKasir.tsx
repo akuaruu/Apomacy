@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, UserCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Search, UserCircle2, Bell, Plus } from "lucide-react";
 
 export default function TopHeader() {
     const [time, setTime] = useState("");
@@ -18,11 +19,28 @@ export default function TopHeader() {
                 <Search size={18} className="text-outline" />
                 <input type="text" placeholder="Pencarian global..." className="flex-1 bg-transparent text-sm font-medium text-on-surface outline-none placeholder:text-outline" />
             </div>
-            <div className="flex items-center gap-4">
+
+            <div className="flex items-center gap-5">
+                <Link 
+                    href="/kasir/transaksi" 
+                    className="flex items-center gap-2 bg-apomacy-primary hover:bg-apomacy-dark text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm"
+                >
+                    <Plus size={18} strokeWidth={2.5} />
+                    Tambah Transaksi Baru
+                </Link>
+
+                <button className="relative flex h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-apomacy-primary transition-colors">
+                    <Bell size={20} strokeWidth={2} />
+                    <span className="absolute top-2.5 right-2.5 flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+                </button>
+
+                <div className="h-6 w-px bg-outline-variant"></div>
+
                 <div className="text-right">
                     <p className="text-sm font-bold text-apomacy-dark">Kasir</p>
-                    <p className="text-xs font-medium text-apomacy-muted">{time} WIB</p>
+                    <p className="text-[11px] font-medium text-apomacy-muted">{time} WIB</p>
                 </div>
+                
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-apomacy-primary/10 border border-apomacy-primary/20 cursor-pointer hover:bg-apomacy-primary/20 transition-colors">
                     <UserCircle2 size={24} className="text-apomacy-primary" strokeWidth={2} />
                 </div>

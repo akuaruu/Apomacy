@@ -24,8 +24,7 @@ export default function NavbarWrapper() {
         return null;
     }
 
-       // Sembunyyin navbar di path admin
-    if (pathname.startsWith("/dasbor") || pathname === "/dashboard") {
+    if (pathname.startsWith("/kasir/member") || pathname === "/kasir/dashboard"|| pathname === "/kasir/karyawan"|| pathname === "/kasir/transaksi") {
         return null;
     }
 
