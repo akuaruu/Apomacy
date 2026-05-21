@@ -44,7 +44,6 @@ export default function TransaksiOfflinePage() {
     
     const [qty, setQty] = useState<number>(1);
     const handleQtyChange = (value: string) => {
-    // Hapus semua karakter selain angka (0-9) menggunakan Regex
     const numericValue = value.replace(/[^0-9]/g, "");
     
     
