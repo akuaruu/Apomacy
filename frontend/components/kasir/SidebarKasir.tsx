@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link"; 
 import { usePathname } from "next/navigation";
 import {
     LayoutDashboard, Pill, RefreshCcw, Truck, Users, UserCheck,
@@ -8,12 +9,10 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-    { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/kasir/dashboard" },
+    { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/kasir" },
     { label: "Data Obat", icon: <Pill size={18} />, href: "/kasir/data-obat" },
     { label: "Member", icon: <Users size={18} />, href: "/kasir/member" },
     { label: "Transaksi", icon: <Receipt size={18} />, href: "/kasir/transaksi" },
-    
-    
 ];
 
 export default function SidebarKasir() {
@@ -32,13 +31,21 @@ export default function SidebarKasir() {
             </div>
             <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1.5 scrollbar-hide">
                 {NAV_ITEMS.map((item) => {
-                    
-                    const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    const isActive = 
+                        item.href === "/kasir" 
+                            ? pathname === "/kasir" 
+                            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+
                     return (
-                        <a key={item.label} href={item.href} className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${isActive ? "bg-apomacy-primary text-white shadow-md shadow-apomacy-primary/20" : "text-apomacy-ice hover:bg-white/10 hover:text-white"}`}>
+                        
+                        <Link 
+                            key={item.label} 
+                            href={item.href} 
+                            className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${isActive ? "bg-apomacy-primary text-white shadow-md shadow-apomacy-primary/20" : "text-apomacy-ice hover:bg-white/10 hover:text-white"}`}
+                        >
                             <span className={`shrink-0 ${isActive ? "text-white" : "text-apomacy-teal group-hover:text-white"}`}>{item.icon}</span>
                             {item.label}
-                        </a>
+                        </Link>
                     );
                 })}
             </nav>
