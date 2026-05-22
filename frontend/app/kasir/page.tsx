@@ -235,10 +235,10 @@ export default function KasirDashboardPage() {
             {/* TABEL DATA PANEL */}
             <div className="flex-1 bg-white rounded-2xl border border-outline-variant p-4 md:p-6 shadow-sm flex flex-col min-h-0">
 
-                {/* AREA FILTER DAN PENCARIAN - Diubah menjadi kolom di HP, baris di Desktop */}
+                
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shrink-0 border-b border-gray-100 pb-4 md:pb-5 w-full">
                     
-                    {/* Tab Navigation - Scrollable horizontal di HP (overflow-x-auto, scrollbar-hide) */}
+                    
                     <div className="flex gap-2 md:gap-3 overflow-x-auto w-full md:w-auto scrollbar-hide snap-x pb-2 md:pb-0 pt-2">
                         {(["Semua", "Pesanan Baru", "Diproses", "Selesai"] as const).map(tab => (
                             <button

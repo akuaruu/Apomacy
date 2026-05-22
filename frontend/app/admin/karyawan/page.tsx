@@ -206,7 +206,6 @@ export default function KaryawanPage() {
                                             <td className="px-4 py-3.5 font-semibold text-apomacy-dark text-[12px] leading-tight whitespace-nowrap">{emp.name}</td>
                                             <td className="px-4 py-3.5 text-on-surface-variant text-[12px] whitespace-nowrap">{emp.role}</td>
                                             <td className="px-4 py-3.5 font-mono text-[12px] whitespace-nowrap">{emp.phone}</td>
-                                            {/* max-w ditingkatkan dan ditambahkan truncate agar alamat rapi */}
                                             <td className="px-4 py-3.5 text-on-surface-variant text-[12px] leading-tight max-w-[200px] truncate">{emp.address}</td>
                                             <td className="px-4 py-3.5 whitespace-nowrap text-center">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${emp.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{emp.status}</span>

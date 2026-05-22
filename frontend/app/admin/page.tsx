@@ -14,7 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 
-// Import komponen yang baru dipisah
+
 import StatCard from "@/components/admin/StatCard";
 import SalesAnalytics from "@/components/admin/SalesAnalytics";
 import TopSellingMedicine from "@/components/admin/TopSellingMedicine";
