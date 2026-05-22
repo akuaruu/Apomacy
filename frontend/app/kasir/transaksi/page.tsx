@@ -43,7 +43,7 @@ export default function TransaksiOfflinePage() {
     const [medSearch, setMedSearch] = useState("");
     const [showMedDropdown, setShowMedDropdown] = useState(false);
     
-    // (1) FITUR BARU: Referensi agar kursor bisa otomatis ke input obat
+
     const medSearchInputRef = useRef<HTMLInputElement>(null);
 
     const [qty, setQty] = useState<number>(1);
@@ -75,7 +75,6 @@ export default function TransaksiOfflinePage() {
 
         fetchData();
         
-        // (1) FITUR BARU: Otomatis fokus ke kolom pencarian obat saat halaman dibuka
         if (medSearchInputRef.current) {
             medSearchInputRef.current.focus();
         }
@@ -224,7 +223,7 @@ export default function TransaksiOfflinePage() {
                                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">Nama Obat / Kode Obat</label>
                                 <div className="relative">
                                     <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                    {/* (1) FITUR BARU: prop ref disisipkan ke input ini */}
+
                                     <input 
                                         ref={medSearchInputRef}
                                         type="text" 
@@ -270,7 +269,7 @@ export default function TransaksiOfflinePage() {
                                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                                         Quantity
                                     </label>
-                                    {/* (2) FITUR BARU: prop onKeyDown disisipkan ke input ini */}
+        
                                     <input 
                                         type="text" 
                                         inputMode="numeric"

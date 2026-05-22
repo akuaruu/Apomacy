@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Search, UserCircle2, Bell, Menu } from "lucide-react";
 
-// Tambahkan properti onMenuClick
+
 interface TopHeaderAdminProps {
     onMenuClick: () => void;
 }
@@ -22,7 +22,7 @@ export default function TopHeaderAdmin({ onMenuClick }: TopHeaderAdminProps) {
     return (
         <header className="sticky top-0 z-30 flex h-16 md:h-20 items-center justify-between gap-2 md:gap-4 bg-white/80 backdrop-blur-md border-b border-outline-variant px-4 md:px-8 shadow-sm">
             
-            {/* Tombol Hamburger (Hanya muncul di Mobile) untuk memanggil Sidebar */}
+            
             <button 
                 onClick={onMenuClick}
                 className="md:hidden flex items-center justify-center p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-apomacy-primary rounded-xl transition-colors shrink-0"
@@ -30,7 +30,7 @@ export default function TopHeaderAdmin({ onMenuClick }: TopHeaderAdminProps) {
                 <Menu size={24} />
             </button>
 
-            {/* Search Bar - Dibuat fleksibel agar ukurannya menyesuaikan layar */}
+            
             <div className="flex max-w-md flex-1 items-center gap-2 rounded-xl bg-surface-container-low px-4 py-2 md:py-2.5 border border-transparent focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
                 <Search size={18} className="text-outline shrink-0" />
                 <input 
@@ -40,7 +40,7 @@ export default function TopHeaderAdmin({ onMenuClick }: TopHeaderAdminProps) {
                 />
             </div>
 
-            {/* Kumpulan Menu Kanan */}
+            
             <div className="flex items-center gap-2 md:gap-5 shrink-0">
                 <button className="hidden sm:flex relative h-10 w-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-apomacy-primary transition-colors">
                     <Bell size={20} strokeWidth={2} />
@@ -49,7 +49,7 @@ export default function TopHeaderAdmin({ onMenuClick }: TopHeaderAdminProps) {
 
                 <div className="hidden md:block h-6 w-px bg-outline-variant"></div>
 
-                {/* Info Admin & Jam disembunyikan di layar sangat kecil (HP) agar tidak menabrak Search Bar */}
+                
                 <div className="hidden sm:block text-right">
                     <p className="text-sm font-bold text-apomacy-dark">Administrator</p>
                     <p className="text-[11px] font-medium text-apomacy-muted">{time} WIB</p>
