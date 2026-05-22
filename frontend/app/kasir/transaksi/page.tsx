@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+// HANYA DITAMBAH useRef
+import { useState, useEffect, useRef } from "react";
 import axios from "axios"; 
 import { 
     Search, Plus, Trash2, ShoppingCart, User, Pill, CreditCard, Banknote, QrCode, Receipt, XCircle
@@ -42,20 +43,19 @@ export default function TransaksiOfflinePage() {
     const [medSearch, setMedSearch] = useState("");
     const [showMedDropdown, setShowMedDropdown] = useState(false);
     
+    // (1) FITUR BARU: Referensi agar kursor bisa otomatis ke input obat
+    const medSearchInputRef = useRef<HTMLInputElement>(null);
+
     const [qty, setQty] = useState<number>(1);
     const handleQtyChange = (value: string) => {
-    // Hapus semua karakter selain angka (0-9) menggunakan Regex
-    const numericValue = value.replace(/[^0-9]/g, "");
-    
-    
-    setQty(numericValue === "" ? "" : Number(numericValue));
-};
+        const numericValue = value.replace(/[^0-9]/g, "");
+        setQty(numericValue === "" ? "" : Number(numericValue));
+    };
     
     const [cart, setCart] = useState<CartItem[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<"Tunai" | "QRIS" | "Debit">("Tunai");
     const [amountPaid, setAmountPaid] = useState<number | "">("");
 
-    
     useEffect(() => {
         const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
         const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
@@ -63,7 +63,6 @@ export default function TransaksiOfflinePage() {
 
         const fetchData = async () => {
             try {
-
                 const response = await axios.get('https://api.npoint.io/f657caeef02d4739e26a');
                 const data = response.data; 
                 
@@ -75,6 +74,11 @@ export default function TransaksiOfflinePage() {
         };
 
         fetchData();
+        
+        // (1) FITUR BARU: Otomatis fokus ke kolom pencarian obat saat halaman dibuka
+        if (medSearchInputRef.current) {
+            medSearchInputRef.current.focus();
+        }
     }, []);
 
     const formatRupiah = (num: number) => "Rp " + num.toLocaleString("id-ID");
@@ -102,6 +106,20 @@ export default function TransaksiOfflinePage() {
         setSelectedMed(null);
         setMedSearch("");
         setQty(1);
+    };
+
+    // (2) FITUR BARU: Tambah ke keranjang pakai tombol "Enter" di keyboard
+    const handleQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedMed && qty > 0) {
+                handleAddToCart();
+                // Kembalikan fokus ke pencarian obat setelah sukses nambah barang
+                if (medSearchInputRef.current) {
+                    medSearchInputRef.current.focus();
+                }
+            }
+        }
     };
 
     const handleRemoveFromCart = (code: string) => {
@@ -206,7 +224,9 @@ export default function TransaksiOfflinePage() {
                                 <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">Nama Obat / Kode Obat</label>
                                 <div className="relative">
                                     <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                    {/* (1) FITUR BARU: prop ref disisipkan ke input ini */}
                                     <input 
+                                        ref={medSearchInputRef}
                                         type="text" 
                                         placeholder="Ketik nama obat..." 
                                         value={medSearch}
@@ -250,11 +270,13 @@ export default function TransaksiOfflinePage() {
                                     <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
                                         Quantity
                                     </label>
+                                    {/* (2) FITUR BARU: prop onKeyDown disisipkan ke input ini */}
                                     <input 
                                         type="text" 
                                         inputMode="numeric"
                                         value={qty === 0 ? "" : qty} 
                                         onChange={(e) => handleQtyChange(e.target.value)}
+                                        onKeyDown={handleQtyKeyDown}
                                         disabled={!selectedMed}
                                         className="w-full rounded-xl bg-white py-2.5 px-4 text-sm font-bold text-gray-800 border border-gray-300 outline-none focus:border-apomacy-primary disabled:bg-gray-50 transition-all" 
                                         placeholder="0"
@@ -330,7 +352,6 @@ export default function TransaksiOfflinePage() {
 
                     {/* Area Checkout & Pembayaran */}
                     <div className="bg-white border-t border-gray-200 shrink-0">
-                        {/* Summary */}
                         <div className="px-6 py-5 bg-apomacy-dark text-white flex justify-between items-center">
                             <div>
                                 <p className="text-xs text-gray-300 font-medium uppercase tracking-wider mb-1">Total Tagihan</p>
@@ -372,6 +393,13 @@ export default function TransaksiOfflinePage() {
                                         onChange={(e) => setAmountPaid(e.target.value === "" ? "" : Number(e.target.value))}
                                         className="w-full rounded-xl bg-white py-2.5 px-4 text-sm font-bold font-mono text-gray-800 border border-gray-300 outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary transition-all" 
                                     />
+                                    
+                                    
+                                    <div className="flex gap-2 mt-2">
+                                        <button type="button" onClick={() => setAmountPaid(totalTagihan)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">Uang Pas</button>
+                                        <button type="button" onClick={() => setAmountPaid(50000)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">50.000</button>
+                                        <button type="button" onClick={() => setAmountPaid(100000)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">100.000</button>
+                                    </div>
                                 </div>
                             </div>
 
