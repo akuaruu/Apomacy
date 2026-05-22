@@ -159,7 +159,7 @@ export default function MemberPage() {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch w-full">
 
-            {/* PANEL KIRI */}
+            {/* PANEL Data */}
             <div className="lg:col-span-2 bg-white rounded-2xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between min-w-0">
                 <div className="flex flex-col flex-1 min-h-0">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
@@ -222,7 +222,7 @@ export default function MemberPage() {
                 </div>
             </div>
 
-            {/* PANEL KANAN */}
+            {/* PANEL INPUT*/}
             <form onSubmit={handleSaveSubmit} className="lg:col-span-1 bg-white rounded-2xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between w-full">
                 <div className="flex flex-col flex-1 min-h-0">
                     <div className="flex items-center gap-2.5 border-b border-outline-variant pb-4 mb-5 shrink-0">
@@ -256,7 +256,7 @@ export default function MemberPage() {
                 </div>
             </form>
 
-            {/* MODAL KONFIRMASI — menggunakan komponen global ModalConfirm */}
+            {/* MODAL KONFIRMASI  */}
             <ModalConfirm
                 isOpen={confirmModal.isOpen}
                 type={confirmModal.type}
