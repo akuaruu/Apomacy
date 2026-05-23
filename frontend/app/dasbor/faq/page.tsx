@@ -44,25 +44,51 @@ export default function FaqPage() {
         <p className="text-apomacy-muted-blue mt-1">Temukan jawaban untuk pertanyaan yang paling sering diajukan terkait layanan Apomacy.</p>
       </div>
 
-      <div className="bg-apomacy-white border border-apomacy-border rounded-xl p-2 mb-8 shadow-sm flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-apomacy-muted-blue ml-3 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input 
-          type="text" 
-          placeholder="Cari topik bantuan (contoh: cara bayar, resep)..." 
-          className="w-full py-2 px-2 outline-none text-apomacy-dark placeholder-gray-400 bg-transparent"
-        />
-        <button className="bg-apomacy-blue text-apomacy-white px-6 py-2 rounded-lg font-medium hover:bg-apomacy-dark transition">
-          Cari
-        </button>
-      </div>
+      {/* Form Pencarian & Filter */}
+      <form 
+        onSubmit={(e) => e.preventDefault()} 
+        className="mb-8"
+      >
+        {/* 1. Input Type Text  */}
+        <div className="bg-apomacy-white border border-apomacy-border rounded-xl p-2 shadow-sm flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-apomacy-muted-blue ml-3 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Cari topik bantuan (contoh: cara bayar, resep)..." 
+            className="w-full py-2 px-2 outline-none text-apomacy-dark placeholder-gray-400 bg-transparent"
+          />
+          <button type="submit" className="bg-apomacy-blue text-apomacy-white px-6 py-2 rounded-lg font-medium hover:bg-apomacy-dark transition">
+            Cari
+          </button>
+        </div>
+
+        {/* 2. Input Type Radio */}
+        <div className="flex items-center gap-5 mt-4 ml-2">
+          <span className="text-sm font-semibold text-apomacy-dark">Filter Topik:</span>
+          
+          <label className="flex items-center gap-1.5 text-sm text-apomacy-muted-blue cursor-pointer hover:text-apomacy-blue transition-colors">
+            <input type="radio" name="kategoriFaq" value="semua" defaultChecked className="accent-apomacy-blue w-4 h-4 cursor-pointer" />
+            Semua
+          </label>
+          
+          <label className="flex items-center gap-1.5 text-sm text-apomacy-muted-blue cursor-pointer hover:text-apomacy-blue transition-colors">
+            <input type="radio" name="kategoriFaq" value="pengiriman" className="accent-apomacy-blue w-4 h-4 cursor-pointer" />
+            Pengiriman
+          </label>
+          
+          <label className="flex items-center gap-1.5 text-sm text-apomacy-muted-blue cursor-pointer hover:text-apomacy-blue transition-colors">
+            <input type="radio" name="kategoriFaq" value="pembayaran" className="accent-apomacy-blue w-4 h-4 cursor-pointer" />
+            Pembayaran
+          </label>
+        </div>
+      </form>
 
       <div className="bg-apomacy-white border border-apomacy-border rounded-2xl shadow-sm overflow-hidden">
         {daftarFaq.map((item, index) => (
           <div 
             key={index} 
-            // PERHATIKAN: Saya sudah mengganti kutip biasa menjadi backtick (`) di bawah ini
             className={`border-b border-apomacy-border last:border-b-0 transition-colors ${
               aktifIndex === index ? 'bg-apomacy-light-blue/20' : 'hover:bg-gray-50'
             }`}
