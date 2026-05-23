@@ -3,9 +3,64 @@
 import Link from "next/link";
 import { User, Mail, Phone, Calendar, Lock, Zap, History, BellRing, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
+import api from "@/lib/api";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!agreed) {
+      setError("Anda harus menyetujui Ketentuan Layanan dan Kebijakan Privasi.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await api.post("/auth/register", {
+        name,
+        email,
+        phone,
+        birth_date: birthDate,
+        password,
+      });
+
+      setSuccess("Pendaftaran berhasil! Silakan masuk ke akun Anda.");
+      
+      // Kosongkan form setelah sukses
+      setName("");
+      setEmail("");
+      setPhone("");
+      setBirthDate("");
+      setPassword("");
+      setAgreed(false);
+
+      // Redireksi ke halaman login setelah 2 detik
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 2000);
+
+    } catch (err: any) {
+      console.error("Register Error:", err);
+      const msg = err.response?.data?.message || err.response?.data?.error || "Gagal melakukan pendaftaran. Silakan periksa kembali data Anda.";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex-grow bg-transparent flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -70,7 +125,19 @@ export default function RegisterPage() {
                <p className="text-gray-500 text-sm">Silakan isi detail Anda untuk memulai.</p>
              </div>
 
-             <form className="space-y-6">
+             {error && (
+               <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium animate-fadeIn">
+                 {error}
+               </div>
+             )}
+
+             {success && (
+               <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-600 rounded-xl text-sm font-medium animate-fadeIn">
+                 {success}
+               </div>
+             )}
+
+             <form onSubmit={handleRegister} className="space-y-6">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama Lengkap</label>
                   <div className="relative">
@@ -79,6 +146,9 @@ export default function RegisterPage() {
                     </div>
                     <input 
                       type="text" 
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                       placeholder="Rizky Pelangi" 
                       className="w-full pl-11 pr-4 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                     />
@@ -93,6 +163,9 @@ export default function RegisterPage() {
                     </div>
                     <input 
                       type="email" 
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="Rizky@example.com" 
                       className="w-full pl-11 pr-4 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                     />
@@ -108,6 +181,9 @@ export default function RegisterPage() {
                        </div>
                        <input 
                          type="tel" 
+                         required
+                         value={phone}
+                         onChange={(e) => setPhone(e.target.value)}
                          placeholder="+62 123-4567-890" 
                          className="w-full pl-11 pr-4 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                        />
@@ -122,6 +198,9 @@ export default function RegisterPage() {
                        </div>
                        <input 
                          type="date" 
+                         required
+                         value={birthDate}
+                         onChange={(e) => setBirthDate(e.target.value)}
                          className="w-full pl-11 pr-4 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm text-gray-500"
                        />
                      </div>
@@ -136,6 +215,10 @@ export default function RegisterPage() {
                     </div>
                     <input 
                       type={showPassword ? "text" : "password"}  
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
                       className="w-full pl-11 pr-12 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                     />
                     <button 
@@ -151,15 +234,36 @@ export default function RegisterPage() {
 
                 <div className="pt-2">
                   <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500 mt-0.5" />
+                    <input 
+                      type="checkbox" 
+                      checked={agreed}
+                      onChange={(e) => setAgreed(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500 mt-0.5" 
+                    />
                     <span className="text-sm text-gray-600 leading-snug">
                       Saya menyetujui <Link href="#" className="font-semibold text-primary-500 hover:underline">Ketentuan Layanan</Link> dan <Link href="#" className="font-semibold text-primary-500 hover:underline">Kebijakan Privasi</Link>.
                     </span>
                   </label>
                 </div>
 
-                <button type="button" className="w-full bg-primary-500 hover:bg-primary-400 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-md mt-6 flex items-center justify-center gap-2">
-                  Daftar Akun <Zap size={18} />
+                <button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className={`w-full ${isLoading ? 'bg-primary-300 cursor-not-allowed' : 'bg-primary-500 hover:bg-primary-400'} text-white font-semibold py-3.5 rounded-xl transition-colors shadow-md mt-6 flex items-center justify-center gap-2`}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Mendaftarkan...
+                    </span>
+                  ) : (
+                    <>
+                      Daftar Akun <Zap size={18} />
+                    </>
+                  )}
                 </button>
              </form>
              
@@ -173,3 +277,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+
