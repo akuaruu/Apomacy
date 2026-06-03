@@ -8,12 +8,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// ValidateToken memvalidasi string JWT dan mengembalikan isi payload (claims) jika valid
 func ValidateToken(tokenString string) (jwt.MapClaims, error) {
 	secretKey := os.Getenv("JWT_SECRET")
-	if secretKey == "" {
-		secretKey = "apomacy_rahasia_default" // Harus sama persis dengan yang ada di user_usecase.go
-	}
 
 	// Proses parsing dan validasi algoritma
 	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {

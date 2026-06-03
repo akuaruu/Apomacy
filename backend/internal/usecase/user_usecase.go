@@ -42,7 +42,7 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 	// 1. Cari user di database
 	user, err := u.repo.GetByUsername(ctx, username)
 	if err != nil {
-		return "", errors.New("username atau password salah") // Jangan pernah sebut spesifik "username tidak ada" untuk alasan keamanan
+		return "", errors.New("username atau password salah")
 	}
 
 	// 2. Cek kecocokan password hash
@@ -66,11 +66,8 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Token expired dalam 24 jam
 	})
 
-	// Ambil secret key dari environment (Pastikan tambahkan JWT_SECRET di file .env kamu nanti)
+	// Ambil secret key dari environment
 	secretKey := os.Getenv("JWT_SECRET")
-	if secretKey == "" {
-		secretKey = "apomacy_rahasia_default" // Fallback jika lupa set .env
-	}
 
 	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
