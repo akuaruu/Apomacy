@@ -14,7 +14,6 @@ interface NavCategory {
 const navCategories: NavCategory[] = [
     { label: "PRODUK BARU", href: "/katalog?badge=new" },
     { label: "PROMO", href: "/katalog?badge=sale", isPromo: true },
-    { label: "TENTANG KAMI", href: "#" },
 ];
 
 interface NavbarProps {

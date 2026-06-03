@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { 
     Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User,
-    CheckCircle2, UserMinus, UserPlus, Pencil
 } from "lucide-react";
+import ModalConfirm from "@/components/shared/ModalConfirm";
 
 interface Member {
     id: number;
@@ -18,94 +18,6 @@ interface Member {
     joinDate: string;
 }
 
-// ─── CONFIRM MODAL ─────────────────────────────────────────────────────────────
-interface ConfirmModalProps {
-    isOpen: boolean;
-    type: "add" | "edit" | "delete";
-    employeeName?: string;
-    onConfirm: () => void;
-    onCancel: () => void;
-}
-
-const modalConfig = {
-    add: {
-        icon: UserPlus,
-        iconBg: "#ecfdf5",
-        iconColor: "#10b981",
-        accentGrad: "linear-gradient(90deg,#10b981,#14b8a6)",
-        confirmGrad: "linear-gradient(135deg,#10b981,#14b8a6)",
-        title: "Tambah Member Baru",
-        subtitle: "akan ditambahkan ke daftar member",
-        confirmLabel: "Ya, Simpan",
-        cancelLabel: "Periksa Lagi",
-    },
-    edit: {
-        icon: Pencil,
-        iconBg: "#eff6ff",
-        iconColor: "#3b82f6",
-        accentGrad: "linear-gradient(90deg,#3b82f6,#6366f1)",
-        confirmGrad: "linear-gradient(135deg,#3b82f6,#6366f1)",
-        title: "Simpan Perubahan",
-        subtitle: "data akan diperbarui",
-        confirmLabel: "Ya, Perbarui",
-        cancelLabel: "Batal",
-    },
-    delete: {
-        icon: UserMinus,
-        iconBg: "#fef2f2",
-        iconColor: "#ef4444",
-        accentGrad: "linear-gradient(90deg,#ef4444,#f43f5e)",
-        confirmGrad: "linear-gradient(135deg,#ef4444,#f43f5e)",
-        title: "Hapus Member",
-        subtitle: "akan dihapus secara permanen",
-        confirmLabel: "Ya, Hapus",
-        cancelLabel: "Batalkan",
-    },
-};
-
-function ConfirmModal({ isOpen, type, employeeName, onConfirm, onCancel }: ConfirmModalProps) {
-    const cfg = modalConfig[type];
-    const Icon = cfg.icon;
-    if (!isOpen) return null;
-    return (
-        <>
-            <style>{`
-                @keyframes cfadeIn { from { opacity:0 } to { opacity:1 } }
-                @keyframes cscaleIn { from { opacity:0; transform:scale(0.93) } to { opacity:1; transform:scale(1) } }
-            `}</style>
-            <div style={{ position:"fixed", inset:0, zIndex:99999, display:"flex", alignItems:"center", justifyContent:"center", animation:"cfadeIn 0.15s ease" }}>
-                <div style={{ position:"absolute", inset:0, background:"rgba(17,24,39,0.55)", backdropFilter:"blur(2px)" }} onClick={onCancel} />
-                <div style={{ position:"relative", background:"#fff", width:340, borderRadius:16, boxShadow:"0 20px 60px rgba(0,0,0,0.18)", overflow:"hidden", animation:"cscaleIn 0.18s cubic-bezier(0.34,1.4,0.64,1)" }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ height:4, background:cfg.accentGrad }} />
-                    <div style={{ padding:"20px 24px 24px" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
-                            <div style={{ width:40, height:40, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", background:cfg.iconBg, flexShrink:0 }}>
-                                <Icon size={20} style={{ color:cfg.iconColor }} />
-                            </div>
-                            <div>
-                                <p style={{ fontSize:15, fontWeight:700, color:"#111827", margin:0 }}>{cfg.title}</p>
-                                <p style={{ fontSize:12, color:"#6b7280", margin:"2px 0 0" }}>
-                                    {employeeName ? <><strong style={{ color:"#374151" }}>{employeeName}</strong> — {cfg.subtitle}</> : cfg.subtitle}
-                                </p>
-                            </div>
-                        </div>
-                        <div style={{ height:1, background:"#f3f4f6", margin:"16px 0" }} />
-                        <div style={{ display:"flex", gap:10 }}>
-                            <button type="button" onClick={onCancel} style={{ flex:1, padding:"9px 0", borderRadius:10, border:"1.5px solid #e5e7eb", background:"#fff", fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer" }}>
-                                {cfg.cancelLabel}
-                            </button>
-                            <button type="button" onClick={onConfirm} style={{ flex:1, padding:"9px 0", borderRadius:10, border:"none", background:cfg.confirmGrad, fontSize:13, fontWeight:700, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-                                <CheckCircle2 size={14} />
-                                {cfg.confirmLabel}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
-}
-
 // ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function MemberPage() {
     const [members, setMembers] = useState<Member[]>([]);
@@ -114,10 +26,17 @@ export default function MemberPage() {
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
 
-    const [confirmModal, setConfirmModal] = useState({
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        type: "tambah" | "edit" | "hapus";
+        title: string;
+        message: string;
+        action: () => void;
+    }>({
         isOpen: false,
-        type: "add" as "add" | "edit" | "delete",
-        memberName: "",
+        type: "tambah",
+        title: "",
+        message: "",
         action: () => {},
     });
 
@@ -180,8 +99,9 @@ export default function MemberPage() {
         if (!selectedMember) return;
         setConfirmModal({
             isOpen: true,
-            type: "delete",
-            memberName: selectedMember.name,
+            type: "hapus",
+            title: "Hapus Data Member",
+            message: `Data member "${selectedMember.name}" akan dihapus secara permanen dari sistem. Tindakan ini tidak dapat dibatalkan.`,
             action: () => {
                 const updated = members.filter(m => m.id !== selectedMember.id);
                 setMembers(updated);
@@ -198,8 +118,9 @@ export default function MemberPage() {
         if (mode === "add") {
             setConfirmModal({
                 isOpen: true,
-                type: "add",
-                memberName: formData.name || "Member Baru",
+                type: "tambah",
+                title: "Tambah Member Baru",
+                message: `Data member "${formData.name || "Member Baru"}" akan disimpan ke dalam sistem.`,
                 action: () => {
                     const generateId = members.length > 0 ? Math.max(...members.map(m => m.id)) + 1 : 1;
                     const newMember: Member = {
@@ -215,7 +136,8 @@ export default function MemberPage() {
             setConfirmModal({
                 isOpen: true,
                 type: "edit",
-                memberName: formData.name,
+                title: "Simpan Perubahan Data",
+                message: `Perubahan data member "${formData.name}" akan diperbarui di sistem.`,
                 action: () => {
                     const updated = members.map(m =>
                         m.id === selectedMember.id ? { ...m, name: formData.name, gender: formData.gender, phone: formData.phone, email: formData.email, address: formData.address, birthDate: formData.birthDate } : m
@@ -334,12 +256,16 @@ export default function MemberPage() {
                 </div>
             </form>
 
-            {/* MODAL KONFIRMASI */}
-            <ConfirmModal
+            {/* MODAL KONFIRMASI — menggunakan komponen global ModalConfirm */}
+            <ModalConfirm
                 isOpen={confirmModal.isOpen}
                 type={confirmModal.type}
-                employeeName={confirmModal.memberName}
-                onConfirm={() => { confirmModal.action(); closeModal(); }}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                onConfirm={() => {
+                    confirmModal.action();
+                    closeModal();
+                }}
                 onCancel={closeModal}
             />
         </div>

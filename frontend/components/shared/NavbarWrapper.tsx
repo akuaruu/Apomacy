@@ -19,17 +19,20 @@ export default function NavbarWrapper() {
         pathname === "/login" ||
         pathname === "/register" ||
         pathname.startsWith("/kasir/member") ||
-        pathname === "/kasir"
+        pathname.startsWith("/kasir")
     ) {
         return null;
     }
 
-    if (pathname.startsWith("/kasir/member") || pathname === "/kasir/dashboard"|| pathname === "/kasir/karyawan"|| pathname === "/kasir/transaksi") {
-        return null;
-    }
+
 
     // cuman gunain navbar singkat uuntuk keranjang dan checkout
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
+        return <NavbarSingkat />;
+    }
+
+    // cuman gunain navbar singkat untuk dasbor pengguna
+    if (pathname.startsWith("/dasbor")) {
         return <NavbarSingkat />;
     }
 

@@ -23,7 +23,7 @@ export default function FooterWrapper() {
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout" || pathname === "/kasir/member") {
         return <FooterSingkat />;
     }
-     if (pathname.startsWith("/kasir/member") || pathname === "/kasir/dashboard"|| pathname === "/kasir/karyawan"|| pathname === "/kasir/transaksi") {
+     if (pathname.startsWith("/kasir") || pathname === "/kasir/member"|| pathname === "/kasir/dashboard"|| pathname === "/kasir/karyawan"|| pathname === "/kasir/transaksi") {
         return <FooterSingkat />;
     }
 
