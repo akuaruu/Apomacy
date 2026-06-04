@@ -12,15 +12,10 @@ type UserHandler struct {
 	usecase model.UserUsecase
 }
 
-// NewUserHandler menginisialisasi routing untuk User
-func NewUserHandler(r *gin.Engine, usecase model.UserUsecase) {
-	handler := &UserHandler{usecase: usecase}
-
-	// Grouping endpoint untuk user
-	userGroup := r.Group("/api/users")
-	{
-		userGroup.POST("/register", handler.Register)
-		userGroup.POST("/login", handler.Login)
+// NewUserHandler menginisialisasi handler untuk User
+func NewUserHandler(usecase model.UserUsecase) *UserHandler {
+	return &UserHandler{
+		usecase: usecase,
 	}
 }
 
