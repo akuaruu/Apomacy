@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/akuaruu/apomacy/backend/internal/auth" // Sesuaikan nama module dengan go.mod kamu
+	"github.com/akuaruu/apomacy/backend/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,16 +29,14 @@ func RequireAuth() gin.HandlerFunc {
 		}
 
 		// 3. Simpan data krusial ke Gin Context
-		// Ini memungkinkan Handler nanti tahu siapa yang sedang melakukan request (misal: untuk mencatat ID Kasir di tabel Transaksi)
 		c.Set("id_user", claims["id_user"])
 		c.Set("role", claims["role"])
 
-		// Lolos dari satpam, silakan lanjut ke Handler
 		c.Next()
 	}
 }
 
-// RequireRole membatasi akses endpoint hanya untuk role tertentu (Role-Based Access Control)
+// (Role-Based Access Control)
 // Wajib dipanggil SETELAH RequireAuth()
 func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -43,5 +43,5 @@ func ExtractBearerToken(authHeader string) (string, error) {
 		return "", errors.New("format token harus 'Bearer <token>'")
 	}
 
-	return parts[1], nil // Mengembalikan <token> saja
+	return parts[1], nil // Mengembalikan <token>
 }

@@ -13,38 +13,30 @@ func NewPaymentUsecase() *PaymentUsecase {
 	return &PaymentUsecase{}
 }
 
-func (u *PaymentUsecase) GenerateSnapToken(orderID string, grossAmount int64, paymentMethod string) (string, error) {
-	// Filter metode pembayaran yang akan ditampilkan di Pop-up
+func (u *PaymentUsecase) GenerateSnapToken(orderID string, grossAmount int64, paymentMethod string, items []midtrans.ItemDetails) (string, error) {
+
+	// 1. Logika Bypass Menu Pembayaran (Hanya masukkan 1 opsi spesifik)
 	var enabledPayments []snap.SnapPaymentType
 
 	switch paymentMethod {
 	case "qris":
-		enabledPayments = []snap.SnapPaymentType{
-			snap.SnapPaymentType("gopay"),
-			snap.SnapPaymentType("other_qris"),
-		}
-	case "bca_va":
-		enabledPayments = []snap.SnapPaymentType{
-			snap.SnapPaymentType("bca_va"),
-		}
-	case "mandiri_va":
-		enabledPayments = []snap.SnapPaymentType{
-			snap.SnapPaymentType("echannel"), // Catatan: Midtrans menggunakan kode "echannel" untuk Mandiri VA
-		}
+		enabledPayments = []snap.SnapPaymentType{snap.SnapPaymentType("other_qris")}
+	case "bca":
+		enabledPayments = []snap.SnapPaymentType{snap.SnapPaymentType("bca_va")}
+	case "mandiri":
+		enabledPayments = []snap.SnapPaymentType{snap.SnapPaymentType("echannel")}
 	default:
-		// Fallback jika tidak ada yang cocok, tampilkan semua
-		enabledPayments = []snap.SnapPaymentType{
-			snap.SnapPaymentType("gopay"),
-			snap.SnapPaymentType("bca_va"),
-		}
+		enabledPayments = []snap.SnapPaymentType{snap.SnapPaymentType("other_qris")}
 	}
 
+	// 2. Buat Request ke Midtrans
 	req := &snap.Request{
 		TransactionDetails: midtrans.TransactionDetails{
 			OrderID:  orderID,
 			GrossAmt: grossAmount,
 		},
-		EnabledPayments: enabledPayments, // Masukkan array yang sudah difilter
+		EnabledPayments: enabledPayments,
+		Items:           &items, // Masukkan daftar barang agar tidak kosong!
 	}
 
 	snapResp, err := midtransPkg.SnapClient.CreateTransaction(req)
