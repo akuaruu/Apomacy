@@ -65,7 +65,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             className="min-w-0 flex-1 bg-white px-5 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none"
                         />
                         <button type="submit" suppressHydrationWarning className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
-                            SEARCH
+                            CARI
                         </button>
                     </form>
 
@@ -74,7 +74,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
-                            <span className="text-sm font-semibold">My Account</span>
+                            <span className="text-sm font-semibold">Akun Saya</span>
                         </Link>
 
                         <Link href="/keranjang" className="flex items-center gap-1.5 text-apomacy-dark transition-colors hover:text-apomacy-primary">
@@ -89,7 +89,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                                 )}
                             </div>
                             <div className="hidden flex-col leading-none sm:flex">
-                                <span className="text-[10px] text-apomacy-muted">Cart</span>
+                                <span className="text-[10px] text-apomacy-muted">Keranjang</span>
                                 <span className="text-sm font-bold">{cartTotal === 0 ? "Rp 0" : formattedTotal}</span>
                             </div>
                         </Link>
@@ -109,7 +109,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
-                            <span className="hidden sm:inline">Shop By Categories</span>
+                            <span className="hidden sm:inline">Lihat Kategori</span>
                         </button>
 
                         {categoryMenuOpen && (
@@ -119,10 +119,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                                     { label: "Batuk & Flu", href: "/katalog?cat=batuk-flu" },
                                     { label: "Pencernaan & Lambung", href: "/katalog?cat=pencernaan" },
                                     { label: "Vitamin & Suplemen", href: "/katalog?cat=vitamin" },
-                                    { label: "P3K & Antiseptik", href: "/katalog?cat=p3k" },
                                     { label: "Ibu & Anak", href: "/katalog?cat=ibu-anak" },
-                                    { label: "Skincare & Perawatan Diri", href: "/katalog?cat=perawatan-diri" },
-                                    { label: "Herbal & Tradisional", href: "/katalog?cat=herbal" }
                                 ].map((item) => (
                                     <Link
                                         key={item.href}

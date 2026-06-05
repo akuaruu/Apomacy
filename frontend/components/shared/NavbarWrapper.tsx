@@ -33,7 +33,7 @@ export default function NavbarWrapper() {
 
     // cuman gunain navbar singkat untuk dasbor pengguna
     if (pathname.startsWith("/dasbor")) {
-        return <NavbarSingkat />;
+        return null
     }
 
     // Gunakan navbar landing untuk homepage, login, register, about
