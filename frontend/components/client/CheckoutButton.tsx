@@ -3,49 +3,58 @@
 import { useState } from "react";
 import Script from "next/script";
 
-interface CheckoutButtonProps {
-    grossAmount: number; // Menerima total harga dari halaman checkout
-    paymentMethod: string;
+interface ItemDetail {
+    id: string;
+    price: number;
+    quantity: number;
+    name: string;
 }
 
+interface CheckoutButtonProps {
+    grossAmount: number;
+    paymentMethod: string;
+    items: ItemDetail[];
+    onValidate: () => boolean;
+}
 
-export default function CheckoutButton({ grossAmount, paymentMethod }: CheckoutButtonProps) {
+export default function CheckoutButton({ grossAmount, paymentMethod, items, onValidate }: CheckoutButtonProps) {
     const [isLoading, setIsLoading] = useState(false);
 
     const handleCheckout = async () => {
+        if (!onValidate()) {
+            return;
+        }
+
         setIsLoading(true);
 
         try {
-            // 1. Buat Order ID yang unik (Bisa juga di-generate di backend nanti, 
-            // tapi untuk sekarang kita generate di frontend pakai timestamp)
             const orderId = `TRX-${Date.now()}`;
 
-            // 2. Tembak API Backend Golang-mu
-            // Pastikan URL-nya sesuai dengan routing di router.go milikmu
             const res = await fetch("http://localhost:8080/api/checkout/", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                },
                 body: JSON.stringify({
                     order_id: orderId,
                     gross_amount: grossAmount,
-                    payment_method: paymentMethod, // Kirim ke Golang
+                    payment_method: paymentMethod,
+                    items: items,
                 }),
             });
+
             if (!res.ok) {
                 throw new Error("Gagal mengambil token dari backend");
             }
 
-            // 3. Tangkap respons JSON dari payment_handler.go
             const data = await res.json();
-            const snapToken = data.token; // Mengambil "token" sesuai dengan c.JSON di Golang
+            const snapToken = data.token;
 
-            // 4. Panggil Snap Pop-up dengan Token Asli
             if (window.snap) {
                 window.snap.pay(snapToken, {
                     onSuccess: function (result: any) {
                         console.log("Payment Success:", result);
                         alert("Pembayaran berhasil diproses!");
-                        // TODO: Arahkan ke halaman sukses atau kosongkan CartContext
                     },
                     onPending: function (result: any) {
                         console.log("Payment Pending:", result);
@@ -62,6 +71,7 @@ export default function CheckoutButton({ grossAmount, paymentMethod }: CheckoutB
                 });
             } else {
                 console.error("Snap script belum termuat.");
+                alert("Sistem pembayaran sedang memuat, silakan coba lagi.");
             }
         } catch (error) {
             console.error("Checkout failed:", error);

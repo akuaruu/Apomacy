@@ -126,9 +126,9 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
                 <button
                     onClick={() => onAddToCart?.(product)}
                     disabled={!product.inStock}
-                    className="w-full rounded border border-apomacy-primary px-3 py-2 text-xs font-bold uppercase tracking-wide text-apomacy-primary transition-all hover:bg-apomacy-primary hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:border-outline-variant disabled:text-outline-variant"
+                    className="w-full rounded border border-apomacy-primary px-3 py-2 text-xs font-bold normal tracking-wide text-apomacy-primary transition-all hover:bg-apomacy-primary hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:border-outline-variant disabled:text-outline-variant"
                 >
-                    {product.inStock ? "ADD TO CART" : "OUT OF STOCK"}
+                    {product.inStock ? "Tambah ke Keranjang" : "Stock Habis"}
                 </button>
             </div>
         </div>

@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { User, Mail, Phone, Calendar, Lock, Zap, History, BellRing, Eye, EyeOff, ArrowLeft, ShoppingCart } from "lucide-react";
+import { User, Mail, Phone, Calendar, Lock, Zap, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import React, { useState, useEffect } from "react";
-import axios from "axios"; // Pastikan sudah install axios (npm install axios)
+import axios from "axios";
 import api from "@/lib/api";
 
-// Tipe data untuk produk
 interface Product {
   id: number;
   title: string;
@@ -16,7 +15,6 @@ interface Product {
 }
 
 export default function RegisterPage() {
-  // --- STATE UNTUK REGISTER ---
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -28,21 +26,15 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // --- STATE UNTUK FETCH 10 DATA (RUBRIK TUGAS) ---
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // ==========================================
-  // BLOK USEEFFECT (CEK SESI & FETCH DATA API)
-  // ==========================================
   useEffect(() => {
-    // 1. Cek Token Login
-    const token = localStorage.getItem("token");
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (token) {
       window.location.href = "/dasbor";
     }
 
-    // 2. Fetch 10 Data dari Public API (Axios GET)
     const fetchProducts = async () => {
       try {
         const response = await axios.get("https://fakestoreapi.com/products?limit=10");
@@ -56,7 +48,6 @@ export default function RegisterPage() {
 
     fetchProducts();
   }, []);
-  // ==========================================
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,12 +62,13 @@ export default function RegisterPage() {
     setIsRegistering(true);
 
     try {
-      await api.post("/auth/register", {
-        name,
-        email,
-        phone,
-        birth_date: birthDate,
-        password,
+      // PENYESUAIAN PAYLOAD: Disesuaikan dengan tag JSON di backend model User
+      await api.post("/users/register", {
+        nama_lengkap: name,
+        email: email,
+        username: email, // Kita gunakan email sebagai username
+        no_telp: phone,
+        password: password, // Akan ditangkap oleh custom struct di backend
       });
 
       setSuccess("Pendaftaran berhasil! Silakan masuk ke akun Anda.");
@@ -102,16 +94,13 @@ export default function RegisterPage() {
 
   return (
     <div className="flex-grow bg-[#f8faff] flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      {/* --- BAGIAN ATAS: TOMBOL KEMBALI --- */}
       <div className="max-w-6xl w-full mb-4 flex justify-start">
         <Link href="/" className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary-500 transition-colors font-medium">
           <ArrowLeft size={16} /> Kembali ke Beranda
         </Link>
       </div>
 
-      {/* --- BAGIAN TENGAH: FORM REGISTER & INFO --- */}
       <div className="max-w-6xl w-full flex flex-col md:flex-row gap-10 items-center mb-16">
-        {/* Kiri - Info */}
         <div className="md:w-[45%] flex flex-col justify-center space-y-10">
           <div className="space-y-4">
             <h2 className="text-4xl lg:text-5xl font-bold text-primary-500 leading-tight">Bergabunglah dengan masa depan layanan kesehatan.</h2>
@@ -130,11 +119,9 @@ export default function RegisterPage() {
                 <p className="text-sm text-gray-500 leading-relaxed">Simpan detail pengiriman dan pembayaran Anda untuk menebus resep hanya dengan dua klik.</p>
               </div>
             </div>
-            {/* ... Info riwayat pesanan dll ... */}
           </div>
         </div>
 
-        {/* Kanan - Form */}
         <div className="md:w-[55%]">
           <div className="bg-white p-10 md:p-12 rounded-[2rem] shadow-xl border border-gray-100">
             <div className="mb-8">
@@ -154,7 +141,6 @@ export default function RegisterPage() {
             )}
 
             <form onSubmit={handleRegister} className="space-y-6">
-              {/* Input Nama */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama Lengkap</label>
                 <div className="relative">
@@ -172,7 +158,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Input Email */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email</label>
                 <div className="relative">
@@ -190,7 +175,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Input Telepon & Tanggal Lahir */}
               <div className="flex flex-col sm:flex-row gap-5">
                 <div className="space-y-1.5 flex-1">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nomor Telepon</label>
@@ -226,7 +210,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Input Password */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Kata Sandi</label>
                 <div className="relative">
@@ -251,7 +234,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Checkbox Setuju */}
               <div className="pt-2">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -266,7 +248,6 @@ export default function RegisterPage() {
                 </label>
               </div>
 
-              {/* Tombol Submit */}
               <button
                 type="submit"
                 disabled={isRegistering}
@@ -292,47 +273,6 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-
-      {/* ==========================================================
-          BAGIAN BAWAH: TAMPILAN 10 DATA PRODUK (MEMENUHI RUBRIK)
-          ========================================================== */}
-      <div className="max-w-6xl w-full border-t border-gray-200 pt-12 mt-4">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl font-bold text-gray-800">Cek Produk Kesehatan Populer Kami</h2>
-          <p className="text-gray-500 text-sm mt-2">Daftar sekarang untuk mendapatkan akses belanja fitur penuh.</p>
-        </div>
-
-        {/* Indikator Loading */}
-        {isLoadingData ? (
-          <div className="flex flex-col items-center justify-center py-10">
-            <svg className="animate-spin h-10 w-10 text-primary-500 mb-3" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <p className="text-gray-500 font-medium animate-pulse">Menyiapkan daftar produk...</p>
-          </div>
-        ) : (
-          /* Grid 10 Produk */
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {products.map((product) => (
-              <div key={product.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden flex flex-col p-4">
-                <div className="h-32 w-full flex justify-center items-center mb-3">
-                  <img src={product.image} alt={product.title} className="max-h-full object-contain" />
-                </div>
-                <div className="flex flex-col flex-grow">
-                  <h3 className="font-bold text-gray-800 text-xs mb-1 line-clamp-2" title={product.title}>
-                    {product.title}
-                  </h3>
-                  <div className="mt-auto flex items-center justify-between pt-2">
-                    <span className="text-sm font-black text-primary-600">${product.price.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }

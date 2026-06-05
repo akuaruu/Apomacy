@@ -14,12 +14,78 @@ export default function CheckoutPage() {
     const [method, setMethod] = useState<'delivery' | 'pickup'>('delivery');
     const [payment, setPayment] = useState("qris");
 
-    // Hanya ambil item yang dipilih (dicentang) di halaman keranjang
-    const checkoutItems = cartItems.filter(i => selectedIds.includes(i.product.id));
+    const [formData, setFormData] = useState({
+        name: "",
+        phone: "",
+        address: "",
+        landmark: "",
+        pickupName: "",
+        pickupPhone: ""
+    });
 
+    const [errors, setErrors] = useState<any>({});
+
+    const checkoutItems = cartItems.filter(i => selectedIds.includes(i.product.id));
     const subtotal = cartTotal;
     const shipping = method === "pickup" ? 0 : (subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_COST);
     const total = subtotal + shipping;
+
+    const orderItems = checkoutItems.map(item => ({
+        id: item.product.id.toString(),
+        price: item.product.price,
+        quantity: item.quantity,
+        name: item.product.name.substring(0, 50)
+    }));
+
+    if (shipping > 0) {
+        orderItems.push({
+            id: "ONGKIR-01",
+            price: shipping,
+            quantity: 1,
+            name: "Biaya Pengiriman"
+        });
+    }
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+
+        if (name === "phone" || name === "pickupPhone") {
+            if (value !== "" && !/^[0-9]+$/.test(value)) return;
+        }
+
+        setFormData(prev => ({ ...prev, [name]: value }));
+
+        if (errors[name]) {
+            setErrors((prev: any) => ({ ...prev, [name]: "" }));
+        }
+    };
+
+    const validateForm = () => {
+        const newErrors: any = {};
+
+        if (method === 'delivery') {
+            if (!formData.name.trim()) newErrors.name = "Nama penerima wajib diisi";
+            if (!formData.address.trim()) newErrors.address = "Alamat lengkap wajib diisi";
+
+            if (!formData.phone.trim()) {
+                newErrors.phone = "Nomor WhatsApp wajib diisi";
+            } else if (formData.phone.length < 11 || formData.phone.length > 13) {
+                newErrors.phone = "Nomor HP harus 11-13 digit";
+            }
+        } else {
+            if (!formData.pickupName.trim()) newErrors.pickupName = "Nama pengambil wajib diisi";
+
+            if (!formData.pickupPhone.trim()) {
+                newErrors.pickupPhone = "Nomor HP wajib diisi";
+            } else if (formData.pickupPhone.length < 11 || formData.pickupPhone.length > 13) {
+                newErrors.pickupPhone = "Nomor HP harus 11-13 digit";
+            }
+        }
+
+        setErrors(newErrors);
+
+        return Object.keys(newErrors).length === 0;
+    };
 
     return (
         <div className="mx-auto max-w-screen-xl px-4 py-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -31,14 +97,14 @@ export default function CheckoutPage() {
                     </h2>
                     <div className="grid grid-cols-2 gap-4">
                         <button
-                            onClick={() => setMethod('delivery')}
+                            onClick={() => { setMethod('delivery'); setErrors({}); }}
                             className={`p-4 rounded-2xl border-2 text-left transition-all ${method === 'delivery' ? 'border-apomacy-primary bg-apomacy-primary/5' : 'border-gray-100'}`}
                         >
                             <p className="font-bold text-apomacy-dark">Instant Delivery</p>
                             <p className="text-xs text-outline">1-2 Jam Sampai</p>
                         </button>
                         <button
-                            onClick={() => setMethod('pickup')}
+                            onClick={() => { setMethod('pickup'); setErrors({}); }}
                             className={`p-4 rounded-2xl border-2 text-left transition-all ${method === 'pickup' ? 'border-apomacy-primary bg-apomacy-primary/5' : 'border-gray-100'}`}
                         >
                             <p className="font-bold text-apomacy-dark">Ambil di Apotek</p>
@@ -55,10 +121,21 @@ export default function CheckoutPage() {
                                 Alamat Pengiriman
                             </h2>
                             <div className="grid grid-cols-2 gap-4">
-                                <input type="text" placeholder="Nama Penerima" className="p-3 rounded-xl border border-gray-200 text-sm focus:ring-apomacy-primary focus:outline-none" />
-                                <input type="text" placeholder="Nomor HP (WhatsApp)" className="p-3 rounded-xl border border-gray-200 text-sm focus:ring-apomacy-primary focus:outline-none" />
-                                <textarea placeholder="Alamat Lengkap (Jalan, No Rumah, RT/RW)" className="col-span-2 p-3 rounded-xl border border-gray-200 text-sm h-24 focus:ring-apomacy-primary focus:outline-none" />
-                                <input type="text" placeholder="Patokan (Contoh: Sebelah Masjid)" className="col-span-2 p-3 rounded-xl border border-gray-200 text-sm focus:ring-apomacy-primary focus:outline-none" />
+                                <div>
+                                    <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="Nama Penerima" className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-apomacy-primary'}`} />
+                                    {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name}</p>}
+                                </div>
+                                <div>
+                                    <input type="text" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="Nomor HP (WhatsApp)" className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.phone ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-apomacy-primary'}`} />
+                                    {errors.phone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.phone}</p>}
+                                </div>
+                                <div className="col-span-2">
+                                    <textarea name="address" value={formData.address} onChange={handleInputChange} placeholder="Alamat Lengkap (Jalan, No Rumah, RT/RW)" className={`w-full p-3 rounded-xl border text-sm h-24 focus:outline-none resize-none ${errors.address ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-apomacy-primary'}`} />
+                                    {errors.address && <p className="text-red-500 text-xs mt-1 font-medium">{errors.address}</p>}
+                                </div>
+                                <div className="col-span-2">
+                                    <input type="text" name="landmark" value={formData.landmark} onChange={handleInputChange} placeholder="Patokan (Opsional, Contoh: Sebelah Masjid)" className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:ring-apomacy-primary focus:outline-none" />
+                                </div>
                             </div>
                         </>
                     ) : (
@@ -73,8 +150,14 @@ export default function CheckoutPage() {
                                 <p className="text-xs text-apomacy-teal font-bold mt-2 italic">Jam Operasional: 08:00 - 22:00</p>
                             </div>
                             <div className="space-y-4">
-                                <input type="text" placeholder="Nama Pengambil" className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:ring-apomacy-primary focus:outline-none" />
-                                <input type="text" placeholder="Nomor HP Pengambil" className="w-full p-3 rounded-xl border border-gray-200 text-sm focus:ring-apomacy-primary focus:outline-none" />
+                                <div>
+                                    <input type="text" name="pickupName" value={formData.pickupName} onChange={handleInputChange} placeholder="Nama Pengambil" className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.pickupName ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-apomacy-primary'}`} />
+                                    {errors.pickupName && <p className="text-red-500 text-xs mt-1 font-medium">{errors.pickupName}</p>}
+                                </div>
+                                <div>
+                                    <input type="text" name="pickupPhone" value={formData.pickupPhone} onChange={handleInputChange} placeholder="Nomor HP Pengambil" className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.pickupPhone ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-apomacy-primary'}`} />
+                                    {errors.pickupPhone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.pickupPhone}</p>}
+                                </div>
                             </div>
                         </>
                     )}
@@ -93,14 +176,7 @@ export default function CheckoutPage() {
                         ].map((p) => (
                             <label key={p.id} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
                                 <span className="text-sm font-bold text-apomacy-dark">{p.label}</span>
-                                <input
-                                    type="radio"
-                                    name="payment"
-                                    value={p.id}
-                                    checked={payment === p.id}
-                                    onChange={(e) => setPayment(e.target.value)}
-                                    className="h-5 w-5 text-apomacy-primary accent-apomacy-primary"
-                                />
+                                <input type="radio" name="payment" value={p.id} checked={payment === p.id} onChange={(e) => setPayment(e.target.value)} className="h-5 w-5 text-apomacy-primary accent-apomacy-primary" />
                             </label>
                         ))}
                     </div>
@@ -113,8 +189,6 @@ export default function CheckoutPage() {
                     <div className="max-h-60 overflow-y-auto pr-2 space-y-4 mb-6 scrollbar-hide">
                         {checkoutItems.map(item => (
                             <div key={item.product.id} className="flex gap-3 items-center">
-
-                                {/* --- BAGIAN GAMBAR YANG DIPERBARUI --- */}
                                 <div className="relative w-12 h-12 bg-white border border-outline-variant rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden p-1">
                                     {(item.product as any).image ? (
                                         <Image
@@ -133,8 +207,6 @@ export default function CheckoutPage() {
                                         </div>
                                     )}
                                 </div>
-                                {/* ------------------------------------- */}
-
                                 <div className="flex-1 text-xs">
                                     <p className="font-bold text-apomacy-dark line-clamp-1">{item.product.name}</p>
                                     <p className="text-outline">Qty: {item.quantity}</p>
@@ -160,8 +232,12 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
-                    {/* Panggil komponen dan lempar prop grossAmount */}
-                    <CheckoutButton grossAmount={total} paymentMethod={payment} />
+                    <CheckoutButton
+                        grossAmount={total}
+                        paymentMethod={payment}
+                        items={orderItems}
+                        onValidate={validateForm}
+                    />
                 </div>
             </div>
         </div>

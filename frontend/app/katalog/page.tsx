@@ -9,10 +9,9 @@ import SectionHeader from "@/components/ui/Header";
 import { useCart } from "@/context/CartContext";
 
 const SORT_OPTIONS = [
-    { value: "popular", label: "Most Popular" },
-    { value: "price-asc", label: "Price: Low to High" },
-    { value: "price-desc", label: "Price: High to Low" },
-    { value: "rating", label: "Top Rated" },
+    { value: "popular", label: "Terpopuler" },
+    { value: "price-asc", label: "Harga: Rendah ke Tinggi" },
+    { value: "price-desc", label: "Harga: Tinggi ke Rendah" },
 ];
 
 const ITEMS_PER_PAGE = 15;
@@ -178,7 +177,7 @@ function KatalogContent() {
             {!isLoadingAPI && !apiError && apiProducts.length > 0 && !isFiltering && (
                 <>
                     <section>
-                        <SectionHeader title="Top Selling" viewAllHref="/katalog?sort=popular" />
+                        <SectionHeader title="Top Selling" />
                         <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
                             {topSellingProducts.map((product) => (
                                 <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
@@ -203,12 +202,12 @@ function KatalogContent() {
 
             <section>
                 <SectionHeader
-                    title={searchQuery ? `Hasil Pencarian: "${searchQuery}"` : categoryFilter ? `Kategori Pilihan` : "All Products"}
+                    title={searchQuery ? `Hasil Pencarian: "${searchQuery}"` : categoryFilter ? `Kategori Pilihan` : "Semua Produk"}
                 />
 
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant pb-4">
                     <div className="flex-1">
-                        <h3 className="text-lg font-bold text-apomacy-dark">Our Collection</h3>
+                        <h3 className="text-lg font-bold text-apomacy-dark">Tersedia di toko</h3>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">

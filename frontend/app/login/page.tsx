@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import api from "@/lib/api";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode"; // Tambahan baru untuk membedah token
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,89 +22,49 @@ export default function LoginPage() {
     setSuccess("");
     setIsLoading(true);
 
-    // DATA DUMMY UNTUK PENGUJIAN/TESTING
-    const dummyAccounts = [
-      {
-        email: "admin@apomacy.com",
-        password: "admin123",
-        user: { name: "Admin Apomacy", email: "admin@apomacy.com", role: "admin" },
-        token: "dummy-token-admin-12345",
-      },
-      {
-        email: "kasir@apomacy.com",
-        password: "kasir123",
-        user: { name: "Kasir Apomacy", email: "kasir@apomacy.com", role: "cashier" },
-        token: "dummy-token-cashier-12345",
-      },
-      {
-        email: "user@apomacy.com",
-        password: "user123",
-        user: { name: "Rizky Pelangi", email: "user@apomacy.com", role: "user" },
-        token: "dummy-token-user-12345",
-      },
-    ];
-
-    // Cek jika kredensial cocok dengan Akun Dummy
-    const matchedDummy = dummyAccounts.find(
-      (acc) => acc.email.toLowerCase() === email.toLowerCase() && acc.password === password
-    );
-
-    if (matchedDummy) {
-      setTimeout(() => {
-        localStorage.setItem("token", matchedDummy.token);
-        localStorage.setItem("user", JSON.stringify(matchedDummy.user));
-        
-        setSuccess("Login berhasil (Menggunakan Akun Demo)! Mengalihkan...");
-        
-        setTimeout(() => {
-          const role = matchedDummy.user.role;
-          if (role === "admin") {
-            window.location.href = "/admin";
-          } else if (role === "cashier") {
-            window.location.href = "/kasir";
-          } else {
-            window.location.href = "/dasbor";
-          }
-        }, 1500);
-        setIsLoading(false);
-      }, 1000); // Simulasi delay loading 1 detik
-      return;
-    }
-
-    // Jika bukan dummy, coba panggil API backend nyata
     try {
-      const response = await api.post("/auth/login", {
-        email,
-        password,
+      // 1. Kirim request ke backend (perhatikan endpoint-nya, sesuaikan dengan router.go milikmu)
+      const response = await api.post("/users/login", {
+        username: email, // Backend meminta "username", kita kirim state "email"
+        password: password,
       });
 
-      // Menyesuaikan format data dari backend
-      const { token, user } = response.data?.data || response.data || {};
+      // 2. Tangkap respons dari backend
+      const { token } = response.data;
 
       if (token) {
-        localStorage.setItem("token", token);
-      }
-      if (user) {
-        localStorage.setItem("user", JSON.stringify(user));
-      }
+        // 3. Simpan token di Cookies
+        Cookies.set("apomacy_token", token, { expires: 1 });
 
-      setSuccess("Login berhasil! Mengalihkan...");
-
-      // Redireksi berdasarkan role user
-      setTimeout(() => {
-        const role = user?.role || "user";
-        if (role === "admin") {
-          window.location.href = "/admin";
-        } else if (role === "cashier") {
-          window.location.href = "/kasir";
-        } else {
-          window.location.href = "/dasbor";
+        // 4. Bedah Token JWT untuk mengambil "role"
+        // Sesuaikan interface dengan MapClaims yang ada di backend Go
+        interface MyTokenPayload {
+          id_user: number;
+          role: string;
+          exp: number;
         }
-      }, 1500);
+
+        const decoded = jwtDecode<MyTokenPayload>(token);
+        const userRole = decoded.role;
+
+        setSuccess("Login berhasil! Mengalihkan...");
+
+        // 5. Redirect berdasarkan role yang ada di dalam Token
+        setTimeout(() => {
+          if (userRole === "Admin") {
+            window.location.href = "/admin";
+          } else if (userRole === "Kasir") {
+            window.location.href = "/kasir";
+          } else {
+            window.location.href = "/katalog"; // Halaman default untuk user biasa
+          }
+        }, 1500);
+      }
 
     } catch (err: any) {
       console.error("Login Error:", err);
-      const msg = err.response?.data?.message || err.response?.data?.error || "Gagal masuk. Silakan periksa kembali email dan kata sandi Anda.";
+      // Tangkap pesan error spesifik dari backend (seperti "username atau password salah")
+      const msg = err.response?.data?.error || "Gagal masuk. Silakan periksa kembali kredensial Anda.";
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -117,7 +79,7 @@ export default function LoginPage() {
         </Link>
       </div>
       <div className="max-w-4xl w-full bg-white rounded-[2rem] shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[600px] border border-gray-100">
-        
+
         {/* Left Side - Banner */}
         <div className="md:w-1/2 bg-primary-500 text-white p-12 flex flex-col justify-center relative overflow-hidden">
           <div className="relative z-10 space-y-6">
@@ -126,7 +88,6 @@ export default function LoginPage() {
               Akses resep obat dan kebutuhan kesehatan Anda dengan keamanan dan presisi yang layak Anda dapatkan.
             </p>
           </div>
-          {/* Background Illustration / Overlay */}
           <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1550831107-1553da8c8464?auto=format&fit=crop&q=80')] bg-cover bg-center mix-blend-overlay pointer-events-none"></div>
           <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary-400 rounded-full blur-3xl opacity-50"></div>
           <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary-300 rounded-full blur-3xl opacity-30"></div>
@@ -153,17 +114,17 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6 flex-grow">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email / Username</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Mail size={18} />
                 </div>
-                <input 
-                  type="email" 
+                <input
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@contoh.com" 
+                  placeholder="admin_apomacy"
                   className="w-full pl-11 pr-4 py-3.5 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                 />
               </div>
@@ -175,15 +136,15 @@ export default function LoginPage() {
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Lock size={18} />
                 </div>
-                <input 
-                  type={showPassword ? "text" : "password"} 
+                <input
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" 
+                  placeholder="••••••••"
                   className="w-full pl-11 pr-12 py-3.5 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 cursor-pointer hover:text-gray-600"
@@ -195,19 +156,19 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between pt-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500" 
+                  className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-600">Ingat saya</span>
               </label>
               <Link href="#" className="text-sm font-medium text-primary-500 hover:text-primary-400">Lupa kata sandi?</Link>
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
               className={`w-full ${isLoading ? 'bg-primary-300 cursor-not-allowed' : 'bg-primary-500 hover:bg-primary-400'} text-white font-semibold py-3.5 rounded-xl transition-colors shadow-md mt-4 flex items-center justify-center`}
             >
@@ -232,7 +193,7 @@ export default function LoginPage() {
                 <span className="bg-white px-4 text-gray-400 font-semibold tracking-widest">atau</span>
               </div>
             </div>
-            
+
             <div className="mt-6 text-center text-sm text-gray-600">
               Baru di Apomacy? <Link href="/register" className="font-semibold text-primary-500 hover:text-primary-400">Daftar Sekarang</Link>
             </div>
@@ -247,4 +208,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
