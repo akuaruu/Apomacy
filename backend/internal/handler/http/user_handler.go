@@ -12,25 +12,44 @@ type UserHandler struct {
 	usecase model.UserUsecase
 }
 
-// NewUserHandler menginisialisasi routing untuk User
-func NewUserHandler(r *gin.Engine, usecase model.UserUsecase) {
-	handler := &UserHandler{usecase: usecase}
-
-	// Grouping endpoint untuk user
-	userGroup := r.Group("/api/users")
-	{
-		userGroup.POST("/register", handler.Register)
-		userGroup.POST("/login", handler.Login)
+// NewUserHandler menginisialisasi handler untuk User
+func NewUserHandler(usecase model.UserUsecase) *UserHandler {
+	return &UserHandler{
+		usecase: usecase,
 	}
 }
 
 // menerima JSON untuk register user baru
 func (h *UserHandler) Register(c *gin.Context) {
-	var req model.User
+	// 1. Buat struct khusus untuk menangkap data dari Frontend
+	var req struct {
+		NamaLengkap string `json:"nama_lengkap" binding:"required"`
+		Email       string `json:"email" binding:"required"`
+		Username    string `json:"username" binding:"required"`
+		NoTelp      string `json:"no_telp" binding:"required"`
+		Password    string `json:"password" binding:"required"`
+	}
 
-	//Bind JSON req ke struxct user
+	// 2. Bind JSON ke struct req
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid: " + err.Error()})
+		return
+	}
+
+	// 3. Pindahkan data ke model User yang asli
+	user := model.User{
+		NamaLengkap:  req.NamaLengkap,
+		Email:        req.Email,
+		Username:     req.Username,
+		NoTelp:       req.NoTelp,
+		PasswordHash: req.Password,     // Taruh password polos di sini sementara, akan di-hash oleh Usecase
+		Role:         model.RoleMember, // Berikan default role
+		Status:       model.StatusAktif,
+	}
+
+	// 4. Lempar ke layer Usecase untuk proses Hash dan Insert ke Database
+	if err := h.usecase.Register(c.Request.Context(), &user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mendaftarkan user: " + err.Error()})
 		return
 	}
 

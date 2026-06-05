@@ -9,8 +9,9 @@ import (
 type UserRole string
 
 const (
-	RoleAdmin UserRole = "Admin"
-	RoleKasir UserRole = "Kasir"
+	RoleAdmin  UserRole = "Admin"
+	RoleKasir  UserRole = "Kasir"
+	RoleMember UserRole = "Member"
 )
 
 type UserStatus string

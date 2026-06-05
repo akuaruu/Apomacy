@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image"; // Wajib import komponen Image Next.js
+import Image from "next/image";
 import { formatRupiah } from "@/lib/Data";
 import { useCart } from "@/context/CartContext";
+import CheckoutButton from "@/components/client/CheckoutButton";
 
 const SHIPPING_COST = 15000;
 const FREE_SHIPPING_THRESHOLD = 150000;
@@ -158,9 +159,9 @@ export default function CheckoutPage() {
                             <span className="text-xl font-extrabold">{formatRupiah(total)}</span>
                         </div>
                     </div>
-                    <button className="w-full bg-apomacy-primary text-white py-4 rounded-2xl font-bold mt-8 hover:bg-apomacy-dark transition-all shadow-lg shadow-apomacy-primary/20 tracking-wider uppercase text-sm">
-                        Selesaikan Pesanan
-                    </button>
+
+                    {/* Panggil komponen dan lempar prop grossAmount */}
+                    <CheckoutButton grossAmount={total} paymentMethod={payment} />
                 </div>
             </div>
         </div>
