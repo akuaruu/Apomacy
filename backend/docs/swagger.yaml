@@ -1,0 +1,361 @@
+openapi: 3.0.3
+info:
+  title: Apomacy API Documentation
+  description: API untuk sistem manajemen apotek Apomacy, mencakup manajemen user, inventaris obat, data pelanggan, supplier, dan transaksi kasir.
+  version: 3.0.3
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/aiml-906/Apomacy/3.0.3
+  - url: http://localhost:8080/api
+    description: Local Development Server
+
+tags:
+  - name: Auth
+    description: Autentikasi dan Registrasi Pegawai/Kasir
+  - name: Obat
+    description: Manajemen Inventaris Obat
+  - name: Customer
+    description: Manajemen Data Pelanggan
+  - name: Supplier
+    description: Manajemen Data Supplier
+  - name: Payment
+    description: Transaksi Kasir dan Checkout
+
+paths:
+
+  # AUTH / USERS
+  /users/register:
+    post:
+      tags: [Auth]
+      summary: Registrasi user baru (Admin/Kasir)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: Registrasi berhasil
+        '400':
+          description: Format request tidak valid
+  
+  /users/login:
+    post:
+      tags: [Auth]
+      summary: Login user dan mendapatkan JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login berhasil, mengembalikan token
+        '401':
+          description: Username atau password salah
+
+
+  # OBAT
+  /obat:
+    get:
+      tags: [Obat]
+      summary: Mengambil semua data obat katalog
+      responses:
+        '200':
+          description: List data obat
+    post:
+      tags: [Obat]
+      summary: Menambahkan data obat baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Obat'
+      responses:
+        '201':
+          description: Obat berhasil ditambahkan
+          
+  /obat/{id}:
+    get:
+      tags: [Obat]
+      summary: Mengambil detail spesifik 1 obat
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detail data obat
+        '404':
+          description: Obat tidak ditemukan
+    put:
+      tags: [Obat]
+      summary: Mengupdate data obat
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Obat'
+      responses:
+        '200':
+          description: Obat berhasil diupdate
+    delete:
+      tags: [Obat]
+      summary: Menghapus data obat
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Obat berhasil dihapus
+
+
+  # CUSTOMER
+  /customer:
+    get:
+      tags: [Customer]
+      summary: Mengambil semua data pelanggan
+      responses:
+        '200':
+          description: List pelanggan
+    post:
+      tags: [Customer]
+      summary: Mendaftarkan pelanggan baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        '201':
+          description: Customer berhasil didaftarkan
+          
+  /customer/{id}:
+    get:
+      tags: [Customer]
+      summary: Detail pelanggan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detail pelanggan
+    put:
+      tags: [Customer]
+      summary: Update pelanggan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        '200':
+          description: Customer berhasil diupdate
+
+
+  # SUPPLIER
+  /supplier:
+    get:
+      tags: [Supplier]
+      summary: Mengambil semua data supplier
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Supplier]
+      summary: Tambah supplier baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+      responses:
+        '201':
+          description: Created
+          
+  /supplier/{id}:
+    get:
+      tags: [Supplier]
+      summary: Detail supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+    put:
+      tags: [Supplier]
+      summary: Update supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Supplier'
+      responses:
+        '200':
+          description: OK
+
+  # CHECKOUT / PAYMENT
+  /checkout:
+    post:
+      tags: [Payment]
+      summary: Proses keranjang belanja dan generate Midtrans Snap Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '200':
+          description: Berhasil memanggil Midtrans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "b7a69c02-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# DATA MODELS (SCHEMAS)
+components:
+  schemas:
+    UserRegister:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        nama_lengkap:
+          type: string
+        no_telp:
+          type: string
+        email:
+          type: string
+          
+    UserLogin:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    Obat:
+      type: object
+      properties:
+        id_supplier:
+          type: integer
+        kode_obat:
+          type: string
+        nama_obat:
+          type: string
+        jenis_obat:
+          type: string
+        bentuk_obat:
+          type: string
+        satuan:
+          type: string
+        harga_beli:
+          type: number
+        harga_jual:
+          type: number
+        stok:
+          type: integer
+        stok_minimum:
+          type: integer
+        expired_date:
+          type: string
+          format: date-time
+        dosis_pemakaian:
+          type: string
+        komposisi:
+          type: string
+        deskripsi:
+          type: string
+        gambar_produk:
+          type: string
+
+    Customer:
+      type: object
+      properties:
+        nama_customer:
+          type: string
+        no_telp:
+          type: string
+        alamat:
+          type: string
+        tanggal_lahir:
+          type: string
+          format: date-time
+        jenis_kelamin:
+          type: string
+          enum: [L, P]
+        email:
+          type: string
+
+    Supplier:
+      type: object
+      properties:
+        kode_supplier:
+          type: string
+        nama_supplier:
+          type: string
+        alamat:
+          type: string
+        kota:
+          type: string
+        no_telp:
+          type: string
+        email:
+          type: string
+        contact_person:
+          type: string
+
+    CheckoutRequest:
+      type: object
+      properties:
+        order_id:
+          type: string
+        gross_amount:
+          type: integer
