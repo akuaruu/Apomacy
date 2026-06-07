@@ -45,6 +45,10 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
 	customerHandler := NewCustomerHandler(customerUsecase)
 
+	supplierRepo := repository.NewSupplierRepository(dbPool)
+	supplierUsecase := usecase.NewSupplierUsecase(supplierRepo)
+	supplierHandler := NewSupplierHandler(supplierUsecase)
+
 	// Domain: transaction
 	paymentUsecase := usecase.NewPaymentUsecase()
 	paymentHandler := NewPaymentHandler(paymentUsecase)
@@ -79,6 +83,14 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			customer.GET("/", customerHandler.GetAllCustomers)
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
+		}
+
+		supplier := api.Group("/supplier")
+		{
+			supplier.POST("/", supplierHandler.CreateSupplier)
+			supplier.GET("/", supplierHandler.GetAllSuppliers)
+			supplier.GET("/:id", supplierHandler.GetSupplierByID)
+			supplier.PUT("/:id", supplierHandler.UpdateSupplier)
 		}
 
 		// Modul Payment

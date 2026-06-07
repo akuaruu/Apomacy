@@ -26,6 +26,8 @@ type Obat struct {
 	Deskripsi      string    `json:"deskripsi"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updateed_at"`
+
+	Kategori []string `json:"kategori"`
 }
 
 type ObatUsecase interface {

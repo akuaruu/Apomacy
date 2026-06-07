@@ -56,9 +56,9 @@ func (r *supplierRepository) GetByID(ctx context.Context, id int) (*model.Suppli
 
 func (r *supplierRepository) GetAll(ctx context.Context) ([]model.Supplier, error) {
 	query := `
-		SELECT id_supplier, kode_supplier, nama_supplier, alamat, kota, no_telp, email, contact_person, status_kemitraan, created_at 
+		SELECT id_supplier, kode_supplier, nama_supplier, alamat, kota, no_telp, email, contact_person, status_kemitraan 
 		FROM supplier 
-		ORDER BY created_at DESC`
+		ORDER BY id_supplier DESC`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
