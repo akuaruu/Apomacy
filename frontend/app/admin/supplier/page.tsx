@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
 import {
   Search,
   RefreshCw,
@@ -21,6 +20,8 @@ import {
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
+// Menggunakan interceptor custom milikmu (bukan axios bawaan)
+import api from "@/lib/api";
 
 export default function SupplierPage() {
   const [supplierList, setSupplierList] = useState<any[]>([]);
@@ -46,8 +47,9 @@ export default function SupplierPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Form State
+  // Form State (ditambah properti id untuk keperluan edit/hapus ke backend)
   const [formData, setFormData] = useState({
+    id: "",
     kode: "",
     nama: "",
     cp: "",
@@ -67,14 +69,27 @@ export default function SupplierPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // API FETCH
+  // API FETCH DARI BACKEND GOLANG
   const fetchSupplierData = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        "https://api.npoint.io/f39f256e6c10202dbe42",
-      );
-      setSupplierList(response.data);
+      const response = await api.get("/supplier/");
+      const data = response.data?.data || response.data || [];
+
+      // Mapping response Golang (snake_case) ke format state frontend
+      const mappedData = data.map((item: any) => ({
+        id: item.id_supplier,
+        kode: item.kode_supplier,
+        nama: item.nama_supplier,
+        cp: item.contact_person || "",
+        telepon: item.no_telp || "",
+        email: item.email || "",
+        kota: item.kota || "",
+        alamat: item.alamat || "",
+        status: item.status_kemitraan || "Aktif",
+      }));
+
+      setSupplierList(mappedData);
     } catch (error) {
       console.error("Gagal mengambil data dari API:", error);
       showToast(
@@ -93,6 +108,7 @@ export default function SupplierPage() {
   // Form Handlers
   const handleClearForm = () => {
     setFormData({
+      id: "",
       kode: "",
       nama: "",
       cp: "",
@@ -179,14 +195,11 @@ export default function SupplierPage() {
       return;
     }
 
-    // 3. Validasi Duplikasi Kode/Nama/Email
+    // 3. Validasi Duplikasi Kode/Nama/Email (di sisi Frontend sbg filter awal)
     const isDuplicate = supplierList.some((item) => {
-      const isSameKode =
-        item.kode.toUpperCase() === formData.kode.trim().toUpperCase();
-      const isSameNama =
-        item.nama.toLowerCase() === formData.nama.trim().toLowerCase();
-      const isSameEmail =
-        item.email.toLowerCase() === formData.email.trim().toLowerCase();
+      const isSameKode = item.kode.toUpperCase() === formData.kode.trim().toUpperCase();
+      const isSameNama = item.nama.toLowerCase() === formData.nama.trim().toLowerCase();
+      const isSameEmail = item.email.toLowerCase() === formData.email.trim().toLowerCase();
 
       if (mode === "edit" && selectedSupplier) {
         return (
@@ -206,45 +219,54 @@ export default function SupplierPage() {
     }
 
     setModalConfig({
-      title:
-        mode === "tambah"
-          ? "Konfirmasi Tambah Supplier"
-          : "Konfirmasi Edit Supplier",
-      message:
-        mode === "tambah"
-          ? "Apakah Anda yakin ingin menyimpan data supplier baru ini ke dalam sistem?"
-          : `Apakah Anda yakin ingin menyimpan perubahan pada data supplier ${formData.nama}?`,
+      title: mode === "tambah" ? "Konfirmasi Tambah Supplier" : "Konfirmasi Edit Supplier",
+      message: mode === "tambah"
+        ? "Apakah Anda yakin ingin menyimpan data supplier baru ini ke dalam sistem?"
+        : `Apakah Anda yakin ingin menyimpan perubahan pada data supplier ${formData.nama}?`,
       type: mode as "tambah" | "edit",
     });
     setIsModalOpen(true);
   };
 
-  // Eksekusi aksi setelah konfirmasi di modal
-  const executeAction = () => {
-    if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
-      const finalData = { ...formData };
-
-      if (modalConfig.type === "tambah") {
-        setSupplierList([finalData, ...supplierList]);
-        setCurrentPage(1);
-        showToast("Data supplier baru berhasil ditambahkan!", "success");
-      } else if (modalConfig.type === "edit") {
-        setSupplierList(
-          supplierList.map((item) =>
-            item.kode === formData.kode ? finalData : item,
-          ),
-        );
-        showToast("Perubahan data supplier berhasil disimpan!", "success");
-      }
-    } else if (modalConfig.type === "hapus" && selectedSupplier) {
-      setSupplierList(
-        supplierList.filter((item) => item.kode !== selectedSupplier.kode),
-      );
-      showToast("Data supplier berhasil dihapus dari sistem.", "success");
-    }
-
+  // Eksekusi API aksi setelah konfirmasi di modal
+  const executeAction = async () => {
     setIsModalOpen(false);
-    handleClearForm();
+
+    try {
+      if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
+
+        // Payload disesuaikan dengan struct JSON di Golang
+        const payload = {
+          kode_supplier: formData.kode,
+          nama_supplier: formData.nama,
+          contact_person: formData.cp,
+          no_telp: formData.telepon,
+          email: formData.email,
+          kota: formData.kota,
+          alamat: formData.alamat,
+          status_kemitraan: formData.status
+        };
+
+        if (modalConfig.type === "tambah") {
+          await api.post("/supplier/", payload);
+          showToast("Data supplier baru berhasil ditambahkan!", "success");
+        } else if (modalConfig.type === "edit") {
+          await api.put(`/supplier/${formData.id}`, payload);
+          showToast("Perubahan data supplier berhasil disimpan!", "success");
+        }
+      } else if (modalConfig.type === "hapus" && selectedSupplier) {
+        await api.delete(`/supplier/${selectedSupplier.id}`);
+        showToast("Data supplier berhasil dihapus dari sistem.", "success");
+      }
+
+      // Ambil ulang data segar dari database
+      await fetchSupplierData();
+      handleClearForm();
+
+    } catch (error: any) {
+      const errMsg = error.response?.data?.error || "Terjadi kesalahan server saat memproses data.";
+      showToast(errMsg, "error");
+    }
   };
 
   // Searching & Pagination
@@ -494,24 +516,22 @@ export default function SupplierPage() {
                       onClick={() =>
                         setFormData({ ...formData, status: "Aktif" })
                       }
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                        formData.status === "Aktif"
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${formData.status === "Aktif"
                           ? "bg-green-500 text-white shadow-sm"
                           : "text-outline hover:text-apomacy-dark"
-                      }`}
+                        }`}
                     >
                       Aktif
                     </button>
                     <button
                       type="button"
                       onClick={() =>
-                        setFormData({ ...formData, status: "NonAktif" })
+                        setFormData({ ...formData, status: "Tidak Aktif" }) // Menyesuaikan enum backend
                       }
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                        formData.status === "NonAktif"
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${formData.status === "Tidak Aktif"
                           ? "bg-gray-400 text-white shadow-sm"
                           : "text-outline hover:text-apomacy-dark"
-                      }`}
+                        }`}
                     >
                       NonAktif
                     </button>
@@ -621,11 +641,10 @@ export default function SupplierPage() {
                     </td>
                     <td className="px-5 py-4 text-center">
                       <span
-                        className={`inline-flex items-center px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md ${
-                          supplier.status === "Aktif"
+                        className={`inline-flex items-center px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md ${supplier.status === "Aktif"
                             ? "bg-green-100 text-green-700"
                             : "bg-gray-100 text-gray-500"
-                        }`}
+                          }`}
                       >
                         {supplier.status}
                       </span>

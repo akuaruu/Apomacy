@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import axios from "axios";
 import {
   Search,
   RefreshCw,
@@ -16,10 +15,10 @@ import {
   Loader2,
 } from "lucide-react";
 
-// Import komponen UI
 import SearchableSelect from "@/components/shared/SearchableSelect";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import api from "@/lib/api";
 
 export default function DataObatPage() {
   const [obatList, setObatList] = useState<any[]>([]);
@@ -29,7 +28,6 @@ export default function DataObatPage() {
   const [selectedObat, setSelectedObat] = useState<any>(null);
   const [mode, setMode] = useState<"tambah" | "edit" | null>(null);
 
-  // Modal & Toast
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     title: "",
@@ -41,7 +39,6 @@ export default function DataObatPage() {
     type: "success" | "error";
   } | null>(null);
 
-  // Pagination dan Master Data
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
 
@@ -50,37 +47,20 @@ export default function DataObatPage() {
     "Obat Bebas Terbatas",
     "Obat Keras",
   ]);
-  const [categories, setCategories] = useState([
-    "Analgetik",
-    "Antibiotik",
-    "Vitamin",
-    "Suplemen",
-    "Herbal",
-    "Antasida",
-    "Obat Maag",
-    "Obat Batuk",
-    "Antihipertensi",
-    "Antidiabetes",
-  ]);
   const [bentukOptions] = useState([
     "Tablet",
     "Kapsul",
     "Kaplet",
     "Sirup",
     "Salep",
+    "Suspensi",
+    "Gel",
   ]);
   const [satuanOptions] = useState(["Strip", "Botol", "Pcs", "Box", "Tube"]);
-  const [supplierOptions] = useState([
-    "PT. Kimia Farma",
-    "PT. Kalbe Farma",
-    "PT. Sanbe Farma",
-    "PT. Konimex",
-    "PT. Merck Indonesia",
-    "PT. Supra Ferbindo Farma",
-    "PT. Deltomed Laboratories",
-    "PT. Johnson & Johnson",
-    "PT. Dexa Medica",
-  ]);
+
+  const [categories, setCategories] = useState<string[]>([]);
+  const [supplierList, setSupplierList] = useState<any[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryText, setNewCategoryText] = useState("");
@@ -90,6 +70,7 @@ export default function DataObatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
+    id: "",
     kode: "",
     nama: "",
     jenis: "",
@@ -108,41 +89,87 @@ export default function DataObatPage() {
     dosis: "",
   });
 
-  // Toast
-  const showToast = (
-    message: string,
-    type: "success" | "error" = "success",
-  ) => {
+  const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // API FETCH
+  const fetchMasterData = async () => {
+    try {
+      // Hanya request ke supplier, kategori ditiadakan karena tidak ada route /kategori di backend
+      const supRes = await api.get("/supplier/");
+      const supData = supRes.data?.data || supRes.data || [];
+
+      setSupplierList(supData);
+      setSupplierOptions(supData.map((s: any) => s.nama_supplier));
+    } catch (error) {
+      console.error("Gagal mengambil data master supplier", error);
+    }
+  };
+
   const fetchObatData = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        "https://api.npoint.io/b6965231a2d369815479",
-      );
-      setObatList(response.data);
+      const response = await api.get("/obat/");
+      const data = response.data?.data || response.data || [];
+
+      // Mengekstrak kategori unik dari data obat yang ditarik untuk tag suggestions
+      const extractedCategories = new Set<string>();
+
+      const mappedData = data.map((item: any) => {
+        const catArray = item.kategori || [];
+        catArray.forEach((c: string) => extractedCategories.add(c));
+
+        // Format waktu agar sesuai untuk value HTML date picker (YYYY-MM-DD)
+        const expiredDate = item.expired_date ? item.expired_date.split("T")[0] : "";
+
+        return {
+          id: item.id_obat,
+          kode: item.kode_obat,
+          nama: item.nama_obat,
+          jenis: item.jenis_obat,
+          kategori: catArray,
+          bentuk: item.bentuk_obat,
+          satuan: item.satuan,
+          // Mencari nama supplier dari List atau set manual jika di backend belum ada join.
+          // Kita pakai id_supplier sbg jembatan, asumsi supplierList sdh termuat
+          supplier: item.id_supplier,
+          hargaBeli: item.harga_beli,
+          hargaJual: item.harga_jual,
+          stok: item.stok,
+          minimal: item.stok_minimum,
+          expired: expiredDate,
+          gambar: item.gambar_produk,
+          deskripsi: item.deskripsi,
+          komposisi: item.komposisi,
+          dosis: item.dosis_pemakaian,
+        };
+      });
+
+      setCategories(Array.from(extractedCategories));
+      setObatList(mappedData);
     } catch (error) {
-      console.error("Gagal mengambil data dari API:", error);
-      showToast(
-        "Terjadi kesalahan saat memuat data obat dari server.",
-        "error",
-      );
+      showToast("Terjadi kesalahan saat memuat data obat dari server.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchObatData();
+    fetchMasterData();
   }, []);
 
-  // Form Handlers
+  // Fetch Obat dipisah agar menunggu fetchMasterData selesai
+  // Sehingga supplierList sudah ready saat mapping di fetchObatData
+  useEffect(() => {
+    if (supplierOptions.length >= 0) {
+      fetchObatData();
+    }
+  }, [supplierOptions.length]);
+
   const handleClearForm = () => {
     setFormData({
+      id: "",
       kode: "",
       nama: "",
       jenis: "",
@@ -179,11 +206,20 @@ export default function DataObatPage() {
     setIsModalOpen(true);
   };
 
+  const getSupplierNameFromId = (id: number) => {
+    const s = supplierList.find(x => x.id_supplier === id);
+    return s ? s.nama_supplier : "Pilih Supplier";
+  };
+
   const handleSelectRow = (obat: any) => {
     setSelectedObat(obat);
     if (mode === "edit") {
-      setFormData(obat);
+      setFormData({
+        ...obat,
+        supplier: getSupplierNameFromId(obat.supplier)
+      });
       setImagePreview(obat.gambar);
+      setImageFile(null);
     }
   };
 
@@ -204,8 +240,12 @@ export default function DataObatPage() {
       handleClearForm();
       setMode("tambah");
     } else if (actionMode === "edit" && selectedObat) {
-      setFormData(selectedObat);
+      setFormData({
+        ...selectedObat,
+        supplier: getSupplierNameFromId(selectedObat.supplier)
+      });
       setImagePreview(selectedObat.gambar);
+      setImageFile(null);
     }
   };
 
@@ -251,7 +291,6 @@ export default function DataObatPage() {
     setIsAddingCategory(false);
   };
 
-  // Validasi sebelum submit
   const handleSaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -270,25 +309,25 @@ export default function DataObatPage() {
       !formData.komposisi.trim()
     ) {
       showToast(
-        "Gagal! Seluruh kolom data (termasuk Deskripsi, Komposisi, & Dosis) wajib diisi.",
+        "Gagal! Seluruh kolom data wajib diisi.",
         "error",
       );
       return;
     }
+
     if (formData.hargaJual <= 0) {
       showToast("Gagal! Harga Jual harus lebih dari 0.", "error");
       return;
     }
+
     if (!imagePreview) {
       showToast("Gagal! Anda wajib mengunggah Foto/Gambar Produk.", "error");
       return;
     }
 
     const isDuplicate = obatList.some((item) => {
-      const isSameKode =
-        item.kode.toUpperCase() === formData.kode.trim().toUpperCase();
-      const isSameNama =
-        item.nama.toLowerCase() === formData.nama.trim().toLowerCase();
+      const isSameKode = item.kode.toUpperCase() === formData.kode.trim().toUpperCase();
+      const isSameNama = item.nama.toLowerCase() === formData.nama.trim().toLowerCase();
       if (mode === "edit" && selectedObat) {
         return (isSameKode || isSameNama) && item.kode !== selectedObat.kode;
       }
@@ -297,57 +336,116 @@ export default function DataObatPage() {
 
     if (isDuplicate) {
       showToast(
-        "Gagal! Data obat dengan Kode atau Nama tersebut sudah terdaftar di sistem. Silakan gunakan identitas yang unik.",
+        "Gagal! Data obat dengan Kode atau Nama tersebut sudah terdaftar di sistem.",
         "error",
       );
       return;
     }
 
     setModalConfig({
-      title:
-        mode === "tambah" ? "Konfirmasi Tambah Data" : "Konfirmasi Edit Data",
-      message:
-        mode === "tambah"
-          ? "Apakah Anda yakin ingin menyimpan data obat baru ini ke dalam sistem inventaris?"
-          : `Apakah Anda yakin ingin menyimpan perubahan pada data obat ${formData.nama} (${formData.kode})?`,
+      title: mode === "tambah" ? "Konfirmasi Tambah Data" : "Konfirmasi Edit Data",
+      message: mode === "tambah"
+        ? "Apakah Anda yakin ingin menyimpan data obat baru ini ke dalam sistem inventaris?"
+        : `Apakah Anda yakin ingin menyimpan perubahan pada data obat ${formData.nama} (${formData.kode})?`,
       type: mode as "tambah" | "edit",
     });
     setIsModalOpen(true);
   };
 
-  // Eksekusi aksi setelah konfirmasi di modal
-  const executeAction = () => {
-    if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
-      const finalData = { ...formData, gambar: imagePreview };
-      if (modalConfig.type === "tambah") {
-        setObatList([finalData, ...obatList]);
-        setCurrentPage(1);
-        showToast("Data obat baru berhasil ditambahkan!", "success");
-      } else if (modalConfig.type === "edit") {
-        setObatList(
-          obatList.map((item) =>
-            item.kode === formData.kode ? finalData : item,
-          ),
-        );
-        showToast("Perubahan data obat berhasil disimpan!", "success");
-      }
-    } else if (modalConfig.type === "hapus" && selectedObat) {
-      setObatList(obatList.filter((item) => item.kode !== selectedObat.kode));
-      showToast("Data obat berhasil dihapus dari sistem.", "success");
-    }
+  const executeAction = async () => {
     setIsModalOpen(false);
-    handleClearForm();
+
+    try {
+      if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
+        const selectedSupplier = supplierList.find(s => s.nama_supplier === formData.supplier);
+        const supplierId = selectedSupplier ? selectedSupplier.id_supplier.toString() : "0";
+
+        // Format ke RFC3339 agar mudah di-parse time.Time oleh Golang
+        const formattedExpiredDate = `${formData.expired}T00:00:00Z`;
+
+        if (modalConfig.type === "tambah") {
+          // POST Menerima Multipart Form Data di obat_handler.go
+          const payload = new FormData();
+          payload.append("kode_obat", formData.kode);
+          payload.append("nama_obat", formData.nama);
+          payload.append("jenis_obat", formData.jenis);
+          payload.append("bentuk_obat", formData.bentuk);
+          payload.append("satuan", formData.satuan);
+          payload.append("id_supplier", supplierId);
+          payload.append("harga_beli", formData.hargaBeli.toString());
+          payload.append("harga_jual", formData.hargaJual.toString());
+          payload.append("stok", formData.stok.toString());
+          payload.append("stok_minimum", formData.minimal.toString());
+          payload.append("expired_date", formattedExpiredDate);
+          payload.append("deskripsi", formData.deskripsi);
+          payload.append("komposisi", formData.komposisi);
+          payload.append("dosis_pemakaian", formData.dosis);
+
+          formData.kategori.forEach(k => {
+            payload.append("kategori", k);
+          });
+
+          if (imageFile) {
+            payload.append("gambar_produk", imageFile);
+          }
+
+          await api.post("/obat/", payload, {
+            headers: { "Content-Type": "multipart/form-data" }
+          });
+          showToast("Data obat baru berhasil ditambahkan!", "success");
+
+        } else if (modalConfig.type === "edit") {
+          // PERHATIAN: PUT /api/obat/:id di handler.go menggunakan c.ShouldBindJSON
+          // Jadi kita Wajib mengirim JSON.
+          const jsonPayload = {
+            kode_obat: formData.kode,
+            nama_obat: formData.nama,
+            jenis_obat: formData.jenis,
+            bentuk_obat: formData.bentuk,
+            satuan: formData.satuan,
+            id_supplier: parseInt(supplierId),
+            harga_beli: formData.hargaBeli,
+            harga_jual: formData.hargaJual,
+            stok: formData.stok,
+            stok_minimum: formData.minimal,
+            expired_date: formattedExpiredDate,
+            deskripsi: formData.deskripsi,
+            komposisi: formData.komposisi,
+            dosis_pemakaian: formData.dosis,
+            kategori: formData.kategori,
+            gambar_produk: formData.gambar,
+          };
+
+          if (imageFile) {
+            showToast("Endpoint Update di server saat ini hanya mendukung JSON. Gambar baru akan diabaikan.", "error");
+          }
+
+          await api.put(`/obat/${formData.id}`, jsonPayload);
+          showToast("Perubahan data obat berhasil disimpan!", "success");
+        }
+      } else if (modalConfig.type === "hapus" && selectedObat) {
+        await api.delete(`/obat/${selectedObat.id}`);
+        showToast("Data obat berhasil dihapus dari sistem.", "success");
+      }
+
+      await fetchObatData();
+      handleClearForm();
+
+    } catch (error: any) {
+      const errMsg = error.response?.data?.error || "Terjadi kesalahan pada server saat memproses data.";
+      showToast(errMsg, "error");
+    }
   };
 
-  // Searching dan Pagination
   const filteredObatList = obatList.filter((o) => {
     const q = search.toLowerCase();
+    const sName = getSupplierNameFromId(o.supplier).toLowerCase();
     return (
       o.kode?.toLowerCase().includes(q) ||
       o.nama?.toLowerCase().includes(q) ||
       o.jenis?.toLowerCase().includes(q) ||
       o.bentuk?.toLowerCase().includes(q) ||
-      o.supplier?.toLowerCase().includes(q) ||
+      sName.includes(q) ||
       o.stok?.toString().includes(q) ||
       o.hargaJual?.toString().includes(q) ||
       (Array.isArray(o.kategori) &&
@@ -358,10 +456,7 @@ export default function DataObatPage() {
   const totalPages = Math.ceil(filteredObatList.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredObatList.slice(
-    indexOfFirstItem,
-    indexOfLastItem,
-  );
+  const currentItems = filteredObatList.slice(indexOfFirstItem, indexOfLastItem);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -375,7 +470,6 @@ export default function DataObatPage() {
         </h1>
       </div>
 
-      {/* Searchbar */}
       <div className="flex gap-4 items-center bg-white p-4 rounded-2xl border border-outline-variant shadow-sm">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-3.5 h-4 w-4 text-outline" />
@@ -398,12 +492,11 @@ export default function DataObatPage() {
           }}
           className="rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-bold text-apomacy-dark hover:bg-surface-container-low transition-colors flex items-center gap-2"
         >
-          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />{" "}
+          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           Refresh
         </button>
       </div>
 
-      {/* Navigasi Tombol Utama */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-surface-container-low p-3 rounded-2xl border border-outline-variant">
         <button
           type="button"
@@ -418,7 +511,7 @@ export default function DataObatPage() {
           disabled={!selectedObat}
           className={`py-3 rounded-xl font-black text-xs tracking-wider transition-all flex items-center justify-center gap-2 border ${!selectedObat ? "opacity-50 cursor-not-allowed bg-gray-100 text-gray-400 border-gray-200" : mode === "edit" ? "bg-apomacy-dark text-white border-apomacy-dark shadow-sm" : "bg-white border-outline-variant text-apomacy-dark hover:bg-gray-50"}`}
         >
-          <Pencil size={16} /> EDIT DATA{" "}
+          <Pencil size={16} /> EDIT DATA
           {selectedObat && `(${selectedObat.kode})`}
         </button>
         <button
@@ -431,7 +524,6 @@ export default function DataObatPage() {
         </button>
       </div>
 
-      {/* Form Dinamis */}
       {mode && (
         <div className="rounded-3xl border border-outline-variant bg-white p-6 shadow-md relative animate-in fade-in duration-300">
           <div className="flex justify-between items-center mb-6 border-b border-outline-variant/50 pb-3">
@@ -451,7 +543,6 @@ export default function DataObatPage() {
 
           <form onSubmit={handleSaveSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-              {/* Kolom 1 */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
@@ -535,7 +626,7 @@ export default function DataObatPage() {
                         key={tag}
                         className="inline-flex items-center gap-1 bg-apomacy-primary/10 text-apomacy-primary text-[11px] font-black px-2.5 py-1 rounded-lg"
                       >
-                        {tag}{" "}
+                        {tag}
                         <button
                           type="button"
                           onClick={() => handleRemoveCategoryTag(tag)}
@@ -549,7 +640,6 @@ export default function DataObatPage() {
                 </div>
               </div>
 
-              {/* Kolom 2 */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
@@ -608,7 +698,6 @@ export default function DataObatPage() {
                 </div>
               </div>
 
-              {/* Kolom 3 */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-red-500 uppercase tracking-wider mb-1.5">
@@ -668,7 +757,6 @@ export default function DataObatPage() {
                 </div>
               </div>
 
-              {/* Kolom 4 */}
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
@@ -676,8 +764,8 @@ export default function DataObatPage() {
                   </label>
                   <div className="flex gap-3 items-center">
                     <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-16 h-16 shrink-0 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex items-center justify-center text-outline cursor-pointer overflow-hidden hover:border-apomacy-primary hover:text-apomacy-primary transition-all"
+                      onClick={() => mode !== "edit" && fileInputRef.current?.click()}
+                      className={`w-16 h-16 shrink-0 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex items-center justify-center text-outline overflow-hidden transition-all ${mode === "edit" ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:border-apomacy-primary hover:text-apomacy-primary"}`}
                     >
                       {imagePreview ? (
                         <img
@@ -695,17 +783,19 @@ export default function DataObatPage() {
                         ref={fileInputRef}
                         accept="image/*"
                         onChange={handleImageChange}
+                        disabled={mode === "edit"}
                         className="hidden"
                       />
                       <button
                         type="button"
+                        disabled={mode === "edit"}
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 text-[11px] font-black tracking-wide rounded-lg border border-outline-variant bg-white text-apomacy-dark hover:bg-gray-50 transition-colors"
+                        className="px-3 py-1.5 text-[11px] font-black tracking-wide rounded-lg border border-outline-variant bg-white text-apomacy-dark hover:bg-gray-50 disabled:opacity-50 transition-colors"
                       >
                         FOTO
                       </button>
                       <p className="text-[10px] text-outline mt-1 truncate max-w-[120px]">
-                        {imageFile ? imageFile.name : "JPG, PNG"}
+                        {mode === "edit" ? "Update foto dari UI belum didukung" : (imageFile ? imageFile.name : "JPG, PNG")}
                       </p>
                     </div>
                   </div>
@@ -740,7 +830,6 @@ export default function DataObatPage() {
               </div>
             </div>
 
-            {/* Textarea */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-outline-variant/30 pt-4">
               <div>
                 <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
@@ -772,7 +861,6 @@ export default function DataObatPage() {
               </div>
             </div>
 
-            {/* Tombol Simpan/Batal Form */}
             <div className="flex justify-end gap-3 border-t border-outline-variant/50 pt-4">
               <button
                 type="button"
@@ -792,7 +880,6 @@ export default function DataObatPage() {
         </div>
       )}
 
-      {/* Tabel Utama & Pagination */}
       <div className="rounded-3xl border border-outline-variant bg-white shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-sm text-left">
@@ -811,15 +898,9 @@ export default function DataObatPage() {
             <tbody className="divide-y divide-outline-variant">
               {isLoading ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-12 text-center text-outline font-bold"
-                  >
+                  <td colSpan={9} className="px-4 py-12 text-center text-outline font-bold">
                     <div className="flex flex-col items-center justify-center gap-3">
-                      <Loader2
-                        size={28}
-                        className="animate-spin text-apomacy-primary"
-                      />
+                      <Loader2 size={28} className="animate-spin text-apomacy-primary" />
                       <span>Memuat data dari server...</span>
                     </div>
                   </td>
@@ -870,16 +951,13 @@ export default function DataObatPage() {
                       Rp {obat.hargaJual.toLocaleString("id-ID")}
                     </td>
                     <td className="px-5 py-4 font-medium text-apomacy-muted">
-                      {obat.supplier}
+                      {getSupplierNameFromId(obat.supplier)}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="px-4 py-12 text-center text-outline font-bold"
-                  >
+                  <td colSpan={9} className="px-4 py-12 text-center text-outline font-bold">
                     Data obat tidak ditemukan.
                   </td>
                 </tr>
@@ -888,7 +966,6 @@ export default function DataObatPage() {
           </table>
         </div>
 
-        {/* Footer Pagination UI */}
         <div className="flex items-center justify-between border-t border-outline-variant bg-surface-container-low/50 px-6 py-4">
           <div className="text-xs font-bold text-outline">
             Menampilkan{" "}
@@ -927,7 +1004,6 @@ export default function DataObatPage() {
         </div>
       </div>
 
-      {/* Panggil komponen Modal dan Toast */}
       <ModalConfirm
         isOpen={isModalOpen}
         title={modalConfig.title}
