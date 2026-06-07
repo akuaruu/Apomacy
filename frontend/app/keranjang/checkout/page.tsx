@@ -23,7 +23,7 @@ export default function CheckoutPage() {
         pickupPhone: ""
     });
 
-    const [errors, setErrors] = useState<any>({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const checkoutItems = cartItems.filter(i => selectedIds.includes(i.product.id));
     const subtotal = cartTotal;
@@ -56,12 +56,12 @@ export default function CheckoutPage() {
         setFormData(prev => ({ ...prev, [name]: value }));
 
         if (errors[name]) {
-            setErrors((prev: any) => ({ ...prev, [name]: "" }));
+            setErrors(prev => ({ ...prev, [name]: "" }));
         }
     };
 
     const validateForm = () => {
-        const newErrors: any = {};
+        const newErrors: Record<string, string> = {};
 
         if (method === 'delivery') {
             if (!formData.name.trim()) newErrors.name = "Nama penerima wajib diisi";
@@ -195,7 +195,7 @@ export default function CheckoutPage() {
                                             src={(item.product as any).image}
                                             alt={item.product.name}
                                             fill
-                                            unoptimized={true}
+                                            unoptimized
                                             className="object-contain mix-blend-multiply p-1"
                                             sizes="48px"
                                         />

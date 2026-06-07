@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import axios from "axios";
 import PromoBanner from "@/components/ui/PromoBanner";
-import ProductCard from "@/components/shared/ProductCard";
+import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
 import SectionHeader from "@/components/ui/Header";
 import { useCart } from "@/context/CartContext";
+import api from "@/lib/api";
 
 const SORT_OPTIONS = [
     { value: "popular", label: "Terpopuler" },
@@ -16,214 +16,115 @@ const SORT_OPTIONS = [
 
 const ITEMS_PER_PAGE = 15;
 
-// KOMPONEN UTAMA DIPISAH AGAR BISA DIBUNGKUS SUSPENSE
 function KatalogContent() {
     const searchParams = useSearchParams();
     const categoryFilter = searchParams.get("cat");
     const searchQuery = searchParams.get("q");
     const badgeFilter = searchParams.get("badge");
 
-    // DETEKSI APAKAH USER SEDANG MELAKUKAN PENCARIAN/FILTER
     const isFiltering = !!categoryFilter || !!searchQuery || !!badgeFilter;
 
     const [sortBy, setSortBy] = useState("popular");
     const [currentPage, setCurrentPage] = useState(1);
-    const [apiProducts, setApiProducts] = useState<any[]>([]);
+    const [apiProducts, setApiProducts] = useState<ExtendedProduct[]>([]);
     const [isLoadingAPI, setIsLoadingAPI] = useState(true);
     const [apiError, setApiError] = useState<string | null>(null);
 
     const { addToCart } = useCart();
 
-    useEffect(() => {
-        const fetchApiData = async () => {
-            try {
-                setIsLoadingAPI(true);
-                setApiError(null);
+    const fetchCatalogData = async () => {
+        setIsLoadingAPI(true);
+        setApiError(null);
+        try {
+            const response = await api.get("/obat/");
+            let data = response.data?.data || response.data;
 
-                const apiUrl = "https://api.npoint.io/68d5bfcf641eb545455a";
-                const response = await axios.get(`${apiUrl}?t=${new Date().getTime()}`);
+            if (!Array.isArray(data)) data = [];
 
-                const mappedApiData = response.data.map((item: any, index: number) => {
-                    let badge = undefined;
-                    let originalPrice = undefined;
-
-                    if (index % 7 === 0) {
-                        badge = "sale";
-                        originalPrice = Math.round(item.price * 1.25);
-                    } else if (index % 5 === 1) {
-                        badge = "new";
-                    } else if (index % 6 === 2) {
-                        badge = "popular";
-                    }
-
-                    return {
-                        id: `api-${item.id}`,
-                        name: item.title,
-                        price: item.price,
-                        originalPrice: originalPrice,
-                        category: item.category,
-                        image: item.image,
-                        inStock: true,
-                        reviewCount: Math.floor(Math.random() * 500) + 10,
-                        rating: (Math.random() * (5.0 - 4.0) + 4.0).toFixed(1),
-                        badge: badge,
-                    };
-                });
-
-                setApiProducts(mappedApiData);
-            } catch (error: any) {
-                console.error("Gagal memuat API:", error);
-                if (error.response && error.response.status === 429) {
-                    setApiError("Terlalu banyak permintaan ke Server API (Error 429). Mohon tunggu 1-2 menit lalu refresh.");
-                } else {
-                    setApiError("Gagal mengambil data dari server mitra.");
-                }
-            } finally {
-                setIsLoadingAPI(false);
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                data = data.filter((item: any) =>
+                    item.nama_obat?.toLowerCase().includes(q) ||
+                    item.deskripsi?.toLowerCase().includes(q)
+                );
             }
-        };
 
-        fetchApiData();
-    }, []);
+            if (categoryFilter) {
+                const cat = categoryFilter.toLowerCase();
+                data = data.filter((item: any) => {
+                    if (item.kategori && Array.isArray(item.kategori)) {
+                        return item.kategori.some((k: string) => k.toLowerCase() === cat);
+                    }
+                    return false;
+                });
+            }
 
-    // 1. FILTER DATA BERDASARKAN KATEGORI / SEARCH
-    const filteredProducts = useMemo(() => {
-        let result = [...apiProducts];
+            const mappedData: ExtendedProduct[] = data.map((item: any) => ({
+                id: item.id_obat.toString(),
+                name: item.nama_obat,
+                price: item.harga_jual,
+                image: item.gambar_produk,
+                category: item.kategori && item.kategori.length > 0 ? item.kategori[0] : item.jenis_obat,
+                unit: item.satuan,
+                inStock: item.stok > 0
+            }));
 
-        if (searchQuery) {
-            const lowerQ = searchQuery.toLowerCase();
-            result = result.filter(p => p.name.toLowerCase().includes(lowerQ));
+            if (sortBy === "price-asc") {
+                mappedData.sort((a, b) => a.price - b.price);
+            } else if (sortBy === "price-desc") {
+                mappedData.sort((a, b) => b.price - a.price);
+            }
+
+            setApiProducts(mappedData);
+            setCurrentPage(1);
+        } catch (error) {
+            setApiError("Gagal memuat produk dari server.");
+        } finally {
+            setIsLoadingAPI(false);
         }
+    };
 
-        if (categoryFilter) {
-            result = result.filter(p => {
-                const apiCat = p.category.toLowerCase();
-                // Pencocokan string kasar agar dropdown sesuai dengan API JSON
-                if (categoryFilter === 'perawatan-diri') return apiCat.includes('skincare') || apiCat.includes('body care');
-                if (categoryFilter === 'herbal') return apiCat.includes('herbal');
-                if (categoryFilter === 'ibu-anak') return apiCat.includes('ibu');
-                if (categoryFilter === 'p3k') return apiCat.includes('p3k');
-                if (categoryFilter === 'vitamin') return apiCat.includes('vitamin');
-                if (categoryFilter === 'pencernaan') return apiCat.includes('pencernaan');
-                if (categoryFilter === 'batuk-flu') return apiCat.includes('batuk');
-                if (categoryFilter === 'pereda-nyeri') return apiCat.includes('nyeri');
-                return true;
-            });
-        }
-
-        if (badgeFilter) {
-            result = result.filter(p => p.badge === badgeFilter);
-        }
-
-        return result;
-    }, [apiProducts, searchQuery, categoryFilter, badgeFilter]);
-
-    // 2. DATA TOP SELLING DAN LATEST (Hanya dari api asli, bukan hasil filter)
-    const topSellingProducts = useMemo(() => {
-        return [...apiProducts].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 5);
-    }, [apiProducts]);
-
-    const latestProducts = useMemo(() => {
-        const newItems = apiProducts.filter(p => p.badge === "new");
-        return newItems.length > 0 ? newItems.slice(0, 5) : apiProducts.slice(0, 5);
-    }, [apiProducts]);
-
-    // 3. SORT DATA HASIL FILTER
-    const sortedCatalog = useMemo(() => {
-        let result = [...filteredProducts];
-        switch (sortBy) {
-            case "price-asc": return result.sort((a, b) => a.price - b.price);
-            case "price-desc": return result.sort((a, b) => b.price - a.price);
-            case "rating": return result.sort((a, b) => b.rating - a.rating);
-            default: return result.sort((a, b) => b.reviewCount - a.reviewCount);
-        }
-    }, [filteredProducts, sortBy]);
-
-    const totalPages = Math.ceil(sortedCatalog.length / ITEMS_PER_PAGE);
-
-    const paginatedCatalog = sortedCatalog.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
-
-    // Reset paginasi saat ada filter baru
     useEffect(() => {
-        setCurrentPage(1);
-    }, [sortBy, isFiltering]);
+        fetchCatalogData();
+    }, [searchQuery, categoryFilter, badgeFilter, sortBy]);
+
+    const totalPages = Math.ceil(apiProducts.length / ITEMS_PER_PAGE);
+    const paginatedProducts = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return apiProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [apiProducts, currentPage]);
 
     return (
-        <main className="mx-auto max-w-screen-xl px-4 py-6 sm:px-6 lg:px-8 flex flex-col gap-10">
-
-            {/* JIKA SEDANG MENCARI / MEMFILTER, SEMBUNYIKAN BANNER DEKORATIF */}
+        <main className="pb-20 max-w-[1400px] mx-auto px-6">
             {!isFiltering && (
-                <section>
-                    <PromoBanner
-                        badge="-20% OFF WEEKEND SALE"
-                        title="Premium Healthcare & Wellness Essentials"
-                        subtitle="Discover top-tier medical supplies, daily vitamins, and personal care products trusted by professionals."
-                        ctaLabel="Shop Now"
-                        ctaHref="/katalog"
-                    />
-                </section>
+                <PromoBanner
+                    badge="-20% OFF WEEKEND SALE"
+                    title="Premium Healthcare & Wellness Essentials"
+                    subtitle="Discover top-tier medical supplies, daily vitamins, and personal care products trusted by professionals."
+                    ctaLabel="Shop Now"
+                    ctaHref="/katalog"
+                />
             )}
 
-            {apiError && (
-                <div className="rounded-xl border border-discount-red bg-discount-red/10 p-6 text-center text-discount-red font-bold">
-                    {apiError}
-                </div>
-            )}
-
-            {/* SEMBUNYIKAN TOP SELLING & LATEST JIKA SEDANG FILTER */}
-            {!isLoadingAPI && !apiError && apiProducts.length > 0 && !isFiltering && (
-                <>
-                    <section>
-                        <SectionHeader title="Top Selling" />
-                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                            {topSellingProducts.map((product) => (
-                                <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
-                                    <ProductCard product={product} onAddToCart={addToCart} />
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    <section>
-                        <SectionHeader title="Latest Arrivals" viewAllHref="/katalog?badge=new" />
-                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                            {latestProducts.map((product) => (
-                                <div key={product.id} className="min-w-[200px] max-w-[240px] shrink-0 snap-start">
-                                    <ProductCard product={product} onAddToCart={addToCart} />
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                </>
-            )}
-
-            <section>
+            <section className="mt-8">
                 <SectionHeader
-                    title={searchQuery ? `Hasil Pencarian: "${searchQuery}"` : categoryFilter ? `Kategori Pilihan` : "Semua Produk"}
+                    title={isFiltering ? "Hasil Pencarian" : "Katalog Lengkap Apomacy"}
                 />
 
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant pb-4">
-                    <div className="flex-1">
-                        <h3 className="text-lg font-bold text-apomacy-dark">Tersedia di toko</h3>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm font-medium text-outline hidden sm:inline-block">
-                            {filteredProducts.length} produk
-                        </span>
-                        <div className="h-4 w-px bg-outline-variant hidden sm:block"></div>
-                        <span className="text-sm text-on-surface-variant">Sort:</span>
+                <div className="flex justify-between items-center mb-6 mt-8">
+                    <p className="text-sm font-bold text-outline">
+                        Menampilkan <span className="text-apomacy-dark">{apiProducts.length}</span> produk
+                    </p>
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-outline hidden sm:inline">Urutkan:</span>
                         <select
+                            className="bg-white border border-outline-variant text-apomacy-dark text-sm rounded-xl focus:ring-apomacy-primary focus:border-apomacy-primary block p-2.5 outline-none font-bold shadow-sm"
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            className="rounded-lg border border-outline-variant bg-white px-3 py-1.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-apomacy-primary/30 cursor-pointer"
                         >
-                            {SORT_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
+                            {SORT_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
                                 </option>
                             ))}
                         </select>
@@ -231,24 +132,30 @@ function KatalogContent() {
                 </div>
 
                 {isLoadingAPI ? (
-                    <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-outline-variant bg-white">
-                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-apomacy-bg border-t-apomacy-primary"></div>
-                        <p className="mt-4 text-sm font-bold text-apomacy-dark">Memuat Katalog Produk...</p>
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-outline-variant border-t-apomacy-primary"></div>
                     </div>
-                ) : paginatedCatalog.length > 0 ? (
+                ) : apiError ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-red-200 bg-red-50 py-20 text-center">
+                        <p className="text-base font-bold text-red-600 mb-2">{apiError}</p>
+                        <button onClick={fetchCatalogData} className="px-4 py-2 bg-white border border-red-200 rounded-lg text-sm font-bold text-red-600 hover:bg-red-100">
+                            Coba Lagi
+                        </button>
+                    </div>
+                ) : paginatedProducts.length > 0 ? (
                     <>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                            {paginatedCatalog.map((product) => (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                            {paginatedProducts.map((product) => (
                                 <ProductCard
                                     key={product.id}
                                     product={product}
-                                    onAddToCart={addToCart}
+                                    onAddToCart={() => addToCart(product as any)}
                                 />
                             ))}
                         </div>
 
                         {totalPages > 1 && (
-                            <div className="mt-10 flex justify-center items-center gap-4">
+                            <div className="mt-12 flex items-center justify-center gap-3">
                                 <button
                                     disabled={currentPage === 1}
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -256,9 +163,6 @@ function KatalogContent() {
                                 >
                                     &larr; Prev
                                 </button>
-                                <span className="px-4 py-2 text-sm font-bold text-apomacy-primary bg-apomacy-primary/10 rounded-lg">
-                                    Page {currentPage} of {totalPages}
-                                </span>
                                 <button
                                     disabled={currentPage === totalPages}
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
@@ -269,7 +173,7 @@ function KatalogContent() {
                             </div>
                         )}
                     </>
-                ) : !apiError && (
+                ) : (
                     <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-white py-20 text-center">
                         <p className="text-base font-semibold text-on-surface">Produk tidak ditemukan</p>
                     </div>
@@ -279,7 +183,6 @@ function KatalogContent() {
     );
 }
 
-// BUNGKUS DENGAN SUSPENSE AGAR NEXT.JS TIDAK ERROR SAAT MENGGUNAKAN useSearchParams
 export default function KatalogPage() {
     return (
         <div className="min-h-screen bg-apomacy-bg">

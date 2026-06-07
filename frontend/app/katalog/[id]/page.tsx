@@ -3,23 +3,21 @@
 import { useEffect, useState, use } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import axios from "axios";
 import { useCart } from "@/context/CartContext";
 import { formatRupiah } from "@/lib/Data";
-import ProductCard from "@/components/shared/ProductCard";
+import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
+import api from "@/lib/api";
 
 interface ProductDetail {
     id: string;
     name: string;
     price: number;
-    originalPrice?: number;
     category: string;
     image?: string;
-    badge?: string;
     inStock: boolean;
     description: string;
     dosage: string;
-    specifications?: any;
+    specifications: Record<string, string | number>;
 }
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,7 +25,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
     const { addToCart } = useCart();
     const [product, setProduct] = useState<ProductDetail | null>(null);
-    const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+    const [relatedProducts, setRelatedProducts] = useState<ExtendedProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
@@ -43,80 +41,84 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
     const handleAddToCart = () => {
         if (product) {
-            (addToCart as any)(product);
+            for (let i = 0; i < quantity; i++) {
+                addToCart(product as any);
+            }
         }
     };
 
     useEffect(() => {
-        const fetchProductDetail = async () => {
+        const fetchProduct = async () => {
+            setIsLoading(true);
             try {
-                const apiUrl = "https://api.npoint.io/68d5bfcf641eb545455a";
-                const response = await axios.get(`${apiUrl}?t=${new Date().getTime()}`);
+                const res = await api.get(`/obat/${id}`);
+                const data = res.data?.data || res.data;
 
-                const rawId = id.replace("api-", "");
+                const currentCategory = data.kategori && data.kategori.length > 0 ? data.kategori[0] : data.jenis_obat;
 
-                const allMappedProducts = response.data.map((item: any, index: number) => {
-                    let badge = undefined;
-                    let originalPrice = undefined;
-
-                    if (index % 7 === 0) {
-                        badge = "sale";
-                        originalPrice = Math.round(item.price * 1.25);
-                    } else if (index % 5 === 1) {
-                        badge = "new";
-                    } else if (index % 6 === 2) {
-                        badge = "popular";
+                const detail: ProductDetail = {
+                    id: data.id_obat.toString(),
+                    name: data.nama_obat,
+                    price: data.harga_jual,
+                    category: data.kategori && data.kategori.length > 0 ? data.kategori.join(", ") : data.jenis_obat,
+                    image: data.gambar_produk,
+                    inStock: data.stok > 0,
+                    description: data.deskripsi,
+                    dosage: data.dosis_pemakaian,
+                    specifications: {
+                        "Jenis Obat": data.jenis_obat,
+                        "Bentuk": data.bentuk_obat,
+                        "Satuan": data.satuan,
+                        "Komposisi": data.komposisi
                     }
+                };
+                setProduct(detail);
 
-                    return {
-                        id: `api-${item.id}`,
-                        name: item.title,
-                        price: item.price,
-                        originalPrice: originalPrice,
-                        category: item.category,
-                        image: item.image,
-                        inStock: true,
-                        badge: badge,
-                        description: item.description || "Deskripsi tidak tersedia.",
-                        dosage: item.specifications?.dosis || "Sesuai petunjuk kemasan.",
-                        specifications: item.specifications
-                    };
-                });
-
-                const foundItem = allMappedProducts.find((p: any) => p.id === `api-${rawId}`);
-
-                if (foundItem) {
-                    setProduct(foundItem);
-
-                    const related = allMappedProducts
-                        .filter((p: any) => p.category === foundItem.category && p.id !== foundItem.id)
-                        .slice(0, 5);
-                    setRelatedProducts(related);
+                const relatedRes = await api.get("/obat");
+                let relatedData = relatedRes.data?.data || relatedRes.data;
+                if (Array.isArray(relatedData)) {
+                    const mappedRelated: ExtendedProduct[] = relatedData
+                        .filter((item: any) => item.id_obat.toString() !== id)
+                        .filter((item: any) => {
+                            const itemCat = item.kategori && item.kategori.length > 0 ? item.kategori[0] : item.jenis_obat;
+                            return itemCat === currentCategory;
+                        })
+                        .slice(0, 5)
+                        .map((item: any) => ({
+                            id: item.id_obat.toString(),
+                            name: item.nama_obat,
+                            price: item.harga_jual,
+                            image: item.gambar_produk,
+                            category: item.kategori && item.kategori.length > 0 ? item.kategori[0] : item.jenis_obat,
+                            unit: item.satuan,
+                            inStock: item.stok > 0
+                        }));
+                    setRelatedProducts(mappedRelated);
                 }
 
             } catch (error) {
-                console.error("Gagal mengambil detail produk:", error);
+                console.error("Gagal mengambil data produk");
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchProductDetail();
+        fetchProduct();
     }, [id]);
 
     if (isLoading) {
         return (
-            <div className="flex min-h-[60vh] flex-col items-center justify-center bg-apomacy-bg">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-outline-variant border-t-apomacy-primary"></div>
+            <div className="flex min-h-screen items-center justify-center bg-apomacy-bg">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-apomacy-bg border-t-apomacy-primary"></div>
             </div>
         );
     }
 
     if (!product) {
         return (
-            <div className="flex min-h-[60vh] flex-col items-center justify-center bg-apomacy-bg">
-                <p className="text-xl font-bold text-apomacy-dark">Produk Tidak Ditemukan</p>
-                <Link href="/katalog" className="mt-4 rounded-lg bg-apomacy-primary px-6 py-2 text-white hover:bg-apomacy-dark">
+            <div className="flex min-h-screen flex-col items-center justify-center bg-apomacy-bg text-center">
+                <h1 className="text-2xl font-bold text-apomacy-dark">Produk tidak ditemukan</h1>
+                <Link href="/katalog" className="mt-4 text-apomacy-primary hover:underline">
                     Kembali ke Katalog
                 </Link>
             </div>
@@ -124,132 +126,110 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
 
     return (
-        <div className="min-h-screen bg-white pb-20 pt-8">
-            <div className="mx-auto max-w-screen-xl px-4 lg:px-8">
-
-                <nav className="mb-8 flex items-center gap-2 text-sm text-outline-variant font-medium">
-                    <Link href="/" className="hover:text-apomacy-primary">Home</Link>
-                    <span>/</span>
-                    <Link href="/katalog" className="hover:text-apomacy-primary">Katalog</Link>
-                    <span>/</span>
-                    <span className="text-apomacy-primary capitalize line-clamp-1">{product.category}</span>
-                </nav>
-
-                <div className="flex flex-col gap-12">
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16">
-
-                        {/* Bagian Kiri: Gambar Produk */}
-                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-surface-container-low border border-gray-100 p-8 flex items-center justify-center">
-                            {product.badge && (
-                                <span className={`absolute left-4 top-4 z-10 rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide ${product.badge === 'sale' ? 'bg-discount-red text-white' :
-                                    product.badge === 'new' ? 'bg-apomacy-teal text-white' : 'bg-amber-500 text-white'
-                                    }`}>
-                                    {product.badge === 'sale' ? '-20%' : product.badge}
-                                </span>
-                            )}
-
+        <div className="min-h-screen bg-apomacy-bg py-8">
+            <main className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8">
+                <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8 lg:p-10">
+                    <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
+                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-surface-container-low">
                             {product.image ? (
                                 <Image
                                     src={product.image}
                                     alt={product.name}
                                     fill
-                                    unoptimized={true}
-                                    className="object-contain mix-blend-multiply p-8"
-                                    sizes="(max-width: 768px) 100vw, 50vw"
+                                    unoptimized
+                                    className="object-cover"
                                 />
                             ) : (
-                                <svg className="h-24 w-24 text-outline-variant" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                </svg>
+                                <div className="flex h-full w-full items-center justify-center text-gray-400">
+                                    No Image
+                                </div>
                             )}
                         </div>
 
-                        {/* Bagian Kanan: INFO, TABS, & AKSI */}
-                        <div className="flex flex-col pt-2 h-full">
-
-                            <h1 className="mb-4 text-2xl lg:text-3xl font-black text-apomacy-dark">
+                        <div className="flex flex-col">
+                            <div className="mb-2 text-sm font-bold text-apomacy-teal">
+                                {product.category}
+                            </div>
+                            <h1 className="mb-4 text-3xl font-black text-apomacy-dark sm:text-4xl">
                                 {product.name}
                             </h1>
-
                             <div className="mb-6 flex items-end gap-3">
-                                <span className="text-3xl font-extrabold text-apomacy-dark">
+                                <span className="text-4xl font-extrabold text-apomacy-primary">
                                     {formatRupiah(product.price)}
                                 </span>
-                                {product.originalPrice && (
-                                    <span className="mb-1 text-sm font-medium text-outline-variant line-through">
-                                        {formatRupiah(product.originalPrice)}
-                                    </span>
-                                )}
                             </div>
 
-                            {/* TABS (Description & Specifications) */}
-                            <div className="flex-1 mb-8">
-                                <div className="flex items-center gap-8 border-b border-gray-200">
+                            <div className="mb-8">
+                                <div className="flex border-b border-gray-200">
                                     <button
                                         onClick={() => setActiveTab('description')}
-                                        className={`pb-3 text-sm font-bold transition-colors border-b-2 -mb-[1px] ${activeTab === 'description' ? 'border-apomacy-dark text-apomacy-dark' : 'border-transparent text-outline-variant hover:text-apomacy-dark'}`}
+                                        className={`px-4 py-2 font-bold text-sm ${activeTab === 'description' ? 'border-b-2 border-apomacy-primary text-apomacy-primary' : 'text-outline-variant hover:text-apomacy-dark'}`}
                                     >
-                                        Description
+                                        Deskripsi
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('specifications')}
-                                        className={`pb-3 text-sm font-bold transition-colors border-b-2 -mb-[1px] ${activeTab === 'specifications' ? 'border-apomacy-dark text-apomacy-dark' : 'border-transparent text-outline-variant hover:text-apomacy-dark'}`}
+                                        className={`px-4 py-2 font-bold text-sm ${activeTab === 'specifications' ? 'border-b-2 border-apomacy-primary text-apomacy-primary' : 'text-outline-variant hover:text-apomacy-dark'}`}
                                     >
-                                        Specifications
+                                        Spesifikasi
                                     </button>
                                 </div>
-
-                                <div className="py-6 text-sm text-on-surface-variant leading-relaxed">
+                                <div className="mt-4 text-sm leading-relaxed text-gray-700 whitespace-pre-line">
                                     {activeTab === 'description' ? (
-                                        <p className="whitespace-pre-line">
-                                            {product.description}
-                                        </p>
+                                        <div>
+                                            <p className="mb-4">{product.description}</p>
+                                            {product.dosage && (
+                                                <div className="mt-6 rounded-xl bg-blue-50/50 p-4 border border-blue-100">
+                                                    <h4 className="font-bold text-apomacy-dark mb-2 flex items-center gap-2">
+                                                        <svg className="w-4 h-4 text-apomacy-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        Dosis & Aturan Pakai:
+                                                    </h4>
+                                                    <p>{product.dosage}</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : (
-                                        <ul className="list-disc pl-5 space-y-3">
-                                            <li><span className="font-semibold text-apomacy-dark">Kategori:</span> {product.category.toUpperCase()}</li>
-                                            {product.specifications?.komposisi && (
-                                                <li><span className="font-semibold text-apomacy-dark">Komposisi:</span> {product.specifications.komposisi}</li>
-                                            )}
-                                            <li><span className="font-semibold text-apomacy-dark">Dosis / Aturan Pakai:</span> {product.dosage}</li>
-                                            {product.specifications?.kemasan && (
-                                                <li><span className="font-semibold text-apomacy-dark">Kemasan:</span> {product.specifications.kemasan}</li>
-                                            )}
-                                            <li><span className="font-semibold text-apomacy-dark">Status Persediaan:</span> {product.inStock ? 'Tersedia' : 'Habis'}</li>
-                                        </ul>
+                                        <div className="space-y-2">
+                                            {Object.entries(product.specifications).map(([key, value]) => (
+                                                <div key={key} className="grid grid-cols-3 border-b border-gray-100 py-2">
+                                                    <span className="font-medium text-outline">{key}</span>
+                                                    <span className="col-span-2 text-apomacy-dark">{value}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* pengatur jumlah untuk produk yang akan dimasukin ke keranjang */}
-                            <div className="flex flex-col sm:flex-row items-center gap-4 border-t border-gray-100 pt-8 mt-auto">
-                                <div className="flex h-12 w-full sm:w-32 shrink-0 items-center justify-between overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                                    <button onClick={() => handleQuantityChange('minus')} className="flex h-full w-10 items-center justify-center text-outline-variant transition-colors hover:bg-gray-50 active:bg-gray-100">
-                                        <span className="text-xl leading-none mb-1">-</span>
+                            <div className="mt-auto flex flex-col gap-4 sm:flex-row sm:items-center">
+                                <div className="flex h-12 w-32 items-center justify-between rounded-lg border border-outline-variant px-2">
+                                    <button
+                                        onClick={() => handleQuantityChange('minus')}
+                                        className="flex h-8 w-8 items-center justify-center rounded text-apomacy-dark hover:bg-gray-100"
+                                    >
+                                        -
                                     </button>
                                     <span className="font-bold text-apomacy-dark">{quantity}</span>
-                                    <button onClick={() => handleQuantityChange('plus')} className="flex h-full w-10 items-center justify-center text-outline-variant transition-colors hover:bg-gray-50 active:bg-gray-100">
-                                        <span className="text-xl leading-none mb-1">+</span>
+                                    <button
+                                        onClick={() => handleQuantityChange('plus')}
+                                        className="flex h-8 w-8 items-center justify-center rounded text-apomacy-dark hover:bg-gray-100"
+                                    >
+                                        +
                                     </button>
                                 </div>
-
                                 <button
                                     onClick={handleAddToCart}
-                                    className="flex h-12 w-full flex-1 items-center justify-center gap-2 rounded-xl border-2 border-apomacy-primary bg-white text-sm font-bold uppercase tracking-wide text-apomacy-primary transition-all hover:bg-apomacy-primary hover:text-white active:scale-95 shadow-sm"
+                                    disabled={!product.inStock}
+                                    className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-apomacy-primary px-8 font-bold text-white transition-all hover:bg-apomacy-dark active:scale-95 disabled:cursor-not-allowed disabled:bg-outline-variant"
                                 >
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
                                     Add to Cart
                                 </button>
                             </div>
-
                         </div>
                     </div>
 
-                    {/* Related Produk */}
                     {relatedProducts.length > 0 && (
-                        <div className="mt-4 pt-8 border-t border-gray-100">
+                        <div className="mt-12 pt-8 border-t border-gray-100">
                             <h2 className="text-xl font-black text-apomacy-dark mb-6">Related Products</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                 {relatedProducts.map((relProduct) => (
@@ -262,9 +242,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             </div>
                         </div>
                     )}
-
                 </div>
-            </div>
+            </main>
         </div>
     );
 }
