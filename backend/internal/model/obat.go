@@ -9,7 +9,7 @@ type Obat struct {
 	ID          int       `json:"id_obat"`
 	IDSupplier  int       `json:"id_supplier"`
 	KodeObat    string    `json:"kode_obat"`
-	NamaObat    string    `json:"nama_obat"`
+	NamaObat    string    `json:"nama_obat" form:"nama_obat"`
 	JenisObat   string    `json:"jenis_obat"`
 	BentukObat  string    `json:"bentuk_obat"`
 	Satuan      string    `json:"satuan"`

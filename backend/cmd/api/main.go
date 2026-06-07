@@ -14,10 +14,13 @@ import (
 	router "github.com/akuaruu/apomacy/backend/internal/handler/http"
 	"github.com/akuaruu/apomacy/backend/pkg/database"
 	midtrans "github.com/akuaruu/apomacy/backend/pkg/transaction"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	// 1. Load Configurations & Infrastructures
+	godotenv.Load()
 	cfg := config.LoadConfig()
 
 	dbPool := database.NewPostgresConn(&cfg.DB)
