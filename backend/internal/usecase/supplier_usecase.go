@@ -39,3 +39,10 @@ func (u *supplierUsecase) UpdateSupplier(ctx context.Context, supplier *model.Su
 	}
 	return u.repo.Update(ctx, supplier)
 }
+
+func (u *supplierUsecase) DeleteSupplier(ctx context.Context, id int) error {
+	// Jika di masa depan kamu butuh validasi (misal: cek apakah supplier masih dipakai di tabel obat),
+	// kamu bisa menambahkannya di sini sebelum memanggil repo.Delete
+
+	return u.repo.Delete(ctx, id)
+}

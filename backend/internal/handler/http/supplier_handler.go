@@ -74,3 +74,22 @@ func (h *SupplierHandler) UpdateSupplier(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Supplier berhasil diupdate"})
 }
+
+func (h *SupplierHandler) DeleteSupplier(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID harus berupa angka"})
+		return
+	}
+
+	if err := h.usecase.DeleteSupplier(c.Request.Context(), id); err != nil {
+		if err.Error() == "supplier tidak ditemukan" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus data supplier: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Supplier berhasil dihapus"})
+}

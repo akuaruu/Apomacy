@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -46,7 +46,8 @@ func (r *supplierRepository) GetByID(ctx context.Context, id int) (*model.Suppli
 		&s.StatusKemitraan, &s.CreatedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		// PERBAIKAN: Menggunakan pgx.ErrNoRows karena koneksi db menggunakan pgxpool
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("supplier tidak ditemukan")
 		}
 		return nil, err
@@ -55,8 +56,9 @@ func (r *supplierRepository) GetByID(ctx context.Context, id int) (*model.Suppli
 }
 
 func (r *supplierRepository) GetAll(ctx context.Context) ([]model.Supplier, error) {
+	// PERBAIKAN: Menambahkan kolom created_at agar sejajar dengan jumlah Scan()
 	query := `
-		SELECT id_supplier, kode_supplier, nama_supplier, alamat, kota, no_telp, email, contact_person, status_kemitraan 
+		SELECT id_supplier, kode_supplier, nama_supplier, alamat, kota, no_telp, email, contact_person, status_kemitraan, created_at 
 		FROM supplier 
 		ORDER BY id_supplier DESC`
 
@@ -66,7 +68,9 @@ func (r *supplierRepository) GetAll(ctx context.Context) ([]model.Supplier, erro
 	}
 	defer rows.Close()
 
-	var suppliers []model.Supplier
+	// PERBAIKAN: Diinisialisasi langsung (slice kosong), agar saat data kosong di DB,
+	// kembalian JSON berupa [] (array kosong), BUKAN null, agar frontend React aman.
+	suppliers := []model.Supplier{}
 	for rows.Next() {
 		var s model.Supplier
 		if err := rows.Scan(
@@ -93,4 +97,21 @@ func (r *supplierRepository) Update(ctx context.Context, supplier *model.Supplie
 		supplier.StatusKemitraan, supplier.ID,
 	)
 	return err
+}
+
+func (r *supplierRepository) Delete(ctx context.Context, id int) error {
+	query := `DELETE FROM supplier WHERE id_supplier = $1`
+
+	// Gunakan Exec untuk operasi Delete
+	commandTag, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	// Mengecek apakah ada baris yang benar-benar terhapus
+	if commandTag.RowsAffected() == 0 {
+		return errors.New("supplier tidak ditemukan")
+	}
+
+	return nil
 }

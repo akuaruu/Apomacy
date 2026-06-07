@@ -45,6 +45,12 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
 	customerHandler := NewCustomerHandler(customerUsecase)
 
+	//Domain: Restock
+	restockRepo := repository.NewRestockRepository(dbPool)
+	restockUsecase := usecase.NewRestockUsecase(restockRepo)
+	restockHandler := NewRestockHandler(restockUsecase)
+
+	//Domain Supplier
 	supplierRepo := repository.NewSupplierRepository(dbPool)
 	supplierUsecase := usecase.NewSupplierUsecase(supplierRepo)
 	supplierHandler := NewSupplierHandler(supplierUsecase)
@@ -91,6 +97,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			supplier.GET("/", supplierHandler.GetAllSuppliers)
 			supplier.GET("/:id", supplierHandler.GetSupplierByID)
 			supplier.PUT("/:id", supplierHandler.UpdateSupplier)
+			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
 		}
 
 		// Modul Payment
@@ -100,6 +107,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		}
 
 		api.GET("/migrate-images", migrationHandler.RunImageMigration)
+		api.POST("/restock/", restockHandler.CreateRestock)
 	}
 
 	return r

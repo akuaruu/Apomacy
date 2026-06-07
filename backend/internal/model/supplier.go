@@ -30,6 +30,7 @@ type SupplierRepository interface {
 	GetByID(ctx context.Context, id int) (*Supplier, error)
 	GetAll(ctx context.Context) ([]Supplier, error)
 	Update(ctx context.Context, supplier *Supplier) error
+	Delete(ctx context.Context, id int) error
 }
 
 type SupplierUsecase interface {
@@ -37,4 +38,5 @@ type SupplierUsecase interface {
 	GetSupplierByID(ctx context.Context, id int) (*Supplier, error)
 	GetAllSuppliers(ctx context.Context) ([]Supplier, error)
 	UpdateSupplier(ctx context.Context, supplier *Supplier) error
+	DeleteSupplier(ctx context.Context, id int) error
 }
