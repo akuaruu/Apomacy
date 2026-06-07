@@ -89,13 +89,46 @@ func (r *obatRepository) GetAll(ctx context.Context) ([]model.Obat, error) {
 }
 
 func (r *obatRepository) Update(ctx context.Context, obat *model.Obat) error {
+	// Query dibuat komprehensif untuk mengupdate seluruh field yang ada di struct
 	query := `
 		UPDATE obat SET 
-			nama_obat = $1, harga_beli = $2, harga_jual = $3, stok = $4
-		WHERE id_obat = $5 RETURNING updated_at
+			id_supplier = $1, 
+			kode_obat = $2, 
+			nama_obat = $3, 
+			jenis_obat = $4, 
+			bentuk_obat = $5, 
+			satuan = $6, 
+			harga_beli = $7, 
+			harga_jual = $8, 
+			stok = $9, 
+			stok_minimum = $10, 
+			expired_date = $11, 
+			gambar_produk = $12, 
+			dosis_pemakaian = $13, 
+			komposisi = $14, 
+			deskripsi = $15,
+			updated_at = NOW()
+		WHERE id_obat = $16 
+		RETURNING updated_at
 	`
+
 	err := r.db.QueryRow(ctx, query,
-		obat.NamaObat, obat.HargaBeli, obat.HargaJual, obat.Stok, obat.ID,
+		obat.IDSupplier,
+		obat.KodeObat,
+		obat.NamaObat,
+		obat.JenisObat,
+		obat.BentukObat,
+		obat.Satuan,
+		obat.HargaBeli,
+		obat.HargaJual,
+		obat.Stok,
+		obat.StokMinimum,
+		obat.ExpiredDate,
+		obat.GambarProduk,
+		obat.DosisPemakaian,
+		obat.Komposisi,
+		obat.Deskripsi,
+		obat.ID, // $16 adalah parameter kondisi WHERE
 	).Scan(&obat.UpdatedAt)
 
 	return err

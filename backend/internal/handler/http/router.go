@@ -49,6 +49,9 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	paymentUsecase := usecase.NewPaymentUsecase()
 	paymentHandler := NewPaymentHandler(paymentUsecase)
 
+	//migration temporary
+	migrationHandler := NewMigrationHandler(dbPool)
+
 	// 3. Routing Setup
 	api := r.Group("/api")
 	{
@@ -83,6 +86,8 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		{
 			payment.POST("/", paymentHandler.Checkout)
 		}
+
+		api.GET("/migrate-images", migrationHandler.RunImageMigration)
 	}
 
 	return r

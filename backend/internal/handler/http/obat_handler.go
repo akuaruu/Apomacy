@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
+	"github.com/akuaruu/apomacy/backend/pkg/storage"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,11 +22,27 @@ func NewObatHandler(usecase model.ObatUsecase) *ObatHandler {
 // Handler untuk menambah obat baru
 func (h *ObatHandler) CreateObat(c *gin.Context) {
 	var req model.Obat
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid"})
+
+	// 1. Ganti ShouldBindJSON menjadi ShouldBind agar bisa membaca form-data
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid: " + err.Error()})
 		return
 	}
 
+	// 2. Tangkap file fisik dari input bernama "gambar_produk"
+	file, err := c.FormFile("gambar_produk")
+	if err == nil {
+		// Jika ada file, panggil fungsi helper upload Supabase yang kita buat sebelumnya
+		imageURL, uploadErr := storage.UploadToSupabase(file)
+		if uploadErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengunggah gambar"})
+			return
+		}
+		// 3. Masukkan URL publik Supabase ke dalam struct
+		req.GambarProduk = &imageURL
+	}
+
+	// 4. Lempar data ke Usecase (Business Logic tetap sama)
 	if err := h.usecase.CreateObat(c.Request.Context(), &req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
