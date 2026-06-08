@@ -30,7 +30,7 @@ export default function CheckoutButton({ grossAmount, paymentMethod, items, onVa
         try {
             const orderId = `TRX-${Date.now()}`;
 
-            const res = await fetch("http://localhost:8080/api/checkout/", {
+            const res = await fetch("http://159.223.82.138:8080/api/checkout/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

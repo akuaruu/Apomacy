@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Buat instance axios dengan konfigurasi default
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api', // Menyesuaikan base URL backend
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://159.223.82.138:8080/api', // Menyesuaikan base URL backend
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
