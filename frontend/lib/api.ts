@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Buat instance axios dengan konfigurasi default
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://159.223.82.138:8080/api', // Menyesuaikan base URL backend
+  baseURL: '/api', // Menyesuaikan base URL backend
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -26,7 +26,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Menangani error secara global (seperti token expired / 401 Unauthorized)
+// Response Interceptor: Menangani error secara global (seperti token" expired / 401 Unauthorized)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
