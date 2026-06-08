@@ -97,7 +97,7 @@ export default function DataObatPage() {
   const fetchMasterData = async () => {
     try {
       // Hanya request ke supplier, kategori ditiadakan karena tidak ada route /kategori di backend
-      const supRes = await api.get("/supplier/");
+      const supRes = await api.get("/supplier");
       const supData = supRes.data?.data || supRes.data || [];
 
       setSupplierList(supData);
@@ -110,7 +110,7 @@ export default function DataObatPage() {
   const fetchObatData = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get("/obat/");
+      const response = await api.get("/obat");
       const data = response.data?.data || response.data || [];
 
       // Mengekstrak kategori unik dari data obat yang ditarik untuk tag suggestions
@@ -389,7 +389,7 @@ export default function DataObatPage() {
             payload.append("gambar_produk", imageFile);
           }
 
-          await api.post("/obat/", payload, {
+          await api.post("/obat", payload, {
             headers: { "Content-Type": "multipart/form-data" }
           });
           showToast("Data obat baru berhasil ditambahkan!", "success");

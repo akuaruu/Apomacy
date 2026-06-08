@@ -39,7 +39,7 @@ function KatalogContent() {
         setIsLoadingAPI(true);
         setApiError(null);
         try {
-            const response = await api.get("/obat/");
+            const response = await api.get("/obat");
             let data = response.data?.data || response.data;
 
             if (!Array.isArray(data)) data = [];
