@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 import { Product, CartItem } from "@/lib/index";
 
 interface CartContextType {
@@ -15,36 +17,70 @@ interface CartContextType {
     cartTotal: number;
 }
 
+interface MyTokenPayload {
+    id_user?: number;
+    user_id?: number;
+    id?: number;
+    role?: string;
+    exp?: number;
+}
+
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
-        const savedCart = localStorage.getItem("apomacy_cart");
-        if (savedCart) {
+        const token = Cookies.get("apomacy_token");
+        let currentUserId = null;
+
+        if (token) {
             try {
-                const parsed = JSON.parse(savedCart);
-                if (Array.isArray(parsed) && (parsed.length === 0 || parsed[0].product)) {
-                    setCartItems(parsed);
-                    setSelectedIds(parsed.map((item: CartItem) => item.product.id));
-                } else {
-                    localStorage.removeItem("apomacy_cart");
+                const decoded = jwtDecode<MyTokenPayload>(token);
+                const extractedId = decoded.id_user || decoded.user_id || decoded.id;
+                if (extractedId) {
+                    currentUserId = String(extractedId);
+                    setUserId(currentUserId);
                 }
             } catch (e) {
-                localStorage.removeItem("apomacy_cart");
+                setUserId(null);
             }
+        } else {
+            setUserId(null);
+        }
+
+        if (currentUserId) {
+            const storageKey = `apomacy_cart_${currentUserId}`;
+            const savedCart = localStorage.getItem(storageKey);
+            if (savedCart) {
+                try {
+                    const parsed = JSON.parse(savedCart);
+                    if (Array.isArray(parsed) && (parsed.length === 0 || parsed[0].product)) {
+                        setCartItems(parsed);
+                        setSelectedIds(parsed.map((item: CartItem) => item.product.id));
+                    } else {
+                        localStorage.removeItem(storageKey);
+                    }
+                } catch (e) {
+                    localStorage.removeItem(storageKey);
+                }
+            }
+        } else {
+            setCartItems([]);
+            setSelectedIds([]);
         }
         setIsLoaded(true);
     }, []);
 
     useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem("apomacy_cart", JSON.stringify(cartItems));
+        if (isLoaded && userId) {
+            const storageKey = `apomacy_cart_${userId}`;
+            localStorage.setItem(storageKey, JSON.stringify(cartItems));
         }
-    }, [cartItems, isLoaded]);
+    }, [cartItems, isLoaded, userId]);
 
     const addToCart = (product: Product) => {
         setCartItems((prev) => {

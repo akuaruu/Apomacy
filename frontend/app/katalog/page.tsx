@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Cookies from "js-cookie";
 import PromoBanner from "@/components/ui/PromoBanner";
 import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
 import SectionHeader from "@/components/ui/Header";
@@ -31,6 +32,8 @@ function KatalogContent() {
     const [apiError, setApiError] = useState<string | null>(null);
 
     const { addToCart } = useCart();
+
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     const fetchCatalogData = async () => {
         setIsLoadingAPI(true);
@@ -85,8 +88,17 @@ function KatalogContent() {
     };
 
     useEffect(() => {
+        setIsLoggedIn(!!Cookies.get("apomacy_token"));
         fetchCatalogData();
     }, [searchQuery, categoryFilter, badgeFilter, sortBy]);
+
+    const handleAddToCartClick = (product: ExtendedProduct) => {
+        if (!isLoggedIn) {
+            window.dispatchEvent(new Event("openLoginModal"));
+            return;
+        }
+        addToCart(product as any);
+    };
 
     const totalPages = Math.ceil(apiProducts.length / ITEMS_PER_PAGE);
     const paginatedProducts = useMemo(() => {
@@ -149,7 +161,7 @@ function KatalogContent() {
                                 <ProductCard
                                     key={product.id}
                                     product={product}
-                                    onAddToCart={() => addToCart(product as any)}
+                                    onAddToCart={() => handleAddToCartClick(product)}
                                 />
                             ))}
                         </div>
