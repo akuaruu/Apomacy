@@ -4,7 +4,6 @@ info:
   description: API untuk sistem manajemen apotek Apomacy, mencakup manajemen user, inventaris obat, data pelanggan, supplier, dan transaksi kasir.
   version: 3.0.3
 servers:
-  # Added by API Auto Mocking Plugin
   - description: SwaggerHub API Auto Mocking
     url: https://virtserver.swaggerhub.com/aiml-906/Apomacy/3.0.3
   - url: http://localhost:8080/api
@@ -19,12 +18,16 @@ tags:
     description: Manajemen Data Pelanggan
   - name: Supplier
     description: Manajemen Data Supplier
+  - name: Transaksi
+    description: Manajemen Transaksi Kasir
   - name: Payment
     description: Transaksi Kasir dan Checkout
+  - name: Restock
+    description: Manajemen Restock Obat
 
 paths:
 
-  # AUTH / USERS
+  #DOMAIN AUTH / USERS
   /users/register:
     post:
       tags: [Auth]
@@ -40,7 +43,6 @@ paths:
           description: Registrasi berhasil
         '400':
           description: Format request tidak valid
-  
   /users/login:
     post:
       tags: [Auth]
@@ -56,9 +58,31 @@ paths:
           description: Login berhasil, mengembalikan token
         '401':
           description: Username atau password salah
+  /users/{id}/foto:
+    put:
+      tags: [Auth]
+      summary: Upload foto profil user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                foto:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Foto profil berhasil diupdate
 
-
-  # OBAT
+  #DOMAIN OBAT
   /obat:
     get:
       tags: [Obat]
@@ -78,7 +102,6 @@ paths:
       responses:
         '201':
           description: Obat berhasil ditambahkan
-          
   /obat/{id}:
     get:
       tags: [Obat]
@@ -125,8 +148,7 @@ paths:
         '200':
           description: Obat berhasil dihapus
 
-
-  # CUSTOMER
+  #DOMAIN CUSTOMER
   /customer:
     get:
       tags: [Customer]
@@ -146,7 +168,6 @@ paths:
       responses:
         '201':
           description: Customer berhasil didaftarkan
-          
   /customer/{id}:
     get:
       tags: [Customer]
@@ -179,8 +200,7 @@ paths:
         '200':
           description: Customer berhasil diupdate
 
-
-  # SUPPLIER
+  #DOMAIN SUPPLIER        
   /supplier:
     get:
       tags: [Supplier]
@@ -200,7 +220,7 @@ paths:
       responses:
         '201':
           description: Created
-          
+
   /supplier/{id}:
     get:
       tags: [Supplier]
@@ -232,8 +252,55 @@ paths:
       responses:
         '200':
           description: OK
+    delete:
+      tags: [Supplier]
+      summary: Hapus supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Supplier berhasil dihapus
 
-  # CHECKOUT / PAYMENT
+  #DOMAIN TRANSAKSI        
+  /transaksi:
+    post:
+      tags: [Transaksi]
+      summary: Checkout transaksi kasir
+      responses:
+        '200':
+          description: OK
+  /transaksi/{id}:
+    get:
+      tags: [Transaksi]
+      summary: Ambil detail transaksi
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+  /transaksi/{id}/batal:
+    put:
+      tags: [Transaksi]
+      summary: Batalkan transaksi
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+
+  #PAYMENT
   /checkout:
     post:
       tags: [Payment]
@@ -256,7 +323,16 @@ paths:
                     type: string
                     example: "b7a69c02-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
-# DATA MODELS (SCHEMAS)
+  #RSTOCK
+  /restock:
+    post:
+      tags: [Restock]
+      summary: Tambah data restock barang
+      responses:
+        '200':
+          description: OK
+
+
 components:
   schemas:
     UserRegister:

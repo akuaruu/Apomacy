@@ -164,24 +164,29 @@ backend/docs/swagger.yaml
 
 ### Ringkasan Endpoint
 
-| Tag      | Method | Endpoint              | Deskripsi                         |
-|----------|--------|-----------------------|-----------------------------------|
-| Auth     | POST   | `/api/users/register` | Registrasi user baru              |
-| Auth     | POST   | `/api/users/login`    | Login dan mendapatkan JWT token   |
-| Obat     | GET    | `/api/obat`           | Ambil semua data obat             |
-| Obat     | POST   | `/api/obat`           | Tambah obat baru                  |
-| Obat     | GET    | `/api/obat/{id}`      | Detail obat                       |
-| Obat     | PUT    | `/api/obat/{id}`      | Update obat                       |
-| Obat     | DELETE | `/api/obat/{id}`      | Hapus obat                        |
-| Customer | GET    | `/api/customer`       | Ambil semua pelanggan             |
-| Customer | POST   | `/api/customer`       | Daftarkan pelanggan baru          |
-| Customer | GET    | `/api/customer/{id}`  | Detail pelanggan                  |
-| Customer | PUT    | `/api/customer/{id}`  | Update pelanggan                  |
-| Supplier | GET    |   `/api/supplier`     | Ambil semua supplier              |
-| Supplier | POST   | `/api/supplier`       | Tambah supplier baru              |
-| Supplier | GET    | `/api/supplier/{id}`  | Detail supplier                   |
-| Supplier | PUT    | `/api/supplier/{id}`  | Update supplier                   |
-| Payment  | POST   | `/api/checkout`       | Payment & midtrans token          |
+| Tag       | Method | Endpoint                     | Deskripsi                         |
+|---------- |--------|------------------------------|-----------------------------------|
+| Auth      | POST   | `/api/users/register`        | Registrasi user baru              |
+| Auth      | POST   | `/api/users/login`           | Login dan mendapatkan JWT token   |
+| Obat      | GET    | `/api/obat`                  | Ambil semua data obat             |
+| Obat      | POST   | `/api/obat`                  | Tambah obat baru                  |
+| Obat      | GET    | `/api/obat/{id}`             | Detail obat                       |
+| Obat      | PUT    | `/api/obat/{id}`             | Update obat                       |
+| Obat      | DELETE | `/api/obat/{id}`             | Hapus obat                        |
+| Customer  | GET    | `/api/customer`              | Ambil semua pelanggan             |
+| Customer  | POST   | `/api/customer`              | Daftarkan pelanggan baru          |
+| Customer  | GET    | `/api/customer/{id}`         | Detail pelanggan                  |
+| Customer  | PUT    | `/api/customer/{id}`         | Update pelanggan                  |
+| Supplier  | GET    | `/api/supplier`              | Ambil semua supplier              |
+| Supplier  | POST   | `/api/supplier`              | Tambah supplier baru              |
+| Supplier  | GET    | `/api/supplier/{id}`         | Detail supplier                   |
+| Supplier  | PUT    | `/api/supplier/{id}`         | Update supplier                   |
+| Supplier  | DELETE | `/api/supplier/{id}`         | Hapus supplier                    |
+| Transaksi | POST   | `/api/transaksi`             | Update pelanggan                  |
+| Transaksi | GET    | `/api/transaksi/{id}`        | Ambil semua supplier              |
+| Transaksi | PUT    | `/api/transaksi/{id}/batal`  | Tambah supplier baru              |
+| Payment   | POST   | `/api/checkout`              | Payment & midtrans token          |
+| Restock   | POST   | `/api/restock`               | Tambah data restock barang        |
 
 ---
 
