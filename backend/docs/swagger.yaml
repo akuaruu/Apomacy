@@ -6,7 +6,7 @@ info:
 servers:
   - description: SwaggerHub API Auto Mocking
     url: https://virtserver.swaggerhub.com/aiml-906/Apomacy/3.0.3
-  - url: http://localhost:8080/api
+  - url: http://159.223.82.138:8080/api
     description: Local Development Server
 
 tags:

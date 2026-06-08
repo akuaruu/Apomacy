@@ -20,7 +20,10 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 	// 1. Global Middleware
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"https://apomacy.vercel.app",
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -80,26 +83,25 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		// Modul Obat
 		obat := api.Group("/obat")
 		{
-			obat.POST("/", obatHandler.CreateObat)
-			obat.GET("/", obatHandler.GetAllObat)
+			obat.POST("", obatHandler.CreateObat)
+			obat.GET("", obatHandler.GetAllObat)
 			obat.GET("/:id", obatHandler.GetObatByID)
 			obat.PUT("/:id", obatHandler.UpdateObat)
 			obat.DELETE("/:id", obatHandler.DeleteObat)
 		}
-
 		// Modul Customer
 		customer := api.Group("/customer")
 		{
-			customer.POST("/", customerHandler.CreateCustomer)
-			customer.GET("/", customerHandler.GetAllCustomers)
+			customer.POST("", customerHandler.CreateCustomer)
+			customer.GET("", customerHandler.GetAllCustomers)
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
 		}
 
 		supplier := api.Group("/supplier")
 		{
-			supplier.POST("/", supplierHandler.CreateSupplier)
-			supplier.GET("/", supplierHandler.GetAllSuppliers)
+			supplier.POST("", supplierHandler.CreateSupplier)
+			supplier.GET("", supplierHandler.GetAllSuppliers)
 			supplier.GET("/:id", supplierHandler.GetSupplierByID)
 			supplier.PUT("/:id", supplierHandler.UpdateSupplier)
 			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
@@ -108,7 +110,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		//Modul transaksi
 		transaksi := api.Group("/transaksi")
 		{
-			transaksi.POST("/", transaksiHandler.Checkout)
+			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
 		}
@@ -116,11 +118,11 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		// Modul Payment
 		payment := api.Group("/checkout")
 		{
-			payment.POST("/", paymentHandler.Checkout)
+			payment.POST("", paymentHandler.Checkout)
 		}
 
 		api.GET("/migrate-images", migrationHandler.RunImageMigration)
-		api.POST("/restock/", restockHandler.CreateRestock)
+		api.POST("/restock", restockHandler.CreateRestock)
 	}
 
 	return r
