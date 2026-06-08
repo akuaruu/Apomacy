@@ -55,10 +55,14 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	supplierUsecase := usecase.NewSupplierUsecase(supplierRepo)
 	supplierHandler := NewSupplierHandler(supplierUsecase)
 
-	// Domain: transaction
+	// Domain: payment
 	paymentUsecase := usecase.NewPaymentUsecase()
 	paymentHandler := NewPaymentHandler(paymentUsecase)
 
+	//Domain: transaksi
+	transaksiRepo := repository.NewTransaksiRepository(dbPool)
+	transaksiUsecase := usecase.NewTransaksiUsecase(transaksiRepo)
+	transaksiHandler := NewTransaksiHandler(transaksiUsecase)
 	//migration temporary
 	migrationHandler := NewMigrationHandler(dbPool)
 
@@ -70,6 +74,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		{
 			auth.POST("/register", userHandler.Register)
 			auth.POST("/login", userHandler.Login)
+			auth.PUT("/:id/foto", userHandler.UploadFotoProfil)
 		}
 
 		// Modul Obat
@@ -98,6 +103,14 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			supplier.GET("/:id", supplierHandler.GetSupplierByID)
 			supplier.PUT("/:id", supplierHandler.UpdateSupplier)
 			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
+		}
+
+		//Modul transaksi
+		transaksi := api.Group("/transaksi")
+		{
+			transaksi.POST("/", transaksiHandler.Checkout)
+			transaksi.GET("/:id", transaksiHandler.GetDetail)
+			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
 		}
 
 		// Modul Payment

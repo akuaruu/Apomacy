@@ -1,0 +1,39 @@
+package usecase
+
+import (
+	"context"
+	"errors"
+
+	"github.com/akuaruu/apomacy/backend/internal/model"
+)
+
+type transaksiUsecase struct {
+	repo model.TransaksiRepository
+}
+
+func NewTransaksiUsecase(repo model.TransaksiRepository) model.TransaksiUsecase {
+	return &transaksiUsecase{repo: repo}
+}
+
+func (t *transaksiUsecase) Checkout(ctx context.Context, tx *model.Transaksi) error {
+	if len(tx.Details) == 0 {
+		return errors.New("keranjang belanja tidak boleh kosong")
+	}
+
+	if tx.TotalBayar < tx.Subtotal {
+		return errors.New("total bayar tidak mencukupi")
+	}
+
+	// Pemanggilan repository yang sudah mencakup pemotongan stok via DB Transaction
+	return t.repo.CreateWithDetails(ctx, tx)
+}
+
+func (t *transaksiUsecase) GetDetailTransaksi(ctx context.Context, id int) (*model.Transaksi, error) {
+	return t.repo.GetByID(ctx, id)
+}
+
+func (t *transaksiUsecase) BatalkanTransaksi(ctx context.Context, id int) error {
+	// Catatan: Jika ingin lebih kompleks, Anda harus menarik DetailTransaksi
+	// dan menambahkan kembali stoknya ke tabel obat. Untuk MVP, kita update statusnya saja.
+	return t.repo.UpdateStatus(ctx, id, model.TxBatal)
+}

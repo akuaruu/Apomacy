@@ -37,6 +37,7 @@ type User struct {
 	Status      UserStatus `json:"status"`
 	CreatedAt   time.Time  `json:"created_at"`
 	LastLogin   *time.Time `json:"last_login"` // Bisa NULL jika user belum pernah login
+	FotoProfil  string     `json:"foto_profil" db:"foto_profil"`
 }
 
 // UserRepository contract
@@ -45,6 +46,7 @@ type UserRepository interface {
 	GetByUsername(ctx context.Context, username string) (*User, error)
 	GetByID(ctx context.Context, id int) (*User, error)
 	UpdateLastLogin(ctx context.Context, id int, loginTime time.Time) error
+	UpdateFotoProfil(ctx context.Context, userID int, fotoURL string) error
 }
 
 // UserUsecase contract
@@ -52,4 +54,5 @@ type UserUsecase interface {
 	Register(ctx context.Context, user *User) error
 	Login(ctx context.Context, username, password string) (string, error)
 	GetProfile(ctx context.Context, id int) (*User, error)
+	UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error)
 }

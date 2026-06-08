@@ -72,3 +72,13 @@ func (r *userRepository) UpdateLastLogin(ctx context.Context, id int, loginTime 
 	_, err := r.db.Exec(ctx, query, loginTime, id)
 	return err
 }
+
+func (r *userRepository) UpdateFotoProfil(ctx context.Context, userID int, fotoURL string) error {
+	query := `UPDATE public.user SET foto_profil = $1 WHERE id_user = $2`
+
+	_, err := r.db.Exec(ctx, query, fotoURL, userID)
+	if err != nil {
+		return err
+	}
+	return nil
+}

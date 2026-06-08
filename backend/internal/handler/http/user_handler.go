@@ -1,7 +1,11 @@
 package http
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/gin-gonic/gin"
@@ -78,5 +82,47 @@ func (h *UserHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login berhasil",
 		"token":   token,
+	})
+}
+
+func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
+	// 1. Tangkap ID User (Bisa dari parameter URL, idealnya dari claim JWT JWT Middleware)
+	idParam := c.Param("id")
+	userID, err := strconv.Atoi(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID user tidak valid"})
+		return
+	}
+
+	// 2. Tangkap file dengan key "foto" dari form-data
+	file, header, err := c.Request.FormFile("foto")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File foto tidak ditemukan dalam request"})
+		return
+	}
+	defer file.Close()
+
+	// 3. Baca file menjadi bentuk byte
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membaca file"})
+		return
+	}
+
+	// 4. Buat nama file unik (Mencegah file tertimpa jika namanya sama)
+	timestamp := time.Now().Unix()
+	fileName := fmt.Sprintf("user_%d_%d_%s", userID, timestamp, header.Filename)
+	contentType := header.Header.Get("Content-Type")
+
+	// 5. Panggil Usecase
+	fotoURL, err := h.usecase.UploadFotoProfil(c.Request.Context(), userID, fileBytes, fileName, contentType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Foto profil berhasil diperbarui",
+		"url":     fotoURL,
 	})
 }

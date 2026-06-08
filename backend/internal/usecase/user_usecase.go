@@ -1,8 +1,11 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -63,6 +66,7 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id_user": user.ID,
 		"role":    user.Role,
+		"nama":    user.NamaLengkap,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Token expired dalam 24 jam
 	})
 
@@ -79,4 +83,48 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 
 func (u *userUsecase) GetProfile(ctx context.Context, id int) (*model.User, error) {
 	return u.repo.GetByID(ctx, id)
+}
+
+func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error) {
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseKey := os.Getenv("SUPABASE_KEY")
+	bucketName := "profil_user"
+
+	if supabaseURL == "" || supabaseKey == "" {
+		return "", errors.New("konfigurasi env supabase tidak ditemukan")
+	}
+	// Endpoint: POST /storage/v1/object/profil_user/{fileName}
+	uploadEndpoint := fmt.Sprintf("%s/storage/v1/object/%s/%s", supabaseURL, bucketName, fileName)
+
+	// 2. Siapkan Request
+	req, err := http.NewRequestWithContext(ctx, "POST", uploadEndpoint, bytes.NewReader(fileBytes))
+	if err != nil {
+		return "", errors.New("gagal menyiapkan request upload")
+	}
+
+	req.Header.Set("Authorization", "Bearer "+supabaseKey)
+	req.Header.Set("Content-Type", contentType)
+
+	// 3. Eksekusi Request ke Supabase
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", errors.New("gagal menghubungi supabase storage")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("gagal upload ke storage, status code: %d", resp.StatusCode)
+	}
+
+	// 4. Generate Public URL dari file yang berhasil diunggah
+	publicURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", supabaseURL, bucketName, fileName)
+
+	// 5. Simpan URL ke Database menggunakan Repository
+	err = u.repo.UpdateFotoProfil(ctx, userID, publicURL)
+	if err != nil {
+		return "", errors.New("gagal menyimpan link foto ke database")
+	}
+
+	return publicURL, nil
 }
