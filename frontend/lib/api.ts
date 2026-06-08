@@ -1,6 +1,8 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
+const token = Cookies.get("apomacy_token");
+
 // Buat instance axios dengan konfigurasi default
 const api = axios.create({
   baseURL: '/api', // Menyesuaikan base URL backend

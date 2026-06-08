@@ -38,14 +38,18 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 }
 
 func (r *userRepository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
-	query := `SELECT * FROM "user" WHERE username = $1 LIMIT 1`
-
+	query := `
+        SELECT id_user, username, password_hash, nama_lengkap, 
+               role, no_telp, email, status, created_at, last_login
+        FROM "user" 
+        WHERE username = $1 
+        LIMIT 1
+    `
 	var u model.User
 	err := r.db.QueryRow(ctx, query, username).Scan(
 		&u.ID, &u.Username, &u.PasswordHash, &u.NamaLengkap,
 		&u.Role, &u.NoTelp, &u.Email, &u.Status, &u.CreatedAt, &u.LastLogin,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("user tidak ditemukan: %v", err)
 	}
@@ -53,14 +57,17 @@ func (r *userRepository) GetByUsername(ctx context.Context, username string) (*m
 }
 
 func (r *userRepository) GetByID(ctx context.Context, id int) (*model.User, error) {
-	query := `SELECT * FROM "user" WHERE id_user = $1`
-
+	query := `
+        SELECT id_user, username, password_hash, nama_lengkap,
+               role, no_telp, email, status, created_at, last_login
+        FROM "user" 
+        WHERE id_user = $1
+    `
 	var u model.User
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&u.ID, &u.Username, &u.PasswordHash, &u.NamaLengkap,
 		&u.Role, &u.NoTelp, &u.Email, &u.Status, &u.CreatedAt, &u.LastLogin,
 	)
-
 	if err != nil {
 		return nil, err
 	}

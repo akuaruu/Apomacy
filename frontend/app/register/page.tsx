@@ -5,6 +5,7 @@ import { User, Mail, Phone, Calendar, Lock, Zap, ArrowLeft, Eye, EyeOff } from "
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import api from "@/lib/api";
+import Cookies from "js-cookie";
 
 interface Product {
   id: number;
@@ -30,7 +31,7 @@ export default function RegisterPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const token = Cookies.get("apomacy_token");
     if (token) {
       window.location.href = "/dasbor";
     }
