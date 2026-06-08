@@ -1,4 +1,5 @@
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
 // Buat instance axios dengan konfigurasi default
 const api = axios.create({
@@ -11,32 +12,20 @@ const api = axios.create({
 });
 
 // Request Interceptor: Otomatis lampirkan token Authorization jika tersedia
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+api.interceptors.request.use((config) => {
+  const token = Cookies.get("apomacy_token"); // ← sesuai handleLogin
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
+  return config;
+});
 
-// Response Interceptor: Menangani error secara global (seperti token" expired / 401 Unauthorized)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        // Di sini bisa ditambahkan redirect jika diperlukan:
-        // window.location.href = '/login';
-      }
+    if (error.response?.status === 401) {
+      Cookies.remove("apomacy_token"); // ← konsisten
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

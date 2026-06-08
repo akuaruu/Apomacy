@@ -1,6 +1,7 @@
 package http
 
 import (
+	"strings"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/repository"
@@ -20,10 +21,14 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 	// 1. Global Middleware
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{
-			"http://localhost:3000",
-			"https://apomacy.vercel.app",
+		AllowOriginFunc: func(origin string) bool {
+			// Izinkan semua subdomain vercel.app milik project apomacy
+			return origin == "https://apomacy.vercel.app" ||
+				strings.HasSuffix(origin, "-aruu.vercel.app") ||
+				origin == "http://localhost:3000" ||
+				origin == "http://localhost:5173"
 		},
+
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
