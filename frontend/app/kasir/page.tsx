@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { 
-    Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2 
+import {
+    Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
 
 interface TransaksiItem {
@@ -12,12 +12,12 @@ interface TransaksiItem {
     price: number;
 }
 
-type StatusType = 
-    | "Pesanan Baru"           
-    | "Obat sedang Disiapkan"  
-    | "Dalam perjalanan"       
-    | "Obat menunggu di ambil" 
-    | "Selesai";               
+type StatusType =
+    | "Pesanan Baru"
+    | "Obat sedang Disiapkan"
+    | "Dalam perjalanan"
+    | "Obat menunggu di ambil"
+    | "Selesai";
 
 interface TransaksiDashboard {
     id: string;
@@ -59,33 +59,33 @@ const statusPriority: Record<StatusType, number> = {
     "Pesanan Baru": 1,
     "Obat sedang Disiapkan": 2,
     "Dalam perjalanan": 3,
-    "Obat menunggu di ambil": 4, 
+    "Obat menunggu di ambil": 4,
     "Selesai": 5,
 };
 
 // ─── MAIN PAGE ──────────────────────────────────────────────────────────────────
 export default function KasirDashboardPage() {
     const [transactions, setTransactions] = useState<TransaksiDashboard[]>([]);
-    const [isLoading, setIsLoading]       = useState(true); 
-    const [searchQuery, setSearchQuery]   = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState("");
     const [selectedDetail, setSelectedDetail] = useState<TransaksiDashboard | null>(null);
-    const [mounted, setMounted]           = useState(false);
-    const [activeTab, setActiveTab]       = useState<"Semua" | "Pesanan Baru" | "Diproses" | "Selesai">("Semua");
-    const [toast, setToast]               = useState<{ visible: boolean; message: string; id: string }>({ visible: false, message: "", id: "" });
-    const [currentPage, setCurrentPage]   = useState(1);
+    const [mounted, setMounted] = useState(false);
+    const [activeTab, setActiveTab] = useState<"Semua" | "Pesanan Baru" | "Diproses" | "Selesai">("Semua");
+    const [toast, setToast] = useState<{ visible: boolean; message: string; id: string }>({ visible: false, message: "", id: "" });
+    const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => { setMounted(true); }, []);
 
-              
+
     useEffect(() => {
         const fetchTransactions = async () => {
             try {
                 setIsLoading(true);
-                const API_URL = "https://api.npoint.io/386af8416f1525ba8335"; 
+                const API_URL = "https://api.npoint.io/386af8416f1525ba8335";
 
                 const response = await fetch(API_URL);
                 if (!response.ok) throw new Error("Gagal memuat data ");
-                
+
                 const data: TransaksiDashboard[] = await response.json();
                 setTransactions(data);
 
@@ -121,11 +121,11 @@ export default function KasirDashboardPage() {
 
     const getStatusStyle = (status: string): React.CSSProperties => {
         const map: Record<string, React.CSSProperties> = {
-            "Pesanan Baru":           { background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca" },
-            "Obat sedang Disiapkan":  { background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" },
-            "Dalam perjalanan":       { background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" },
+            "Pesanan Baru": { background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca" },
+            "Obat sedang Disiapkan": { background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" },
+            "Dalam perjalanan": { background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" },
             "Obat menunggu di ambil": { background: "#f5f3ff", color: "#7c3aed", border: "1px solid #ddd6fe" },
-            "Selesai":                { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" },
+            "Selesai": { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" },
         };
         return map[status] ?? { background: "#f3f4f6", color: "#6b7280" };
     };
@@ -155,7 +155,7 @@ export default function KasirDashboardPage() {
     if (searchQuery) {
         filteredData = filteredData.filter(
             t => t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                 t.customerName.toLowerCase().includes(searchQuery.toLowerCase())
+                t.customerName.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }
 
@@ -166,12 +166,12 @@ export default function KasirDashboardPage() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    const totalPages    = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
-    const safePage      = Math.min(currentPage, totalPages);
+    const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+    const safePage = Math.min(currentPage, totalPages);
     const displayedData = filteredData.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
     const handleTabChange = (tab: typeof activeTab) => { setActiveTab(tab); setCurrentPage(1); };
-    const handleSearch    = (q: string)             => { setSearchQuery(q); setCurrentPage(1); };
+    const handleSearch = (q: string) => { setSearchQuery(q); setCurrentPage(1); };
 
     const renderAction = (trx: TransaksiDashboard) => {
         if (activeTab === "Semua") {
@@ -211,16 +211,16 @@ export default function KasirDashboardPage() {
     };
 
     return (
-       
+
         <div className="flex flex-col gap-4 md:gap-6 w-full h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] relative">
 
             {/* BARIS SUMMARY PANEL CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
                 {[
-                    { icon: <Receipt size={24} />, bg: "#eff6ff", color: "#2563eb", label: "Total Hari Ini",       value: `${transactions.length} Transaksi` },
-                    { icon: <Clock size={24} />,   bg: "#fffbeb", color: "#d97706", label: "Sedang Disiapkan",     value: `${transactions.filter(t => t.status === "Obat sedang Disiapkan" || t.status === "Pesanan Baru").length} Pesanan` },
-                    { icon: <Store size={24} />,   bg: "#f5f3ff", color: "#7c3aed", label: "Menunggu Diambil",     value: `${transactions.filter(t => t.status === "Obat menunggu di ambil").length} Pesanan` },
-                    { icon: <Truck size={24} />,   bg: "#ecfdf5", color: "#059669", label: "Dalam Perjalanan",     value: `${transactions.filter(t => t.status === "Dalam perjalanan").length} Pesanan` },
+                    { icon: <Receipt size={24} />, bg: "#eff6ff", color: "#2563eb", label: "Total Hari Ini", value: `${transactions.length} Transaksi` },
+                    { icon: <Clock size={24} />, bg: "#fffbeb", color: "#d97706", label: "Sedang Disiapkan", value: `${transactions.filter(t => t.status === "Obat sedang Disiapkan" || t.status === "Pesanan Baru").length} Pesanan` },
+                    { icon: <Store size={24} />, bg: "#f5f3ff", color: "#7c3aed", label: "Menunggu Diambil", value: `${transactions.filter(t => t.status === "Obat menunggu di ambil").length} Pesanan` },
+                    { icon: <Truck size={24} />, bg: "#ecfdf5", color: "#059669", label: "Dalam Perjalanan", value: `${transactions.filter(t => t.status === "Dalam perjalanan").length} Pesanan` },
                 ].map((s, i) => (
                     <div key={i} className="bg-white p-4 md:p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center gap-3 md:gap-4">
                         <div style={{ background: s.bg, color: s.color }} className="p-2.5 md:p-3 rounded-xl shrink-0">{s.icon}</div>
@@ -235,18 +235,17 @@ export default function KasirDashboardPage() {
             {/* TABEL DATA PANEL */}
             <div className="flex-1 bg-white rounded-2xl border border-outline-variant p-4 md:p-6 shadow-sm flex flex-col min-h-0">
 
-                
+
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shrink-0 border-b border-gray-100 pb-4 md:pb-5 w-full">
-                    
-                    
+
+
                     <div className="flex gap-2 md:gap-3 overflow-x-auto w-full md:w-auto scrollbar-hide snap-x pb-2 md:pb-0 pt-2">
                         {(["Semua", "Pesanan Baru", "Diproses", "Selesai"] as const).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => handleTabChange(tab)}
-                                className={`snap-center shrink-0 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all relative whitespace-nowrap ${
-                                    activeTab === tab ? "bg-apomacy-dark text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className={`snap-center shrink-0 px-3 md:px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all relative whitespace-nowrap ${activeTab === tab ? "bg-apomacy-dark text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                                    }`}
                             >
                                 {tab}
                                 {tab === "Pesanan Baru" && newOrdersCount > 0 && (
@@ -278,8 +277,8 @@ export default function KasirDashboardPage() {
                 </div>
 
                 <div className="w-full border border-outline-variant rounded-xl overflow-hidden bg-white shadow-xs flex-1 min-h-0">
-                <div className="overflow-y-auto overflow-x-auto max-h-[400px] md:max-h-[580px] block w-full scrollbar-thin scrollbar-thumb-gray-300 relative h-full">
-                        
+                    <div className="overflow-y-auto overflow-x-auto max-h-[400px] md:max-h-[580px] block w-full scrollbar-thin scrollbar-thumb-gray-300 relative h-full">
+
                         {isLoading ? (
                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 gap-2 z-50 min-h-[300px]">
                                 <Loader2 className="animate-spin text-apomacy-primary" size={32} />
@@ -374,11 +373,11 @@ export default function KasirDashboardPage() {
                     position: "fixed", bottom: 20, right: "auto", left: "50%", transform: "translateX(-50%)", zIndex: 999999,
                     background: "#fff", borderRadius: 16, padding: "14px 16px",
                     boxShadow: "0 20px 40px rgba(0,0,0,0.2)", border: "1px solid #fde68a",
-                    display: "flex", alignItems: "flex-start", gap: 12, 
+                    display: "flex", alignItems: "flex-start", gap: 12,
                     width: "calc(100% - 40px)", maxWidth: 360,
                     animation: "slideInRight 0.4s cubic-bezier(0.34,1.3,0.64,1)"
                 }}
-                className="md:right-10 md:left-auto md:transform-none"
+                    className="md:right-10 md:left-auto md:transform-none"
                 >
                     <div style={{ background: "#fffbeb", color: "#d97706", padding: 8, borderRadius: "50%", marginTop: 2, flexShrink: 0 }}>
                         <Bell size={20} className="animate-pulse" />
@@ -435,7 +434,7 @@ export default function KasirDashboardPage() {
                                 <thead>
                                     <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
                                         {["Item", "Qty", "Total"].map((h, i) => (
-                                            <th key={h} style={{ padding: "8px 0", fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", tracking: "wider", textAlign: i === 0 ? "left" : i === 1 ? "center" : "right" }}>{h}</th>
+                                            <th key={h} style={{ padding: "8px 0", fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", textAlign: i === 0 ? "left" : i === 1 ? "center" : "right" }}>{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
