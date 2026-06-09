@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -101,6 +102,8 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			customer.GET("", customerHandler.GetAllCustomers)
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
+			customer.DELETE("/:id", customerHandler.DeleteCustomer)
+
 		}
 
 		supplier := api.Group("/supplier")
@@ -128,7 +131,14 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 		api.GET("/migrate-images", migrationHandler.RunImageMigration)
 		api.POST("/restock", restockHandler.CreateRestock)
+
+	}
+
+	for _, route := range r.Routes() {
+		fmt.Printf("Rute Terdaftar: %s %s\n", route.Method, route.Path)
+		//debug gwah den
 	}
 
 	return r
+
 }

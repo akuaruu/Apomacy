@@ -48,3 +48,10 @@ func (u *customerUsecase) UpdateCustomer(ctx context.Context, customer *model.Cu
 
 	return u.repo.Update(ctx, customer)
 }
+
+func (u *customerUsecase) DeleteCustomer(ctx context.Context, id int) error {
+	if id <= 0 {
+		return errors.New("ID customer tidak valid")
+	}
+	return u.repo.Delete(ctx, id)
+}
