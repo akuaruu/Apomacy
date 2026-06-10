@@ -3,6 +3,7 @@ package http
 import (
 	"time"
 
+	"github.com/akuaruu/apomacy/backend/internal/middleware"
 	"github.com/akuaruu/apomacy/backend/internal/repository"
 	"github.com/akuaruu/apomacy/backend/internal/usecase"
 	"github.com/gin-contrib/cors"
@@ -96,6 +97,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		}
 
 		transaksi := api.Group("/transaksi")
+		transaksi.Use(middleware.RequireAuth())
 		{
 			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)

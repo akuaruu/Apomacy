@@ -25,11 +25,13 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	// Validasi dasar di tingkat handler
-	if req.IDUser == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID User (Kasir) wajib diisi"})
+	// Ambil id_user dari JWT context (di-set oleh RequireAuth)  ← ganti blok validasi lama
+	idUser, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
 		return
 	}
+	req.IDUser = int(idUser.(float64))
 
 	if err := h.usecase.Checkout(c.Request.Context(), &req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses transaksi", "detail": err.Error()})
