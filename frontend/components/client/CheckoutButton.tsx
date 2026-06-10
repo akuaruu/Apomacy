@@ -85,8 +85,8 @@ export default function CheckoutButton({ grossAmount, paymentMethod, items, onVa
         <>
             <Script
                 src="https://app.sandbox.midtrans.com/snap/snap.js"
-                data-client-key="ISI_DENGAN_CLIENT_KEY_SAYA"
-                strategy="lazyOnload"
+                data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+                strategy="beforeInteractive" // Ini penting agar dimuat sebelum tombol diklik
             />
 
             <button
