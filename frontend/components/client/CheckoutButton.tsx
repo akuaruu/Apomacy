@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
+import { useCart } from "@/context/CartContext";
 
 interface ItemDetail {
     id: string;
@@ -17,65 +19,193 @@ interface CheckoutButtonProps {
     onValidate: () => boolean;
 }
 
-export default function CheckoutButton({ grossAmount, paymentMethod, items, onValidate }: CheckoutButtonProps) {
-    const [isLoading, setIsLoading] = useState(false);
+type NotifStatus = "success" | "pending" | "error" | "closed" | null;
 
-    const handleCheckout = async () => {
-        if (!onValidate()) {
+// ── Komponen notifikasi internal ─────────────────────────────────────────────
+function PaymentNotification({
+    status,
+    orderId,
+    onRedirect,
+}: {
+    status: NotifStatus;
+    orderId: string;
+    onRedirect: () => void;
+}) {
+    const [countdown, setCountdown] = useState(5);
+
+    useEffect(() => {
+        if (status !== "success") return;
+        if (countdown <= 0) {
+            onRedirect();
             return;
         }
+        const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [status, countdown, onRedirect]);
 
+    if (!status) return null;
+
+    const config: Record<
+        NonNullable<NotifStatus>,
+        { bg: string; border: string; icon: string; title: string; message: string }
+    > = {
+        success: {
+            bg: "bg-emerald-50",
+            border: "border-emerald-400",
+            icon: "✅",
+            title: "Pembayaran Berhasil!",
+            message: `Order #${orderId} telah dikonfirmasi.`,
+        },
+        pending: {
+            bg: "bg-yellow-50",
+            border: "border-yellow-400",
+            icon: "⏳",
+            title: "Menunggu Pembayaran",
+            message: `Order #${orderId} sedang diproses. Selesaikan pembayaran sebelum batas waktu.`,
+        },
+        error: {
+            bg: "bg-red-50",
+            border: "border-red-400",
+            icon: "❌",
+            title: "Pembayaran Gagal",
+            message: "Transaksi tidak berhasil. Silakan coba kembali.",
+        },
+        closed: {
+            bg: "bg-gray-50",
+            border: "border-gray-300",
+            icon: "ℹ️",
+            title: "Pembayaran Dibatalkan",
+            message: "Kamu menutup halaman pembayaran. Pesanan belum diproses.",
+        },
+    };
+
+    const { bg, border, icon, title, message } = config[status];
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className={`w-full max-w-sm rounded-2xl border-2 ${border} ${bg} p-6 shadow-2xl`}>
+                {/* Icon */}
+                <div className="mb-4 text-center text-5xl">{icon}</div>
+
+                {/* Title */}
+                <h2 className="mb-2 text-center text-xl font-black text-apomacy-dark">{title}</h2>
+
+                {/* Message */}
+                <p className="mb-5 text-center text-sm text-gray-600">{message}</p>
+
+                {/* Countdown bar (hanya untuk success) */}
+                {status === "success" && (
+                    <div className="mb-4">
+                        <div className="mb-1 text-center text-xs text-gray-500">
+                            Mengalihkan ke katalog dalam{" "}
+                            <span className="font-bold text-apomacy-primary">{countdown}</span> detik...
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-emerald-200">
+                            <div
+                                className="h-full rounded-full bg-emerald-500 transition-all duration-1000 ease-linear"
+                                style={{ width: `${(countdown / 5) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Tombol aksi */}
+                <div className="flex flex-col gap-2">
+                    {status === "success" && (
+                        <button
+                            onClick={onRedirect}
+                            className="w-full rounded-xl bg-apomacy-primary py-3 text-sm font-bold text-white transition-all hover:bg-apomacy-dark"
+                        >
+                            Ke Katalog Sekarang
+                        </button>
+                    )}
+                    {status === "pending" && (
+                        <button
+                            onClick={onRedirect}
+                            className="w-full rounded-xl bg-yellow-500 py-3 text-sm font-bold text-white transition-all hover:bg-yellow-600"
+                        >
+                            Lihat Status Pesanan
+                        </button>
+                    )}
+                    {(status === "error" || status === "closed") && (
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full rounded-xl bg-apomacy-primary py-3 text-sm font-bold text-white transition-all hover:bg-apomacy-dark"
+                        >
+                            Coba Lagi
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Komponen utama ────────────────────────────────────────────────────────────
+export default function CheckoutButton({
+    grossAmount,
+    paymentMethod,
+    items,
+    onValidate,
+}: CheckoutButtonProps) {
+    const router = useRouter();
+    const { clearCart } = useCart(); // Pastikan CartContext kamu punya fungsi clearCart
+
+    const [isLoading, setIsLoading] = useState(false);
+    const [notifStatus, setNotifStatus] = useState<NotifStatus>(null);
+    const [orderId, setOrderId] = useState("");
+
+    const handleRedirect = () => {
+        setNotifStatus(null);
+        router.push("/katalog");
+    };
+
+    const handleCheckout = async () => {
+        if (!onValidate()) return;
         setIsLoading(true);
 
         try {
-            const orderId = `TRX-${Date.now()}`;
+            const generatedOrderId = `TRX-${Date.now()}`;
+            setOrderId(generatedOrderId);
 
             const res = await fetch("/api/checkout", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    order_id: orderId,
+                    order_id: generatedOrderId,
                     gross_amount: grossAmount,
                     payment_method: paymentMethod,
-                    items: items,
+                    items,
                 }),
             });
 
-            if (!res.ok) {
-                throw new Error("Gagal mengambil token dari backend");
-            }
+            if (!res.ok) throw new Error("Gagal mengambil token dari backend");
 
             const data = await res.json();
             const snapToken = data.token;
 
-            if (window.snap) {
-                window.snap.pay(snapToken, {
-                    onSuccess: function (result: any) {
-                        console.log("Payment Success:", result);
-                        alert("Pembayaran berhasil diproses!");
-                    },
-                    onPending: function (result: any) {
-                        console.log("Payment Pending:", result);
-                        window.location.href = `/pembayaran/pending?order_id=${result.order_id}`;
-                    },
-                    onError: function (result: any) {
-                        console.log("Payment Error:", result);
-                        alert("Pembayaran gagal atau kadaluarsa.");
-                    },
-                    onClose: function () {
-                        console.log("Pop-up Closed");
-                        alert("Pop-up ditutup tanpa menyelesaikan pembayaran.");
-                    }
-                });
-            } else {
-                console.error("Snap script belum termuat.");
-                alert("Sistem pembayaran sedang memuat, silakan coba lagi.");
+            if (!window.snap) {
+                throw new Error("Snap script belum termuat");
             }
+
+            window.snap.pay(snapToken, {
+                onSuccess: function () {
+                    clearCart?.();
+                    setNotifStatus("success");
+                },
+                onPending: function () {
+                    setNotifStatus("pending");
+                },
+                onError: function () {
+                    setNotifStatus("error");
+                },
+                onClose: function () {
+                    setNotifStatus("closed");
+                },
+            });
         } catch (error) {
             console.error("Checkout failed:", error);
-            alert("Terjadi kesalahan komunikasi dengan server Apomacy.");
+            setNotifStatus("error");
         } finally {
             setIsLoading(false);
         }
@@ -86,7 +216,13 @@ export default function CheckoutButton({ grossAmount, paymentMethod, items, onVa
             <Script
                 src="https://app.sandbox.midtrans.com/snap/snap.js"
                 data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-                strategy="beforeInteractive" // Ini penting agar dimuat sebelum tombol diklik
+                strategy="beforeInteractive"
+            />
+
+            <PaymentNotification
+                status={notifStatus}
+                orderId={orderId}
+                onRedirect={handleRedirect}
             />
 
             <button

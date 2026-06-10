@@ -17,9 +17,10 @@ const (
 type StatusTransaksi string
 
 const (
-	TxSelesai StatusTransaksi = "Selesai"
-	TxPending StatusTransaksi = "Pending"
-	TxBatal   StatusTransaksi = "Batal"
+	TxSelesai            StatusTransaksi = "Selesai"
+	TxPending            StatusTransaksi = "Pending"
+	TxBatal              StatusTransaksi = "Batal"
+	TxMenungguPembayaran StatusTransaksi = "menunggu_pembayaran"
 )
 
 type Transaksi struct {
@@ -56,10 +57,12 @@ type TransaksiRepository interface {
 	CreateWithDetails(ctx context.Context, tx *Transaksi) error
 	GetByID(ctx context.Context, id int) (*Transaksi, error)
 	UpdateStatus(ctx context.Context, id int, status StatusTransaksi) error
+	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 }
 
 type TransaksiUsecase interface {
 	Checkout(ctx context.Context, tx *Transaksi) error // Logic kurangi stok ada di sini
 	GetDetailTransaksi(ctx context.Context, id int) (*Transaksi, error)
 	BatalkanTransaksi(ctx context.Context, id int) error // Logic kembalikan stok
+	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 }

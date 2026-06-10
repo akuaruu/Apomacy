@@ -29,7 +29,7 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 
 	tx.TanggalTransaksi = time.Now()
 	if tx.Status == "" {
-		tx.Status = model.TxSelesai // Default status
+		tx.Status = model.TxPending // Default status
 	}
 
 	// 1. Insert ke tabel utama (transaksi)
@@ -125,4 +125,16 @@ func (r *transaksiRepository) UpdateStatus(ctx context.Context, id int, status m
 	query := `UPDATE transaksi SET status = $1 WHERE id_transaksi = $2`
 	_, err := r.db.Exec(ctx, query, status, id)
 	return err
+}
+
+func (r *transaksiRepository) UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status model.StatusTransaksi) error {
+	query := `UPDATE transaksi SET status = $1 WHERE no_transaksi = $2`
+	result, err := r.db.Exec(ctx, query, status, noTransaksi)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("transaksi tidak ditemukan: " + noTransaksi)
+	}
+	return nil
 }
