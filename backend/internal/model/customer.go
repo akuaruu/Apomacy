@@ -31,6 +31,7 @@ type CustomerRepository interface {
 	GetByID(ctx context.Context, id int) (*Customer, error)
 	GetAll(ctx context.Context) ([]Customer, error)
 	Update(ctx context.Context, customer *Customer) error
+	Delete(ctx context.Context, id int) error
 }
 
 type CustomerUsecase interface {
@@ -38,4 +39,5 @@ type CustomerUsecase interface {
 	GetCustomerByID(ctx context.Context, id int) (*Customer, error)
 	GetAllCustomers(ctx context.Context) ([]Customer, error)
 	UpdateCustomer(ctx context.Context, customer *Customer) error
+	DeleteCustomer(ctx context.Context, id int) error
 }

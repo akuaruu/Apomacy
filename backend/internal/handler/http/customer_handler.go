@@ -78,3 +78,19 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Customer berhasil diupdate"})
 }
+
+func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID harus berupa angka"})
+		return
+	}
+
+	if err := h.usecase.DeleteCustomer(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Customer berhasil dihapus"})
+}

@@ -100,3 +100,14 @@ func (r *customerRepository) Update(ctx context.Context, customer *model.Custome
 	}
 	return nil
 }
+
+func (r *customerRepository) Delete(ctx context.Context, id int) error {
+	query := `DELETE FROM customer WHERE id_customer = $1`
+
+	_, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("gagal delete customer: %v", err)
+	}
+
+	return nil
+}
