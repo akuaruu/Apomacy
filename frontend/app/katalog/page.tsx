@@ -107,7 +107,7 @@ function KatalogContent() {
     }, [apiProducts, currentPage]);
 
     return (
-        <main className="pb-20 max-w-[1400px] mx-auto px-6">
+        <main className="mt-8 pb-20 max-w-[1400px] mx-auto px-6">
             {!isFiltering && (
                 <PromoBanner
                     badge="-20% OFF WEEKEND SALE"

@@ -130,7 +130,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
         <>
             <header className="sticky top-0 z-40 w-full">
                 <div className="bg-white shadow-sm">
-                    <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-6 px-4 lg:px-8">
+                    <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-8 px-4 lg:px-8">
                         <Link href="/katalog" className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container">
                             <Image src="/image/logo_apomacy.png" alt="Logo Apomacy" width={40} height={40} className="object-contain" />
                             <span className="text-xl font-black tracking-[-0.02em]">Apomacy</span>
