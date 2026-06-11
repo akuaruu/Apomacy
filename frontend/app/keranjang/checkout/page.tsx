@@ -34,6 +34,36 @@ export default function CheckoutPage() {
         if (!token) {
             router.replace("/login?redirect=/checkout");
         }
+
+        // Fetch data profil user secara otomatis
+        const fetchProfile = async () => {
+            try {
+                // Gunakan relative path (Proxy Vercel)
+                const res = await fetch("/api/users/profile", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (res.ok) {
+                    const json = await res.json();
+                    const profileData = json.data;
+
+                    // Otomatis isi state formData dengan data database
+                    setFormData(prev => ({
+                        ...prev,
+                        name: profileData.nama || "",
+                        phone: profileData.telepon || "",
+                        pickupName: profileData.nama || "",
+                        pickupPhone: profileData.telepon || "",
+                    }));
+                }
+            } catch (error) {
+                console.error("Gagal memuat profil", error);
+            }
+        };
+
+        fetchProfile();
     }, [router]);
 
     const checkoutItems = cartItems.filter((i) => selectedIds.includes(i.product.id));
@@ -81,30 +111,21 @@ export default function CheckoutPage() {
     const validateForm = () => {
         const newErrors: Record<string, string> = {};
 
-        if (method === "delivery") {
+        if (method === 'delivery') {
+            // Validasi khusus untuk pesan antar
             if (!formData.name.trim()) newErrors.name = "Nama penerima wajib diisi";
-            if (!formData.address.trim()) newErrors.address = "Alamat lengkap wajib diisi";
+            if (!formData.phone.trim()) newErrors.phone = "Nomor handphone wajib diisi";
+            if (!formData.address.trim()) newErrors.address = "Alamat pengiriman wajib diisi";
 
-            if (!formData.phone.trim()) {
-                newErrors.phone = "Nomor WhatsApp wajib diisi";
-            } else if (formData.phone.length < 11 || formData.phone.length > 13) {
-                newErrors.phone = "Nomor HP harus 11-13 digit";
-            }
-        } else {
-            if (!formData.pickupName.trim())
-                newErrors.pickupName = "Nama pengambil wajib diisi";
-
-            if (!formData.pickupPhone.trim()) {
-                newErrors.pickupPhone = "Nomor HP wajib diisi";
-            } else if (
-                formData.pickupPhone.length < 11 ||
-                formData.pickupPhone.length > 13
-            ) {
-                newErrors.pickupPhone = "Nomor HP harus 11-13 digit";
-            }
+        } else if (method === 'pickup') {
+            // Validasi khusus untuk ambil sendiri
+            if (!formData.pickupName.trim()) newErrors.pickupName = "Nama pengambil wajib diisi";
+            if (!formData.pickupPhone.trim()) newErrors.pickupPhone = "Nomor telepon pengambil wajib diisi";
         }
 
         setErrors(newErrors);
+
+        // Form dianggap valid jika tidak ada error sama sekali
         return Object.keys(newErrors).length === 0;
     };
 
@@ -126,8 +147,8 @@ export default function CheckoutPage() {
                                 setErrors({});
                             }}
                             className={`p-4 rounded-2xl border-2 text-left transition-all ${method === "delivery"
-                                    ? "border-apomacy-primary bg-apomacy-primary/5"
-                                    : "border-gray-100"
+                                ? "border-apomacy-primary bg-apomacy-primary/5"
+                                : "border-gray-100"
                                 }`}
                         >
                             <p className="font-bold text-apomacy-dark">Instant Delivery</p>
@@ -139,8 +160,8 @@ export default function CheckoutPage() {
                                 setErrors({});
                             }}
                             className={`p-4 rounded-2xl border-2 text-left transition-all ${method === "pickup"
-                                    ? "border-apomacy-primary bg-apomacy-primary/5"
-                                    : "border-gray-100"
+                                ? "border-apomacy-primary bg-apomacy-primary/5"
+                                : "border-gray-100"
                                 }`}
                         >
                             <p className="font-bold text-apomacy-dark">Ambil di Apotek</p>
@@ -165,36 +186,28 @@ export default function CheckoutPage() {
                                         type="text"
                                         name="name"
                                         value={formData.name}
-                                        onChange={handleInputChange}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        readOnly={formData.name.length > 0} // Hanya dikunci jika teks sudah terisi
                                         placeholder="Nama Penerima"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.name
-                                                ? "border-red-500 focus:ring-red-500"
-                                                : "border-gray-200 focus:ring-apomacy-primary"
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.name.length > 0
+                                            ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                                            : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
                                     />
-                                    {errors.name && (
-                                        <p className="text-red-500 text-xs mt-1 font-medium">
-                                            {errors.name}
-                                        </p>
-                                    )}
                                 </div>
                                 <div>
                                     <input
                                         type="text"
                                         name="phone"
                                         value={formData.phone}
-                                        onChange={handleInputChange}
-                                        placeholder="Nomor HP (WhatsApp)"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.phone
-                                                ? "border-red-500 focus:ring-red-500"
-                                                : "border-gray-200 focus:ring-apomacy-primary"
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        readOnly={formData.phone.length > 0}
+                                        placeholder="Nomor Handphone"
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.phone.length > 0
+                                            ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                                            : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
                                     />
-                                    {errors.phone && (
-                                        <p className="text-red-500 text-xs mt-1 font-medium">
-                                            {errors.phone}
-                                        </p>
-                                    )}
                                 </div>
                                 <div className="col-span-2">
                                     <textarea
@@ -203,8 +216,8 @@ export default function CheckoutPage() {
                                         onChange={handleInputChange}
                                         placeholder="Alamat Lengkap (Jalan, No Rumah, RT/RW)"
                                         className={`w-full p-3 rounded-xl border text-sm h-24 focus:outline-none resize-none ${errors.address
-                                                ? "border-red-500 focus:ring-red-500"
-                                                : "border-gray-200 focus:ring-apomacy-primary"
+                                            ? "border-red-500 focus:ring-red-500"
+                                            : "border-gray-200 focus:ring-apomacy-primary"
                                             }`}
                                     />
                                     {errors.address && (
@@ -248,38 +261,30 @@ export default function CheckoutPage() {
                                 <div>
                                     <input
                                         type="text"
-                                        name="pickupName"
-                                        value={formData.pickupName}
-                                        onChange={handleInputChange}
-                                        placeholder="Nama Pengambil"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.pickupName
-                                                ? "border-red-500 focus:ring-red-500"
-                                                : "border-gray-200 focus:ring-apomacy-primary"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        readOnly={formData.name.length > 0} // Hanya dikunci jika teks sudah terisi
+                                        placeholder="Nama Penerima"
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.name.length > 0
+                                            ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                                            : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
                                     />
-                                    {errors.pickupName && (
-                                        <p className="text-red-500 text-xs mt-1 font-medium">
-                                            {errors.pickupName}
-                                        </p>
-                                    )}
                                 </div>
                                 <div>
                                     <input
                                         type="text"
-                                        name="pickupPhone"
-                                        value={formData.pickupPhone}
-                                        onChange={handleInputChange}
-                                        placeholder="Nomor HP Pengambil"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none ${errors.pickupPhone
-                                                ? "border-red-500 focus:ring-red-500"
-                                                : "border-gray-200 focus:ring-apomacy-primary"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        readOnly={formData.phone.length > 0}
+                                        placeholder="Nomor Handphone"
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.phone.length > 0
+                                            ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                                            : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
                                     />
-                                    {errors.pickupPhone && (
-                                        <p className="text-red-500 text-xs mt-1 font-medium">
-                                            {errors.pickupPhone}
-                                        </p>
-                                    )}
                                 </div>
                             </div>
                         </>

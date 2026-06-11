@@ -113,6 +113,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const clearCart = () => {
         setCartItems([]);
+        localStorage.removeItem("apomacy_cart");
     };
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);

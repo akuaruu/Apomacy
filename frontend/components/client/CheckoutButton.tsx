@@ -187,7 +187,11 @@ export default function CheckoutButton({
     };
 
     const handleCheckout = async () => {
-        if (!onValidate()) return;
+        if (!onValidate()) {
+            alert("Pemesanan ditolak: Harap lengkapi seluruh data pengiriman terlebih dahulu!");
+            return;
+        }
+
         setIsLoading(true);
 
         try {
@@ -262,24 +266,38 @@ export default function CheckoutButton({
             }
 
             // ── STEP 5: Buka Snap popup 
-            window.snap.pay(snapToken, {
-                onSuccess: function () {
-                    setPaymentDone(true);
-                    clearCart?.();
-                    setNotifStatus("success");
-                },
-                onPending: function () {
-                    setNotifStatus("pending");
-                },
-                onError: function () {
-                    setNotifStatus("error");
-                },
-                onClose: function () {
-                    if (!paymentDone) {           // ← hanya tampilkan closed jika belum sukses
-                        setNotifStatus("closed");
+            if (window.snap) {
+                window.snap.pay(snapToken, {
+                    onSuccess: function (result: any) {
+                        console.log("Payment Success:", result);
+                        // 1. Kosongkan keranjang (karena pesanan sudah lunas)
+                        if (clearCart) clearCart();
+                        // 2. Pindah ke halaman sukses dengan mulus
+                        router.push(`/pembayaran/sukses?order_id=${result.order_id}`);
+                    },
+                    onPending: function (result: any) {
+                        console.log("Payment Pending:", result);
+                        // 1. Kosongkan keranjang (panggil fungsi clearCart yang sudah diperbaiki di atas)
+                        if (clearCart) clearCart();
+
+                        // 2. Bawa user ke halaman pending BESERTA snapToken-nya
+                        router.push(`/pembayaran/pending?order_id=${result.order_id}&token=${snapToken}`);
+                    },
+                    onError: function (result: any) {
+                        console.log("Payment Error/Canceled:", result);
+                        // Cukup beri alert, user tetap di halaman checkout untuk mencoba lagi
+                        alert("Pembayaran gagal atau dibatalkan oleh sistem. Silakan coba lagi.");
+                        setIsLoading(false);
+                    },
+                    onClose: function () {
+                        console.log("Pop-up Closed");
+                        // User sengaja menutup pop-up (Cancel)
+                        alert("Kamu menutup jendela pembayaran. Klik bayar lagi jika ingin melanjutkan.");
+                        setIsLoading(false);
                     }
-                },
-            });
+                });
+            }
+
         } catch (error: unknown) {
             console.error("Checkout failed:", error);
 
