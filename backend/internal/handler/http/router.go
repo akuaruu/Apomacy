@@ -63,13 +63,20 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	// 3. Routing
 	api := r.Group("/api")
 	{
-		auth := api.Group("/users")
-		auth.Use(middleware.RequireAuth())
+		// --- AREA PUBLIK (Tanpa Middleware Auth) ---
+		// Bebas diakses siapa saja untuk mendaftar atau mengambil token
+		publicUsers := api.Group("/users")
 		{
-			auth.POST("/register", userHandler.Register)
-			auth.POST("/login", userHandler.Login)
-			auth.PUT("/:id/foto", userHandler.UploadFotoProfil)
-			auth.GET("/profile", userHandler.GetProfile)
+			publicUsers.POST("/register", userHandler.Register)
+			publicUsers.POST("/login", userHandler.Login)
+		}
+
+		// -AREA PRIVAT (Wajib Login/Bawa Token)
+		protectedUsers := api.Group("/users")
+		protectedUsers.Use(middleware.RequireAuth())
+		{
+			protectedUsers.PUT("/:id/foto", userHandler.UploadFotoProfil)
+			protectedUsers.GET("/profile", userHandler.GetProfile)
 		}
 
 		obat := api.Group("/obat")
