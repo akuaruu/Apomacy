@@ -20,7 +20,7 @@ const (
 	TxSelesai            StatusTransaksi = "Selesai"
 	TxPending            StatusTransaksi = "Pending"
 	TxBatal              StatusTransaksi = "Batal"
-	TxMenungguPembayaran StatusTransaksi = "menunggu_pembayaran"
+	TxMenungguPembayaran StatusTransaksi = "Pending"
 )
 
 type Transaksi struct {

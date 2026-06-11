@@ -81,8 +81,8 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 	return tokenString, nil
 }
 
-func (u *userUsecase) GetProfile(ctx context.Context, id int) (*model.User, error) {
-	return u.repo.GetByID(ctx, id)
+func (u *userUsecase) GetProfile(ctx context.Context, id int) (*model.UserProfile, error) {
+	return u.repo.GetProfile(ctx, id)
 }
 
 func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error) {

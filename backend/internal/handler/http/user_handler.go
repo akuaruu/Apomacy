@@ -126,3 +126,34 @@ func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
 		"url":     fotoURL,
 	})
 }
+
+// GetProfile menangani request pengambilan data gabungan profil
+func (h *UserHandler) GetProfile(c *gin.Context) {
+	// 1. Tangkap ID User dari JWT Middleware yang sudah diamankan
+	userIDRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
+		return
+	}
+
+	// 2. Konversi tipe data (JWT id_user biasanya dibaca sebagai float64 oleh golang)
+	userIDFloat, ok := userIDRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
+		return
+	}
+	userID := int(userIDFloat)
+
+	// 3. Panggil usecase
+	profile, err := h.usecase.GetProfile(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data profil"})
+		return
+	}
+
+	// 4. Kirim response sesuai harapan Frontend
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Berhasil memuat profil",
+		"data":    profile,
+	})
+}

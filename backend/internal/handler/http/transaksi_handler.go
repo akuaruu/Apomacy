@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -34,6 +35,8 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	req.IDUser = int(idUser.(float64))
 
 	if err := h.usecase.Checkout(c.Request.Context(), &req); err != nil {
+		// tambah log ini sementara
+		fmt.Printf("[ERROR] Checkout gagal: %+v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses transaksi", "detail": err.Error()})
 		return
 	}

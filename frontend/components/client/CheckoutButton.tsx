@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useCart } from "@/context/CartContext";
-import api from "@/lib/api"; // axios instance yang sudah attach Bearer token otomatis
+import api from "@/lib/api";
+import Image from 'next/image';
+
 
 interface ItemDetail {
     id: string;
@@ -58,33 +60,33 @@ function PaymentNotification({
 
     const config: Record<
         NonNullable<NotifStatus>,
-        { bg: string; border: string; icon: string; title: string; message: string }
+        { bg: string; border: string; icon: React.ReactNode; title: string; message: string }
     > = {
         success: {
             bg: "bg-emerald-50",
             border: "border-emerald-400",
-            icon: "✅",
+            icon: <Image src="/app/checkbox-check.ico" alt="Success" width={24} height={24} />,
             title: "Pembayaran Berhasil!",
             message: `Order #${orderId} telah dikonfirmasi.`,
         },
         pending: {
             bg: "bg-yellow-50",
             border: "border-yellow-400",
-            icon: "⏳",
+            icon: <Image src="/app/loading.ico" alt="Menunggu Pembayaran" width={24} height={24} />,
             title: "Menunggu Pembayaran",
             message: `Order #${orderId} sedang diproses. Selesaikan pembayaran sebelum batas waktu.`,
         },
         error: {
             bg: "bg-red-50",
             border: "border-red-400",
-            icon: "❌",
+            icon: <Image src="/app/circle-x.ico" alt="Cancelled" width={24} height={24} />,
             title: "Pembayaran Gagal",
             message: "Transaksi tidak berhasil. Silakan coba kembali.",
         },
         closed: {
             bg: "bg-gray-50",
             border: "border-gray-300",
-            icon: "ℹ️",
+            icon: <Image src="/app/circle-x.ico" alt="Cancelled" width={24} height={24} />,
             title: "Pembayaran Dibatalkan",
             message: "Kamu menutup halaman pembayaran. Pesanan belum diproses.",
         },
@@ -145,7 +147,7 @@ function PaymentNotification({
     );
 }
 
-// ── Helper: decode JWT payload tanpa library tambahan ─────────────────────────
+//Helper: decode JWT payload tanpa library tambahan 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
         const base64Url = token.split(".")[1];
@@ -162,8 +164,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
     }
 }
 
-// ── Komponen utama ────────────────────────────────────────────────────────────
+//Komponen utama 
 export default function CheckoutButton({
+
     grossAmount,
     paymentMethod,
     items,
@@ -176,6 +179,7 @@ export default function CheckoutButton({
     const [isLoading, setIsLoading] = useState(false);
     const [notifStatus, setNotifStatus] = useState<NotifStatus>(null);
     const [orderId, setOrderId] = useState("");
+    const [paymentDone, setPaymentDone] = useState(false);
 
     const handleRedirect = () => {
         setNotifStatus(null);
@@ -187,7 +191,7 @@ export default function CheckoutButton({
         setIsLoading(true);
 
         try {
-            // ── STEP 1: Ambil id_user dari JWT di cookie ──────────────────
+            // ── STEP 1: Ambil id_user dari JWT di cookie
             const Cookies = (await import("js-cookie")).default;
             const token = Cookies.get("apomacy_token");
 
@@ -204,13 +208,13 @@ export default function CheckoutButton({
                 throw new Error("Token tidak valid, silakan login ulang");
             }
 
-            // ── STEP 2: Bangun payload transaksi untuk backend Go ─────────
+            // ── STEP 2: Bangun payload transaksi untuk backend Go 
             const generatedOrderId = `TRX-${Date.now()}`;
             setOrderId(generatedOrderId);
 
             // Mapping items dari Midtrans format → detail_transaksi format
             const details = items
-                .filter((item) => item.id !== "ONGKIR-01") // shipping bukan obat
+                .filter((item) => item.id !== "ONGKIR-01")
                 .map((item) => ({
                     id_obat: parseInt(item.id),
                     nama_obat: item.name,
@@ -236,15 +240,14 @@ export default function CheckoutButton({
                 total_bayar: grossAmount, // sudah termasuk ongkir
                 metode_pembayaran: mapPaymentMethod(paymentMethod),
                 resep_required: false,
-                status: "menunggu_pembayaran",
                 details,
             };
 
-            // ── STEP 3: Simpan transaksi ke database dulu ─────────────────
+            // ── STEP 3: Simpan transaksi ke database dulu 
             // Menggunakan axios instance `api` yang sudah attach Authorization header otomatis
             await api.post("/transaksi", transaksiPayload);
 
-            // ── STEP 4: Ambil Snap token dari backend Go ──────────────────
+            // ── STEP 4: Ambil Snap token dari backend Go 
             const snapRes = await api.post("/checkout", {
                 order_id: generatedOrderId,
                 gross_amount: grossAmount,
@@ -258,9 +261,10 @@ export default function CheckoutButton({
                 throw new Error("Snap script belum termuat");
             }
 
-            // ── STEP 5: Buka Snap popup ───────────────────────────────────
+            // ── STEP 5: Buka Snap popup 
             window.snap.pay(snapToken, {
                 onSuccess: function () {
+                    setPaymentDone(true);
                     clearCart?.();
                     setNotifStatus("success");
                 },
@@ -271,7 +275,9 @@ export default function CheckoutButton({
                     setNotifStatus("error");
                 },
                 onClose: function () {
-                    setNotifStatus("closed");
+                    if (!paymentDone) {           // ← hanya tampilkan closed jika belum sukses
+                        setNotifStatus("closed");
+                    }
                 },
             });
         } catch (error: unknown) {
@@ -292,7 +298,7 @@ export default function CheckoutButton({
             <Script
                 src="https://app.sandbox.midtrans.com/snap/snap.js"
                 data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-                strategy="beforeInteractive"
+                strategy="afterInteractive"  // ← ubah dari beforeInteractive
             />
 
             <PaymentNotification

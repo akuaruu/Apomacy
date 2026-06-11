@@ -64,10 +64,12 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	api := r.Group("/api")
 	{
 		auth := api.Group("/users")
+		auth.Use(middleware.RequireAuth())
 		{
 			auth.POST("/register", userHandler.Register)
 			auth.POST("/login", userHandler.Login)
 			auth.PUT("/:id/foto", userHandler.UploadFotoProfil)
+			auth.GET("/profile", userHandler.GetProfile)
 		}
 
 		obat := api.Group("/obat")

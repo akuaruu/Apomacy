@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
@@ -48,6 +49,8 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 	).Scan(&tx.ID)
 
 	if err != nil {
+		// Tambah log detail
+		fmt.Printf("[REPO ERROR] Insert transaksi gagal: %+v\nPayload: %+v\n", err, tx)
 		return err
 	}
 

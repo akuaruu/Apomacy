@@ -89,3 +89,34 @@ func (r *userRepository) UpdateFotoProfil(ctx context.Context, userID int, fotoU
 	}
 	return nil
 }
+
+func (r *userRepository) GetProfile(ctx context.Context, id int) (*model.UserProfile, error) {
+	query := `
+		SELECT 
+			u.nama_lengkap, 
+			u.email, 
+			COALESCE(u.foto_profil, '') as foto_profil,
+			COALESCE(c.no_telp, u.no_telp) as no_telp,
+			COALESCE(CAST(c.tanggal_lahir AS VARCHAR), '') as tanggal_lahir,
+			COALESCE(c.alamat, '') as alamat
+		FROM public.user u
+		LEFT JOIN public.customer c ON c.id_user = u.id_user
+		WHERE u.id_user = $1
+	`
+
+	var profile model.UserProfile
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&profile.NamaLengkap,
+		&profile.Email,
+		&profile.FotoProfil,
+		&profile.NoTelp,
+		&profile.TanggalLahir,
+		&profile.Alamat,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
+}
