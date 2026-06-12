@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
@@ -86,13 +85,20 @@ func (h *UserHandler) Login(c *gin.Context) {
 }
 
 func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
-	// 1. Tangkap ID User (Bisa dari parameter URL, idealnya dari claim JWT JWT Middleware)
-	idParam := c.Param("id")
-	userID, err := strconv.Atoi(idParam)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID user tidak valid"})
+	// 1. Tangkap ID User langsung dari claim JWT Middleware (Aman & Dinamis)
+	userIDRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
 		return
 	}
+
+	// Konversi tipe data float64 dari JWT ke integer
+	userIDFloat, ok := userIDRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
+		return
+	}
+	userID := int(userIDFloat)
 
 	// 2. Tangkap file dengan key "foto" dari form-data
 	file, header, err := c.Request.FormFile("foto")

@@ -1,21 +1,86 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import Cookies from "js-cookie";
 
 export default function ProfilPage() {
+  // Asumsi: ID User ini digunakan sementara untuk endpoint upload foto (PUT /api/users/:id/foto)
+  const userID = 1;
+
+  // State untuk menyimpan isian form
   const [formData, setFormData] = useState({
-    nama: 'Budi Santoso',
-    telepon: '081234567890',
-    tanggalLahir: '1990-01-01',
-    alamat: 'Jl. Sudirman No. 123, Kelurahan Senayan, Kecamatan Kebayoran Baru, Jakarta Selatan, DKI Jakarta 12190',
+    nama: '',
+    telepon: '',
+    tanggalLahir: '',
+    alamat: '',
   });
 
   const [fotoProfil, setFotoProfil] = useState('https://i.pinimg.com/736x/c5/fa/25/c5fa25a74ace1a1b5e351626a4bf6936.jpg');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [pesanSukses, setPesanSukses] = useState(false);
+  const [pesanError, setPesanError] = useState("");
 
+  // =====================================================================
+  // 1. FETCH DATA PROFIL (Dipanggil otomatis saat halaman dibuka)
+  // =====================================================================
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // Ambil token dari Cookies sesuai dengan nama yang diset di halaman Login
+        const token = Cookies.get('apomacy_token');
+
+        // Memanggil endpoint GET /api/users/profile (Sesuai dengan router.go Anda!)
+        const res = await fetch(`/api/users/profile`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        // Penanganan error yang tahan banting (Mencegah SyntaxError JSON position 4)
+        if (!res.ok) {
+          const errText = await res.text();
+          let errMessage = "Gagal mengambil data profil";
+          try {
+            const errData = JSON.parse(errText);
+            errMessage = errData.error || errMessage;
+          } catch (e) {
+            errMessage = `Error Server (${res.status}): ${errText}`;
+          }
+          throw new Error(errMessage);
+        }
+
+        // Parsing JSON jika responsnya sukses (200 OK)
+        const responseData = await res.json();
+        const data = responseData.data;
+
+        // Mengisi form dengan data dari database
+        setFormData({
+          nama: data.nama || '',
+          telepon: data.telepon || '',
+          tanggalLahir: data.tanggalLahir || '',
+          alamat: data.alamat || '',
+        });
+
+        if (data.fotoProfil) {
+          setFotoProfil(data.fotoProfil);
+        }
+      } catch (error: any) {
+        console.error("Error fetching profile:", error);
+        setPesanError(error.message);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // =====================================================================
+  // 2. HANDLER INPUT & FOTO
+  // =====================================================================
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -23,22 +88,83 @@ export default function ProfilPage() {
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFotoProfil(URL.createObjectURL(file));
+      setSelectedFile(file); // Simpan file mentah untuk dikirim ke API
+      setFotoProfil(URL.createObjectURL(file)); // Tampilkan preview lokal di web
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // =====================================================================
+  // 3. SUBMIT PERUBAHAN
+  // =====================================================================
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setPesanSukses(false);
+    setPesanError("");
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Ambil token dari Cookies sesuai dengan nama yang diset di halaman Login
+      const token = Cookies.get('apomacy_token');
+
+      // --- A. Upload Foto Profil ---
+      // (Sesuai endpoint PUT /api/users/:id/foto di router.go)
+      // --- A. Upload Foto Profil ---
+      if (selectedFile) {
+        const formDataFoto = new FormData();
+        formDataFoto.append("foto", selectedFile);
+
+        // Ubah URL pemanggilan agar sesuai dengan route baru di backend
+        const resFoto = await fetch(`/api/users/foto`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formDataFoto
+        });
+
+        if (!resFoto.ok) {
+          const errText = await resFoto.text();
+          let errMessage = "Gagal mengunggah foto profil";
+          try {
+            const errData = JSON.parse(errText);
+            errMessage = errData.error || errMessage;
+          } catch {
+            errMessage = `Error Server (${resFoto.status}): ${errText}`;
+          }
+          throw new Error(errMessage);
+        }
+      }
+
+      // --- B. Update Data Teks (Belum Ada API-nya di Golang) ---
+      // Jika besok-besok Anda sudah buat API-nya di Golang, cukup buka komentar di bawah ini!
+      /*
+      const resData = await fetch(`/api/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+      
+      if (!resData.ok) {
+          throw new Error("Gagal menyimpan perubahan teks profil");
+      }
+      */
+
       setPesanSukses(true);
       setTimeout(() => setPesanSukses(false), 3000);
-    }, 1500);
+    } catch (error: any) {
+      console.error("Gagal memperbarui profil:", error);
+      setPesanError(error.message || "Terjadi kesalahan saat menyimpan data.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // =====================================================================
+  // 4. TAMPILAN ANTARMUKA (UI)
+  // =====================================================================
   return (
     <div className="max-w-4xl mx-auto pb-10">
       <div className="mb-8">
@@ -55,9 +181,15 @@ export default function ProfilPage() {
         </div>
       )}
 
+      {pesanError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-500 text-red-700 rounded-lg flex items-center gap-3">
+          <span className="font-medium">{pesanError}</span>
+        </div>
+      )}
+
       <div className="bg-apomacy-white rounded-2xl shadow-sm border border-apomacy-border p-8 sm:p-10">
-        
-        {/* Foto Profil */}
+
+        {/* Foto Profil UI */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 pb-8 border-b border-apomacy-border">
           <div className="relative group shrink-0">
             <div className="w-32 h-32 rounded-full border-4 border-apomacy-light-blue bg-apomacy-white overflow-hidden shadow-sm">
@@ -82,7 +214,7 @@ export default function ProfilPage() {
           </div>
         </div>
 
-        {/* Form Edit Profil */}
+        {/* Form Edit Profil UI */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <h3 className="text-lg font-semibold text-apomacy-dark mb-4 pb-2 border-b border-apomacy-border">Informasi Pribadi</h3>
