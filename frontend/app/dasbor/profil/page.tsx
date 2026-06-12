@@ -15,7 +15,7 @@ export default function ProfilPage() {
     alamat: '',
   });
 
-  const [fotoProfil, setFotoProfil] = useState('https://i.pinimg.com/736x/c5/fa/25/c5fa25a74ace1a1b5e351626a4bf6936.jpg');
+  const [fotoProfil, setFotoProfil] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,16 +108,15 @@ export default function ProfilPage() {
 
       // --- A. Upload Foto Profil ---
       // (Sesuai endpoint PUT /api/users/:id/foto di router.go)
-      // --- A. Upload Foto Profil ---
       if (selectedFile) {
         const formDataFoto = new FormData();
         formDataFoto.append("foto", selectedFile);
 
-        // Ubah URL pemanggilan agar sesuai dengan route baru di backend
-        const resFoto = await fetch(`/api/users/foto`, {
+        const resFoto = await fetch(`/api/users/${userID}/foto`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`
+            // Jangan set Content-Type secara manual saat menggunakan FormData!
           },
           body: formDataFoto
         });
@@ -135,22 +134,6 @@ export default function ProfilPage() {
         }
       }
 
-      // --- B. Update Data Teks (Belum Ada API-nya di Golang) ---
-      // Jika besok-besok Anda sudah buat API-nya di Golang, cukup buka komentar di bawah ini!
-      /*
-      const resData = await fetch(`/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-      
-      if (!resData.ok) {
-          throw new Error("Gagal menyimpan perubahan teks profil");
-      }
-      */
 
       setPesanSukses(true);
       setTimeout(() => setPesanSukses(false), 3000);
@@ -192,9 +175,17 @@ export default function ProfilPage() {
         {/* Foto Profil UI */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 pb-8 border-b border-apomacy-border">
           <div className="relative group shrink-0">
-            <div className="w-32 h-32 rounded-full border-4 border-apomacy-light-blue bg-apomacy-white overflow-hidden shadow-sm">
-              <img src={fotoProfil} alt="Foto Profil" className="w-full h-full object-cover bg-apomacy-light-blue/20" />
+
+            <div className="w-32 h-32 rounded-full border-4 border-apomacy-light-blue bg-apomacy-white overflow-hidden shadow-sm flex items-center justify-center bg-gray-50">
+              {fotoProfil ? (
+                <img src={fotoProfil} alt="Foto Profil" className="w-full h-full object-cover bg-apomacy-light-blue/20" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              )}
             </div>
+      
             <div onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-apomacy-dark/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-apomacy-white">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -204,7 +195,6 @@ export default function ProfilPage() {
             </div>
             <input type="file" ref={fileInputRef} onChange={handleFotoChange} accept="image/*" className="hidden" />
           </div>
-
           <div className="text-center sm:text-left pt-2">
             <h3 className="text-lg font-semibold text-apomacy-dark">Foto Profil</h3>
             <p className="text-sm text-apomacy-muted-blue mt-1 max-w-sm">Format gambar yang didukung: JPEG, PNG, atau GIF. Direkomendasikan rasio 1:1.</p>

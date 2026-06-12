@@ -5,6 +5,7 @@ import Navbar from "@/components/ui/Navbar";
 import NavbarSingkat from "@/components/ui/NavbarSingkat";
 import NavbarLanding from "@/components/ui/NavbarLanding";
 import { useCart } from "@/context/CartContext";
+import path from "path";
 
 export default function NavbarWrapper() {
     const pathname = usePathname();
@@ -30,6 +31,11 @@ export default function NavbarWrapper() {
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
         return <NavbarSingkat />;
     }
+
+       if (pathname === "app/dasbor" || pathname === "/dasbor" || pathname == "/dasbor/profil" || pathname == "/dasbor/riwayat-obat" || pathname == "/dasbor/faq") {
+        return <NavbarSingkat />;
+    }
+
 
     // cuman gunain navbar singkat untuk dasbor pengguna
     if (pathname.startsWith("/dasbor")) {

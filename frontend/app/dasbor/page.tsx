@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import Cookies from 'js-cookie';
 
+// ============================================================
+// DATA STATIS APOTEK
+// ============================================================
 const apotekStatis = [
   { id: 1, inisial: 'AK', nama: 'Apotek Kimia Farma', alamat: 'Jl. Ahmad Yani No. 12', kota: 'Magelang' },
   { id: 2, inisial: 'AS', nama: 'Apotek Sehat Sejahtera', alamat: 'Jl. Pemuda No. 45', kota: 'Magelang' },
@@ -11,32 +13,9 @@ const apotekStatis = [
   { id: 4, inisial: 'AG', nama: 'Apotek Griya Sehat', alamat: 'Jl. Pahlawan No. 23', kota: 'Magelang' },
 ];
 
-// Interface untuk tipe data dari Public API
-interface ApotekMitra {
-  id: number;
-  name: string;
-  email: string;
-  address: {
-    street: string;
-    city: string;
-  };
-  phone: string;
-}
-
-
-interface UserProfile {
-  id_user: number;
-  nama: string | null;
-  email: string | null;
-  no_telepon: string | null;
-  alamat: string | null;
-  foto_profil: string | null;
-}
-
 // ============================================================
 // INTERFACES
 // ============================================================
-
 interface Transaksi {
   id_transaksi: number;
   no_transaksi: string;
@@ -49,24 +28,26 @@ interface Transaksi {
 }
 
 interface UserProfile {
-  id_user: number;
-  nama: string | null;
-  email: string | null;
-  no_telepon: string | null;
-  alamat: string | null;
-  foto_profil: string | null;
+  id_user?: number;
+  nama?: string;
+  username?: string;
+  email?: string;
+  telepon?: string;
+  alamat?: string;
+  tanggalLahir?: string;
+  fotoProfil?: string;
 }
 
 // ============================================================
 // PROFILE COMPLETION HELPER
 // ============================================================
-
+// Disesuaikan dengan data yang ada di halaman profil
 const PROFILE_FIELDS: (keyof UserProfile)[] = [
   'nama',
-  'email',
-  'no_telepon',
+  'telepon',
   'alamat',
-  'foto_profil',
+  'tanggalLahir',
+  'fotoProfil',
 ];
 
 const hitungKelengkapan = (profile: UserProfile): number => {
@@ -78,45 +59,62 @@ const hitungKelengkapan = (profile: UserProfile): number => {
 };
 
 export default function DasborPage() {
-
-  // STATE — semua useState di sini
+  // STATE
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [loadingTransaksi, setLoadingTransaksi] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  // DERIVED VALUES — wajib di dalam component, setelah state
-  const pesananAktif = transaksi.filter(
-    (t) => t.status === 'Pending' || t.status === 'Menunggu Pembayaran'
-  );
+  // DERIVED VALUES
+  // Disesuaikan dengan status backend (Pending, Selesai, Batal)
+  const pesananAktif = transaksi.filter((t) => t.status === 'Pending' || t.status === 'Menunggu Pembayaran');
   const aktivitasTerakhir = transaksi.slice(0, 3);
   const persentaseProfil = profile ? hitungKelengkapan(profile) : null;
 
-  // HELPER FUNCTIONS — juga di dalam component
+  // HELPER FUNCTIONS
   const formatTanggal = (iso: string) =>
     new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 
   const formatRupiah = (angka: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka);
 
-
-  // Mengambil data saat halaman dasbor pertama kali dimuat
+  // FETCH DATA SAAT HALAMAN DIMUAT
   useEffect(() => {
-    const token = Cookies.get('token');
-    const headers = { Authorization: `Bearer ${token}` };
-    const base = process.env.NEXT_PUBLIC_API_URL;
+    const fetchDashboardData = async () => {
+      // 1. Ambil Token dengan nama kunci yang benar
+      const token = Cookies.get('apomacy_token');
+      if (!token) {
+        setLoadingTransaksi(false);
+        return;
+      }
 
-    axios
-      .get(`${base}/api/transaksi`, { headers })
-      .then((res) => setTransaksi(res.data.data ?? []))
-      .catch((err) => console.error('Gagal fetch transaksi:', err))
-      .finally(() => setLoadingTransaksi(false));
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
 
-    axios
-      .get(`${base}/api/users/profile`, { headers })
-      .then((res) => setProfile(res.data.data))
-      .catch((err) => console.error('Gagal fetch profil:', err));
+      try {
+        // 2. Fetch Riwayat Transaksi (Persis seperti di Riwayat Obat)
+        const resTx = await fetch('/api/transaksi', { method: 'GET', headers });
+        if (resTx.ok) {
+          const txData = await resTx.json();
+          setTransaksi(txData.data || []);
+        }
+
+        // 3. Fetch Profil (Persis seperti di Edit Profil)
+        const resProfile = await fetch('/api/users/profile', { method: 'GET', headers });
+        if (resProfile.ok) {
+          const profileData = await resProfile.json();
+          setProfile(profileData.data);
+        }
+      } catch (error) {
+        console.error('Gagal memuat data dasbor:', error);
+      } finally {
+        setLoadingTransaksi(false);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
-
 
   return (
     <div className="max-w-5xl mx-auto pb-10">
@@ -159,7 +157,7 @@ export default function DasborPage() {
 
       </div>
 
-      {/* Aktivitas Terakhir (Statis) */}
+      {/* Aktivitas Terakhir (Dinamis dari Backend) */}
       <div className="bg-apomacy-white p-6 rounded-xl shadow-sm border border-apomacy-border mb-8">
         <h3 className="text-lg font-bold text-apomacy-blue mb-4">Aktivitas Terakhir</h3>
 
@@ -193,9 +191,7 @@ export default function DasborPage() {
         )}
       </div>
 
-      {/* ========================================================
-          INTEGRASI AXIOS & LOADING (Syarat Tugas Nilai A)
-         ======================================================== */}
+      {/* Jaringan Apotek Mitra (Statis) */}
       <div className="bg-apomacy-white p-6 rounded-xl shadow-sm border border-apomacy-border">
         <h3 className="text-lg font-bold text-apomacy-blue border-l-4 border-apomacy-teal pl-2 mb-2">
           Jaringan Apotek Mitra Terdekat

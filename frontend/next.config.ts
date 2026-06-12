@@ -1,15 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Menambahkan jalur proxy (rewrites) untuk mengatasi Mixed Content 
-  // dari Vercel (HTTPS) ke VPS DigitalOcean (HTTP)
+  // Menambahkan jalur proxy (rewrites) untuk mengatasi masalah CORS / Mixed Content
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://159.223.82.138:8080/api/:path*',
-        // Catatan: Pastikan port backend Apomacy benar
-
+        // Arahkan ke backend Golang di server VPS 
+        destination: 'http://159.223.82.138:8080/api/:path*', 
       },
     ];
   },
@@ -21,7 +19,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'http',
-        hostname: 'localhost', // Mengizinkan gambar dari URL shortener lokalmu
+        hostname: 'localhost',  // Mengizinkan gambar dari URL shortener lokalmu
       }
     ],
     dangerouslyAllowSVG: true,
