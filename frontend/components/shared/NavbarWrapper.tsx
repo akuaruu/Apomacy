@@ -20,11 +20,11 @@ export default function NavbarWrapper() {
         pathname === "/login" ||
         pathname === "/register" ||
         pathname.startsWith("/kasir/member") ||
-        pathname.startsWith("/kasir")
+        pathname.startsWith("/kasir") ||
+        pathname.startsWith("/pembayaran")
     ) {
         return null;
     }
-
 
 
     // cuman gunain navbar singkat uuntuk keranjang dan checkout
@@ -32,13 +32,11 @@ export default function NavbarWrapper() {
         return <NavbarSingkat />;
     }
 
-       if (pathname === "app/dasbor" || pathname === "/dasbor" || pathname == "/dasbor/profil" || pathname == "/dasbor/riwayat-obat" || pathname == "/dasbor/faq") {
-        return <NavbarSingkat />;
-    }
-
-
-    // cuman gunain navbar singkat untuk dasbor pengguna
-    if (pathname.startsWith("/dasbor")) {
+    // Client side
+    if (
+        pathname.startsWith("/dasbor") ||
+        pathname.startsWith("/pembayaran")
+    ) {
         return null
     }
 

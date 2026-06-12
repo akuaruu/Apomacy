@@ -23,7 +23,8 @@ export default function FooterWrapper() {
         pathname.startsWith("/dasbor") ||
         pathname === "/faq" ||
         pathname === "/profil" ||
-        pathname === "/riwayat-obat"
+        pathname === "/riwayat-obat" ||
+        pathname.startsWith("/pembayaran")
     ) {
         return null;
     }

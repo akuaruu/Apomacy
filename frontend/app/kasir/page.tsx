@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import {
     Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
-
+import Cookies from "js-cookie";
 interface TransaksiItem {
     name: string;
     qty: number;
@@ -80,41 +80,55 @@ export default function KasirDashboardPage() {
     useEffect(() => {
         const fetchTransactions = async () => {
             try {
-                setIsLoading(true);
-                const API_URL = "https://api.npoint.io/386af8416f1525ba8335";
+                // Gunakan URL Backend Asli
+                const API_URL = "/api/transaksi/all";
+                // Misal butuh token:
+                const token = Cookies.get('apomacy_token');
 
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error("Gagal memuat data ");
+                const response = await fetch(API_URL, {
+                    // headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error("Gagal memuat data dari server");
 
-                const data: TransaksiDashboard[] = await response.json();
-                setTransactions(data);
+                const result = await response.json();
+                const newData: TransaksiDashboard[] = result.data;
+
+                // --- Logika Cek Pesanan Baru untuk Memunculkan Notifikasi ---
+                setTransactions(prevTransactions => {
+                    // Cek jika ada ID transaksi baru yang belum ada di state sebelumnya
+                    if (prevTransactions.length > 0 && newData.length > 0) {
+                        const existingIds = new Set(prevTransactions.map(t => t.id));
+                        const incomingNewOrders = newData.filter(t => !existingIds.has(t.id));
+
+                        if (incomingNewOrders.length > 0) {
+                            // Munculkan notifikasi toast
+                            setToast({
+                                visible: true,
+                                message: `Ada ${incomingNewOrders.length} pesanan baru masuk!`,
+                                id: incomingNewOrders[0].id
+                            });
+                            // Hilangkan notifikasi setelah 5 detik
+                            setTimeout(() => setToast({ visible: false, message: "", id: "" }), 5000);
+                        }
+                    }
+                    return newData;
+                });
 
             } catch (error) {
-                console.error("Koneksi API  Error:", error);
+                console.error("Koneksi API Error:", error);
             } finally {
                 setIsLoading(false);
             }
         };
 
+        // Panggil pertama kali saat halaman dimuat
         fetchTransactions();
 
-        const timer = setTimeout(() => {
-            const newOrder: TransaksiDashboard = {
-                id: "TRX-099",
-                type: "Online",
-                customerName: "Ahmad Fauzi (Gojek)",
-                items: [{ name: "Tolak Angin Cair Box", qty: 1, price: 45000 }],
-                subtotal: 45000,
-                paymentMethod: "QRIS",
-                status: "Obat sedang Disiapkan",
-                date: "2026-05-19 14:35",
-            };
-            setTransactions(prev => [newOrder, ...prev]);
-            setToast({ visible: true, message: "Pesanan Online baru masuk! Obat perlu disiapkan.", id: "TRX-099" });
-            setTimeout(() => setToast({ visible: false, message: "", id: "" }), 5000);
-        }, 3000);
+        // POLLLING: Tarik data dari database otomatis setiap 5 detik (5000 ms)
+        const intervalId = setInterval(fetchTransactions, 5000);
 
-        return () => clearTimeout(timer);
+        // Bersihkan interval saat komponen ditutup agar tidak memori bocor
+        return () => clearInterval(intervalId);
     }, []);
 
     const formatRupiah = (num: number) => "Rp " + num.toLocaleString("id-ID");

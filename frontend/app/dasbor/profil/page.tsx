@@ -10,6 +10,7 @@ export default function ProfilPage() {
   // State untuk menyimpan isian form
   const [formData, setFormData] = useState({
     nama: '',
+    email: '',
     telepon: '',
     tanggalLahir: '',
     alamat: '',
@@ -61,6 +62,7 @@ export default function ProfilPage() {
         // Mengisi form dengan data dari database
         setFormData({
           nama: data.nama || '',
+          email: data.email || '',
           telepon: data.telepon || '',
           tanggalLahir: data.tanggalLahir || '',
           alamat: data.alamat || '',
@@ -132,6 +134,36 @@ export default function ProfilPage() {
           }
           throw new Error(errMessage);
         }
+
+      }
+
+      // --- B. Update Data Teks (Menyimpan Nama, Alamat, Tanggal Lahir) ---
+      const resData = await fetch(`/api/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        // Pastikan key JSON di bawah ini (nama, telepon, dll) sesuai 
+        // dengan struct yang kamu buat di file handler Golang-mu!
+        body: JSON.stringify({
+          nama_lengkap: formData.nama,
+          no_telp: formData.telepon,
+          tanggal_lahir: formData.tanggalLahir,
+          alamat: formData.alamat
+        })
+      });
+
+      if (!resData.ok) {
+        const errText = await resData.text();
+        let errMessage = "Gagal menyimpan perubahan teks profil";
+        try {
+          const errData = JSON.parse(errText);
+          errMessage = errData.error || errMessage;
+        } catch {
+          errMessage = `Error Server (${resData.status}): ${errText}`;
+        }
+        throw new Error(errMessage);
       }
 
 
@@ -185,7 +217,7 @@ export default function ProfilPage() {
                 </svg>
               )}
             </div>
-      
+
             <div onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-apomacy-dark/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity text-apomacy-white">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -216,8 +248,12 @@ export default function ProfilPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-apomacy-dark mb-1">Email <span className="text-apomacy-danger">*</span></label>
-                <input type="email" defaultValue="budi.santoso@email.com" disabled
-                  className="w-full px-4 py-2.5 border border-apomacy-border bg-gray-50 rounded-lg text-apomacy-muted-blue cursor-not-allowed" />
+                <input
+                  type="email"
+                  value={formData.email} // <-- Gunakan value dari state
+                  disabled
+                  className="w-full px-4 py-2.5 border border-apomacy-border bg-gray-50 rounded-lg text-apomacy-muted-blue cursor-not-allowed"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-apomacy-dark mb-1">Nomor Telepon</label>
