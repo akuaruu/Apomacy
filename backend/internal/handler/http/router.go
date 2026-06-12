@@ -111,6 +111,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
+			transaksi.GET("", transaksiHandler.GetRiwayatUser)
 		}
 
 		payment := api.Group("/checkout")

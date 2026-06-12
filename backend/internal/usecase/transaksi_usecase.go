@@ -41,3 +41,7 @@ func (t *transaksiUsecase) BatalkanTransaksi(ctx context.Context, id int) error 
 func (u *transaksiUsecase) UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status model.StatusTransaksi) error {
 	return u.repo.UpdateStatusByNoTransaksi(ctx, noTransaksi, status)
 }
+
+func (t *transaksiUsecase) GetRiwayatByUser(ctx context.Context, idUser int) ([]*model.Transaksi, error) {
+	return t.repo.GetByUserID(ctx, idUser)
+}

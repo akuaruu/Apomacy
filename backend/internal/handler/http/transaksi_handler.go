@@ -84,3 +84,24 @@ func (h *TransaksiHandler) Batalkan(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Status transaksi berhasil diubah menjadi Batal"})
 }
+
+func (h *TransaksiHandler) GetRiwayatUser(c *gin.Context) {
+	idUserRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+	idUserFloat, ok := idUserRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+
+	data, err := h.usecase.GetRiwayatByUser(c.Request.Context(), int(idUserFloat))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil riwayat transaksi", "detail": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}

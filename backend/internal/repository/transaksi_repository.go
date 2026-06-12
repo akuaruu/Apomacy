@@ -141,3 +141,34 @@ func (r *transaksiRepository) UpdateStatusByNoTransaksi(ctx context.Context, noT
 	}
 	return nil
 }
+
+func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*model.Transaksi, error) {
+	query := `
+		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi,
+		       nama_customer, total_item, subtotal, total_bayar, metode_pembayaran,
+		       resep_required, no_resep, status
+		FROM transaksi
+		WHERE id_user = $1
+		ORDER BY tanggal_transaksi DESC`
+
+	rows, err := r.db.Query(ctx, query, idUser)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*model.Transaksi
+	for rows.Next() {
+		var t model.Transaksi
+		if err := rows.Scan(
+			&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi,
+			&t.NamaCustomer, &t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran,
+			&t.ResepRequired, &t.NoResep, &t.Status,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, &t)
+	}
+
+	return result, nil
+}
