@@ -172,3 +172,60 @@ func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*m
 
 	return result, nil
 }
+func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, error) {
+	// 1. Ambil semua data transaksi utama
+	queryTrx := `
+		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi, 
+		       nama_customer, total_item, subtotal, total_bayar, metode_pembayaran, 
+		       resep_required, no_resep, status
+		FROM transaksi
+		ORDER BY tanggal_transaksi DESC
+	`
+	rows, err := r.db.Query(ctx, queryTrx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []model.Transaksi
+	for rows.Next() {
+		var t model.Transaksi
+		err := rows.Scan(
+			&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi,
+			&t.NamaCustomer, &t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran,
+			&t.ResepRequired, &t.NoResep, &t.Status,
+		)
+		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, t)
+	}
+
+	// Jika tidak ada transaksi, langsung kembalikan array kosong
+	if len(transactions) == 0 {
+		return transactions, nil
+	}
+
+	// 2. Ambil detail obat untuk setiap transaksi agar kasir bisa melihat rinciannya
+	for i := range transactions {
+		queryDetails := `
+			SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
+			FROM detail_transaksi WHERE id_transaksi = $1
+		`
+		detailRows, err := r.db.Query(ctx, queryDetails, transactions[i].ID)
+		if err != nil {
+			continue // Lanjutkan ke transaksi berikutnya jika detail gagal ditarik
+		}
+
+		for detailRows.Next() {
+			var dt model.DetailTransaksi
+			err := detailRows.Scan(&dt.IDDetailTrx, &dt.IDTransaksi, &dt.IDObat, &dt.NamaObat, &dt.HargaSatuan, &dt.Qty, &dt.Subtotal)
+			if err == nil {
+				transactions[i].Details = append(transactions[i].Details, dt)
+			}
+		}
+		detailRows.Close()
+	}
+
+	return transactions, nil
+}

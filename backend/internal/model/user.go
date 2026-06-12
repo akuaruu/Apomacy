@@ -57,15 +57,15 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id int) (*User, error)
 	UpdateLastLogin(ctx context.Context, id int, loginTime time.Time) error
 	UpdateFotoProfil(ctx context.Context, userID int, fotoURL string) error
-	// Tambahkan ini di repository
 	GetProfile(ctx context.Context, id int) (*UserProfile, error)
+	UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error
 }
 
 // UserUsecase contract
 type UserUsecase interface {
 	Register(ctx context.Context, user *User) error
 	Login(ctx context.Context, username, password string) (string, error)
-	// Ubah return type dari *User menjadi *UserProfile
 	GetProfile(ctx context.Context, id int) (*UserProfile, error)
 	UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error)
+	UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error
 }

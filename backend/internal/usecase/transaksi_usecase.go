@@ -45,3 +45,7 @@ func (u *transaksiUsecase) UpdateStatusByNoTransaksi(ctx context.Context, noTran
 func (t *transaksiUsecase) GetRiwayatByUser(ctx context.Context, idUser int) ([]*model.Transaksi, error) {
 	return t.repo.GetByUserID(ctx, idUser)
 }
+
+func (t *transaksiUsecase) GetAll(ctx context.Context) ([]model.Transaksi, error) {
+	return t.repo.GetAll(ctx)
+}

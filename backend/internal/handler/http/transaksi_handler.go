@@ -105,3 +105,17 @@ func (h *TransaksiHandler) GetRiwayatUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": data})
 }
+
+// GetAll mengambil seluruh data transaksi untuk Dashboard Kasir / Admin
+func (h *TransaksiHandler) GetAll(c *gin.Context) {
+	transactions, err := h.usecase.GetAll(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil seluruh data transaksi", "detail": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Berhasil menarik data transaksi",
+		"data":    transactions,
+	})
+}

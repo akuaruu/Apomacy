@@ -120,3 +120,13 @@ func (r *userRepository) GetProfile(ctx context.Context, id int) (*model.UserPro
 
 	return &profile, nil
 }
+
+func (r *userRepository) UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error {
+	query := `
+		UPDATE "user" 
+		SET nama_lengkap = $1, no_telp = $2, tanggal_lahir = $3, alamat = $4 
+		WHERE id_user = $5
+	`
+	_, err := r.db.Exec(ctx, query, nama, noTelp, tglLahir, alamat, userID)
+	return err
+}

@@ -76,6 +76,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		protectedUsers.Use(middleware.RequireAuth())
 		{
 			protectedUsers.PUT("/foto", userHandler.UploadFotoProfil)
+			protectedUsers.PUT("/profile", userHandler.Register)
 			protectedUsers.GET("/profile", userHandler.GetProfile)
 		}
 
@@ -112,6 +113,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
 			transaksi.GET("", transaksiHandler.GetRiwayatUser)
+			transaksi.GET("/all", transaksiHandler.GetAll)
 		}
 
 		payment := api.Group("/checkout")

@@ -163,3 +163,45 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		"data":    profile,
 	})
 }
+
+// UpdateProfile menangani request untuk mengubah data teks profil user
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	// 1. Ambil ID User dari token JWT (Aman, tidak bisa dipalsukan)
+	userIDRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
+		return
+	}
+
+	// Konversi float64 (bawaan JWT) ke int
+	userIDFloat, ok := userIDRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
+		return
+	}
+	userID := int(userIDFloat)
+
+	// 2. Buat struct penangkap JSON yang datang dari Frontend (page.tsx)
+	var req struct {
+		NamaLengkap  string `json:"nama_lengkap"`
+		NoTelp       string `json:"no_telp"`
+		TanggalLahir string `json:"tanggal_lahir"`
+		Alamat       string `json:"alamat"`
+	}
+
+	// 3. Pasangkan (Bind) data JSON ke dalam struct
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid: " + err.Error()})
+		return
+	}
+
+	// 4. Panggil Usecase untuk mengeksekusi logika dan simpan ke DB
+	err := h.usecase.UpdateProfileText(c.Request.Context(), userID, req.NamaLengkap, req.NoTelp, req.TanggalLahir, req.Alamat)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan profil: " + err.Error()})
+		return
+	}
+
+	// 5. Kembalikan response 200 OK ke frontend
+	c.JSON(http.StatusOK, gin.H{"message": "Data profil berhasil diperbarui"})
+}

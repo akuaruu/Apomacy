@@ -59,6 +59,7 @@ type TransaksiRepository interface {
 	UpdateStatus(ctx context.Context, id int, status StatusTransaksi) error
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetByUserID(ctx context.Context, idUser int) ([]*Transaksi, error)
+	GetAll(ctx context.Context) ([]Transaksi, error)
 }
 
 type TransaksiUsecase interface {
@@ -67,4 +68,5 @@ type TransaksiUsecase interface {
 	BatalkanTransaksi(ctx context.Context, id int) error // Logic kembalikan stok
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)
+	GetAll(ctx context.Context) ([]Transaksi, error)
 }
