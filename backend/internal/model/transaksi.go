@@ -37,8 +37,8 @@ type Transaksi struct {
 	ResepRequired    bool             `json:"resep_required"`
 	NoResep          *string          `json:"no_resep"`
 	Status           StatusTransaksi  `json:"status"`
+	StatusPesanan    string           `json:"status_pesanan"` // BARIS BARU
 
-	// Relasi untuk memudahkan balikan JSON API
 	Details []DetailTransaksi `json:"details,omitempty"`
 }
 
@@ -53,20 +53,21 @@ type DetailTransaksi struct {
 }
 
 type TransaksiRepository interface {
-	// Transaksi menggunakan pattern DB Transaction (BEGIN, COMMIT, ROLLBACK)
 	CreateWithDetails(ctx context.Context, tx *Transaksi) error
 	GetByID(ctx context.Context, id int) (*Transaksi, error)
 	UpdateStatus(ctx context.Context, id int, status StatusTransaksi) error
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetByUserID(ctx context.Context, idUser int) ([]*Transaksi, error)
 	GetAll(ctx context.Context) ([]Transaksi, error)
+	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error // BARIS BARU
 }
 
 type TransaksiUsecase interface {
-	Checkout(ctx context.Context, tx *Transaksi) error // Logic kurangi stok ada di sini
+	Checkout(ctx context.Context, tx *Transaksi) error
 	GetDetailTransaksi(ctx context.Context, id int) (*Transaksi, error)
-	BatalkanTransaksi(ctx context.Context, id int) error // Logic kembalikan stok
+	BatalkanTransaksi(ctx context.Context, id int) error
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)
 	GetAll(ctx context.Context) ([]Transaksi, error)
+	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error // BARIS BARU
 }

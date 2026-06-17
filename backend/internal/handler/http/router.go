@@ -95,6 +95,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			customer.GET("", customerHandler.GetAllCustomers)
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
+			customer.DELETE("/:id", customerHandler.DeleteCustomer)
 		}
 
 		supplier := api.Group("/supplier")
@@ -112,6 +113,8 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
+
+			transaksi.PATCH("/:id/status-pesanan", transaksiHandler.UpdateStatusPesanan)
 			transaksi.GET("", transaksiHandler.GetRiwayatUser)
 			transaksi.GET("/all", transaksiHandler.GetAll)
 		}

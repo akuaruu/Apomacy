@@ -88,13 +88,13 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 func (r *transaksiRepository) GetByID(ctx context.Context, id int) (*model.Transaksi, error) {
 	var t model.Transaksi
 	query := `SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi, nama_customer, 
-	          total_item, subtotal, total_bayar, metode_pembayaran, resep_required, no_resep, status 
+	          total_item, subtotal, total_bayar, metode_pembayaran, resep_required, no_resep, status, status_pesanan 
 	          FROM transaksi WHERE id_transaksi = $1`
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi, &t.NamaCustomer,
 		&t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran, &t.ResepRequired,
-		&t.NoResep, &t.Status,
+		&t.NoResep, &t.Status, &t.StatusPesanan,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -103,7 +103,6 @@ func (r *transaksiRepository) GetByID(ctx context.Context, id int) (*model.Trans
 		return nil, err
 	}
 
-	// Ambil detail transaksinya juga
 	queryDetails := `SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
 	                 FROM detail_transaksi WHERE id_transaksi = $1`
 
@@ -146,7 +145,7 @@ func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*m
 	query := `
 		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi,
 		       nama_customer, total_item, subtotal, total_bayar, metode_pembayaran,
-		       resep_required, no_resep, status
+		       resep_required, no_resep, status, status_pesanan
 		FROM transaksi
 		WHERE id_user = $1
 		ORDER BY tanggal_transaksi DESC`
@@ -163,7 +162,7 @@ func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*m
 		if err := rows.Scan(
 			&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi,
 			&t.NamaCustomer, &t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran,
-			&t.ResepRequired, &t.NoResep, &t.Status,
+			&t.ResepRequired, &t.NoResep, &t.Status, &t.StatusPesanan,
 		); err != nil {
 			return nil, err
 		}
@@ -172,12 +171,12 @@ func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*m
 
 	return result, nil
 }
+
 func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, error) {
-	// 1. Ambil semua data transaksi utama
 	queryTrx := `
 		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi, 
 		       nama_customer, total_item, subtotal, total_bayar, metode_pembayaran, 
-		       resep_required, no_resep, status
+		       resep_required, no_resep, status, status_pesanan
 		FROM transaksi
 		ORDER BY tanggal_transaksi DESC
 	`
@@ -193,7 +192,7 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 		err := rows.Scan(
 			&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi,
 			&t.NamaCustomer, &t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran,
-			&t.ResepRequired, &t.NoResep, &t.Status,
+			&t.ResepRequired, &t.NoResep, &t.Status, &t.StatusPesanan,
 		)
 		if err != nil {
 			return nil, err
@@ -201,12 +200,10 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 		transactions = append(transactions, t)
 	}
 
-	// Jika tidak ada transaksi, langsung kembalikan array kosong
 	if len(transactions) == 0 {
 		return transactions, nil
 	}
 
-	// 2. Ambil detail obat untuk setiap transaksi agar kasir bisa melihat rinciannya
 	for i := range transactions {
 		queryDetails := `
 			SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
@@ -214,7 +211,7 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 		`
 		detailRows, err := r.db.Query(ctx, queryDetails, transactions[i].ID)
 		if err != nil {
-			continue // Lanjutkan ke transaksi berikutnya jika detail gagal ditarik
+			continue
 		}
 
 		for detailRows.Next() {
@@ -228,4 +225,10 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 	}
 
 	return transactions, nil
+}
+
+func (r *transaksiRepository) UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error {
+	query := `UPDATE transaksi SET status_pesanan = $1 WHERE id_transaksi = $2`
+	_, err := r.db.Exec(ctx, query, statusPesanan, id)
+	return err
 }
