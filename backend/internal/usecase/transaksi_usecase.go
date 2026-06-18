@@ -24,6 +24,19 @@ func (t *transaksiUsecase) Checkout(ctx context.Context, tx *model.Transaksi) er
 		return errors.New("total bayar tidak mencukupi")
 	}
 
+	// Validasi Pengiriman (Jika transaksi online dari frontend)
+	if tx.Pengiriman != nil {
+		if tx.Pengiriman.MetodePenerimaan == "delivery" {
+			if tx.Pengiriman.AlamatPengiriman == "" {
+				return errors.New("alamat pengiriman wajib diisi untuk metode delivery")
+			}
+		} else if tx.Pengiriman.MetodePenerimaan == "pickup" {
+			if tx.Pengiriman.NamaPenerima == "" {
+				return errors.New("nama pengambil wajib diisi untuk metode pickup")
+			}
+		}
+	}
+
 	// Pemanggilan repository yang sudah mencakup pemotongan stok via DB Transaction
 	return t.repo.CreateWithDetails(ctx, tx)
 }

@@ -7,7 +7,6 @@ import { useCart } from "@/context/CartContext";
 import api from "@/lib/api";
 import Image from 'next/image';
 
-
 interface ItemDetail {
     id: string;
     price: number;
@@ -20,7 +19,6 @@ interface CheckoutButtonProps {
     paymentMethod: string;
     items: ItemDetail[];
     onValidate: () => boolean;
-    /** Data pengiriman/pickup dari form di page.tsx */
     deliveryData: {
         method: "delivery" | "pickup";
         name: string;
@@ -34,7 +32,6 @@ interface CheckoutButtonProps {
 
 type NotifStatus = "success" | "pending" | "error" | "closed" | null;
 
-// ── Komponen notifikasi internal ─────────────────────────────────────────────
 function PaymentNotification({
     status,
     orderId,
@@ -147,7 +144,6 @@ function PaymentNotification({
     );
 }
 
-//Helper: decode JWT payload tanpa library tambahan 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
         const base64Url = token.split(".")[1];
@@ -164,9 +160,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
     }
 }
 
-//Komponen utama 
 export default function CheckoutButton({
-
     grossAmount,
     paymentMethod,
     items,
@@ -179,7 +173,6 @@ export default function CheckoutButton({
     const [isLoading, setIsLoading] = useState(false);
     const [notifStatus, setNotifStatus] = useState<NotifStatus>(null);
     const [orderId, setOrderId] = useState("");
-    const [paymentDone, setPaymentDone] = useState(false);
 
     const handleRedirect = () => {
         setNotifStatus(null);
@@ -195,12 +188,10 @@ export default function CheckoutButton({
         setIsLoading(true);
 
         try {
-            // ── STEP 1: Ambil id_user dari JWT di cookie
             const Cookies = (await import("js-cookie")).default;
             const token = Cookies.get("apomacy_token");
 
             if (!token) {
-                // Token tidak ada → redirect ke login
                 router.push("/login?redirect=/checkout");
                 return;
             }
@@ -212,11 +203,9 @@ export default function CheckoutButton({
                 throw new Error("Token tidak valid, silakan login ulang");
             }
 
-            // ── STEP 2: Bangun payload transaksi untuk backend Go 
             const generatedOrderId = `TRX-${Date.now()}`;
             setOrderId(generatedOrderId);
 
-            // Mapping items dari Midtrans format → detail_transaksi format
             const details = items
                 .filter((item) => item.id !== "ONGKIR-01")
                 .map((item) => ({
@@ -229,11 +218,10 @@ export default function CheckoutButton({
 
             const subtotal = details.reduce((acc, d) => acc + d.subtotal, 0);
 
-            // Nama customer: ambil dari form delivery atau pickup
-            const namaCustomer =
-                deliveryData.method === "delivery"
-                    ? deliveryData.name
-                    : deliveryData.pickupName;
+            const isDelivery = deliveryData.method === "delivery";
+            const namaCustomer = isDelivery ? deliveryData.name : deliveryData.pickupName;
+            const noHpCustomer = isDelivery ? deliveryData.phone : deliveryData.pickupPhone;
+            const alamatCustomer = isDelivery ? deliveryData.address : "";
 
             const transaksiPayload = {
                 id_user: idUser,
@@ -241,17 +229,20 @@ export default function CheckoutButton({
                 nama_customer: namaCustomer || null,
                 total_item: details.reduce((acc, d) => acc + d.qty, 0),
                 subtotal: subtotal,
-                total_bayar: grossAmount, // sudah termasuk ongkir
+                total_bayar: grossAmount,
                 metode_pembayaran: mapPaymentMethod(paymentMethod),
                 resep_required: false,
                 details,
+                pengiriman: {
+                    metode_penerimaan: deliveryData.method,
+                    nama_penerima: namaCustomer,
+                    no_hp_penerima: noHpCustomer,
+                    alamat_pengiriman: alamatCustomer,
+                }
             };
 
-            // ── STEP 3: Simpan transaksi ke database dulu 
-            // Menggunakan axios instance `api` yang sudah attach Authorization header otomatis
             await api.post("/transaksi", transaksiPayload);
 
-            // ── STEP 4: Ambil Snap token dari backend Go 
             const snapRes = await api.post("/checkout", {
                 order_id: generatedOrderId,
                 gross_amount: grossAmount,
@@ -265,44 +256,31 @@ export default function CheckoutButton({
                 throw new Error("Snap script belum termuat");
             }
 
-            // ── STEP 5: Buka Snap popup 
-            if (window.snap) {
-                window.snap.pay(snapToken, {
-                    onSuccess: function (result: any) {
-                        console.log("Payment Success:", result);
-                        // 1. Kosongkan keranjang (karena pesanan sudah lunas)
-                        if (clearCart) clearCart();
-                        // 2. Pindah ke halaman sukses dengan mulus
-                        router.push(`/pembayaran/sukses?order_id=${result.order_id}`);
-                    },
-                    onPending: function (result: any) {
-                        console.log("Payment Pending:", result);
-                        // 1. Kosongkan keranjang (panggil fungsi clearCart yang sudah diperbaiki di atas)
-                        if (clearCart) clearCart();
-
-                        // 2. Bawa user ke halaman pending BESERTA snapToken-nya
-                        router.push(`/pembayaran/pending?order_id=${result.order_id}&token=${snapToken}`);
-                    },
-                    onError: function (result: any) {
-                        console.log("Payment Error/Canceled:", result);
-                        // Cukup beri alert, user tetap di halaman checkout untuk mencoba lagi
-                        alert("Pembayaran gagal atau dibatalkan oleh sistem. Silakan coba lagi.");
-                        setIsLoading(false);
-                    },
-                    onClose: function () {
-                        console.log("Pop-up Closed");
-                        // User sengaja menutup pop-up (Cancel)
-                        alert("Kamu menutup jendela pembayaran. Klik bayar lagi jika ingin melanjutkan.");
-                        setIsLoading(false);
-                    }
-                });
-            }
+            window.snap.pay(snapToken, {
+                onSuccess: function (result: any) {
+                    console.log("Payment Success:", result);
+                    if (clearCart) clearCart();
+                    router.push(`/pembayaran/sukses?order_id=${result.order_id}`);
+                },
+                onPending: function (result: any) {
+                    console.log("Payment Pending:", result);
+                    if (clearCart) clearCart();
+                    router.push(`/pembayaran/pending?order_id=${result.order_id}&token=${snapToken}`);
+                },
+                onError: function (result: any) {
+                    console.log("Payment Error/Canceled:", result);
+                    alert("Pembayaran gagal atau dibatalkan oleh sistem. Silakan coba lagi.");
+                    setIsLoading(false);
+                },
+                onClose: function () {
+                    console.log("Pop-up Closed");
+                    alert("Kamu menutup jendela pembayaran. Klik bayar lagi jika ingin melanjutkan.");
+                    setIsLoading(false);
+                }
+            });
 
         } catch (error: unknown) {
             console.error("Checkout failed:", error);
-
-            // Jika 401 → axios interceptor di api.ts sudah redirect ke /login
-            // Tangkap error lain dan tampilkan notif
             if ((error as { response?: { status: number } })?.response?.status !== 401) {
                 setNotifStatus("error");
             }
@@ -316,7 +294,7 @@ export default function CheckoutButton({
             <Script
                 src="https://app.sandbox.midtrans.com/snap/snap.js"
                 data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-                strategy="afterInteractive"  // ← ubah dari beforeInteractive
+                strategy="afterInteractive"
             />
 
             <PaymentNotification
@@ -336,7 +314,6 @@ export default function CheckoutButton({
     );
 }
 
-// ── Helper: map string payment method ke enum backend ─────────────────────────
 function mapPaymentMethod(method: string): string {
     switch (method) {
         case "qris":

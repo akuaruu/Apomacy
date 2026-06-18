@@ -37,9 +37,10 @@ type Transaksi struct {
 	ResepRequired    bool             `json:"resep_required"`
 	NoResep          *string          `json:"no_resep"`
 	Status           StatusTransaksi  `json:"status"`
-	StatusPesanan    string           `json:"status_pesanan"` // BARIS BARU
+	StatusPesanan    string           `json:"status_pesanan"`
 
-	Details []DetailTransaksi `json:"details,omitempty"`
+	Details    []DetailTransaksi `json:"details,omitempty"`
+	Pengiriman *Pengiriman       `json:"pengiriman,omitempty"`
 }
 
 type DetailTransaksi struct {
@@ -52,6 +53,16 @@ type DetailTransaksi struct {
 	Subtotal    float64 `json:"subtotal"`
 }
 
+type Pengiriman struct {
+	IDPengiriman     int        `json:"id_pengiriman,omitempty"`
+	IDTransaksi      int        `json:"id_transaksi,omitempty"`
+	MetodePenerimaan string     `json:"metode_penerimaan"`
+	NamaPenerima     string     `json:"nama_penerima"`
+	NoHpPenerima     string     `json:"no_hp_penerima"`
+	AlamatPengiriman string     `json:"alamat_pengiriman"`
+	WaktuSampai      *time.Time `json:"waktu_pesanan_sampai,omitempty"`
+}
+
 type TransaksiRepository interface {
 	CreateWithDetails(ctx context.Context, tx *Transaksi) error
 	GetByID(ctx context.Context, id int) (*Transaksi, error)
@@ -59,7 +70,7 @@ type TransaksiRepository interface {
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetByUserID(ctx context.Context, idUser int) ([]*Transaksi, error)
 	GetAll(ctx context.Context) ([]Transaksi, error)
-	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error // BARIS BARU
+	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error
 }
 
 type TransaksiUsecase interface {
@@ -69,5 +80,5 @@ type TransaksiUsecase interface {
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)
 	GetAll(ctx context.Context) ([]Transaksi, error)
-	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error // BARIS BARU
+	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error
 }

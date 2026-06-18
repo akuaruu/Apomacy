@@ -32,24 +32,27 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 	if tx.Status == "" {
 		tx.Status = model.TxPending // Default status
 	}
+	// Default status pesanan jika belum ada
+	if tx.StatusPesanan == "" {
+		tx.StatusPesanan = "Menunggu Pembayaran"
+	}
 
 	// 1. Insert ke tabel utama (transaksi)
 	queryTrx := `
 		INSERT INTO transaksi (
 			id_customer, id_user, no_transaksi, tanggal_transaksi, nama_customer, 
-			total_item, subtotal, total_bayar, metode_pembayaran, resep_required, no_resep, status
+			total_item, subtotal, total_bayar, metode_pembayaran, resep_required, no_resep, status, status_pesanan
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 		) RETURNING id_transaksi`
 
 	err = dbTx.QueryRow(ctx, queryTrx,
 		tx.IDCustomer, tx.IDUser, tx.NoTransaksi, tx.TanggalTransaksi, tx.NamaCustomer,
 		tx.TotalItem, tx.Subtotal, tx.TotalBayar, tx.MetodePembayaran,
-		tx.ResepRequired, tx.NoResep, tx.Status,
+		tx.ResepRequired, tx.NoResep, tx.Status, tx.StatusPesanan,
 	).Scan(&tx.ID)
 
 	if err != nil {
-		// Tambah log detail
 		fmt.Printf("[REPO ERROR] Insert transaksi gagal: %+v\nPayload: %+v\n", err, tx)
 		return err
 	}
@@ -63,7 +66,6 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 	queryUpdateStok := `UPDATE obat SET stok = stok - $1 WHERE id_obat = $2 AND stok >= $1`
 
 	for _, detail := range tx.Details {
-		// Insert detail transaksi
 		_, err = dbTx.Exec(ctx, queryDetail,
 			tx.ID, detail.IDObat, detail.NamaObat, detail.HargaSatuan, detail.Qty, detail.Subtotal,
 		)
@@ -71,13 +73,33 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 			return err
 		}
 
-		// Update (kurangi) stok obat
 		res, err := dbTx.Exec(ctx, queryUpdateStok, detail.Qty, detail.IDObat)
 		if err != nil {
 			return err
 		}
 		if res.RowsAffected() == 0 {
 			return errors.New("stok obat tidak mencukupi untuk item: " + detail.NamaObat)
+		}
+	}
+
+	// 3. BARIS BARU: Insert ke tabel logistik JIKA ada data pengiriman (Transaksi Online)
+	if tx.Pengiriman != nil {
+		queryPengiriman := `
+			INSERT INTO transaksi_pengiriman (
+				id_transaksi, metode_penerimaan, nama_penerima, no_hp_penerima, alamat_pengiriman
+			) VALUES ($1, $2, $3, $4, $5) RETURNING id_pengiriman`
+
+		err = dbTx.QueryRow(ctx, queryPengiriman,
+			tx.ID, // Gunakan ID transaksi yang baru saja di-generate
+			tx.Pengiriman.MetodePenerimaan,
+			tx.Pengiriman.NamaPenerima,
+			tx.Pengiriman.NoHpPenerima,
+			tx.Pengiriman.AlamatPengiriman,
+		).Scan(&tx.Pengiriman.IDPengiriman)
+
+		if err != nil {
+			fmt.Printf("[REPO ERROR] Insert pengiriman gagal: %+v\n", err)
+			return err
 		}
 	}
 
