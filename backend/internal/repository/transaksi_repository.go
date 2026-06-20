@@ -152,7 +152,16 @@ func (r *transaksiRepository) UpdateStatus(ctx context.Context, id int, status m
 }
 
 func (r *transaksiRepository) UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status model.StatusTransaksi) error {
-	query := `UPDATE transaksi SET status = $1 WHERE no_transaksi = $2`
+	var query string
+
+	if status == model.TxSelesai {
+		query = `UPDATE transaksi SET status = $1, status_pesanan = 'Menunggu Diproses' WHERE no_transaksi = $2`
+	} else if status == model.TxBatal {
+		query = `UPDATE transaksi SET status = $1, status_pesanan = 'Dibatalkan' WHERE no_transaksi = $2`
+	} else {
+		query = `UPDATE transaksi SET status = $1 WHERE no_transaksi = $2`
+	}
+
 	result, err := r.db.Exec(ctx, query, status, noTransaksi)
 	if err != nil {
 		return err
@@ -249,8 +258,8 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 	return transactions, nil
 }
 
-func (r *transaksiRepository) UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error {
-	query := `UPDATE transaksi SET status_pesanan = $1 WHERE id_transaksi = $2`
-	_, err := r.db.Exec(ctx, query, statusPesanan, id)
+func (r *transaksiRepository) UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error {
+	query := `UPDATE transaksi SET status_pesanan = $1 WHERE no_transaksi = $2`
+	_, err := r.db.Exec(ctx, query, statusPesanan, noTransaksi)
 	return err
 }

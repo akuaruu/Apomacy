@@ -63,19 +63,20 @@ func (t *transaksiUsecase) GetAll(ctx context.Context) ([]model.Transaksi, error
 	return t.repo.GetAll(ctx)
 }
 
-func (t *transaksiUsecase) UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error {
+func (t *transaksiUsecase) UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error {
 	validStatus := map[string]bool{
 		"Menunggu Pembayaran": true,
 		"Menunggu Diproses":   true,
 		"Sedang Diracik":      true,
-		"Siap Diambil":        true,
 		"Sedang Dikirim":      true,
+		"Siap Diambil":        true,
 		"Selesai":             true,
+		"Dibatalkan":          true, // Aman untuk Midtrans
 	}
 
 	if !validStatus[statusPesanan] {
 		return errors.New("status pesanan tidak valid: " + statusPesanan)
 	}
 
-	return t.repo.UpdateStatusPesanan(ctx, id, statusPesanan)
+	return t.repo.UpdateStatusPesanan(ctx, noTransaksi, statusPesanan)
 }

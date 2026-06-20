@@ -70,7 +70,7 @@ type TransaksiRepository interface {
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetByUserID(ctx context.Context, idUser int) ([]*Transaksi, error)
 	GetAll(ctx context.Context) ([]Transaksi, error)
-	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error
+	UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error
 }
 
 type TransaksiUsecase interface {
@@ -80,5 +80,5 @@ type TransaksiUsecase interface {
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)
 	GetAll(ctx context.Context) ([]Transaksi, error)
-	UpdateStatusPesanan(ctx context.Context, id int, statusPesanan string) error
+	UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error
 }

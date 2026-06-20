@@ -125,12 +125,7 @@ func (h *TransaksiHandler) GetAll(c *gin.Context) {
 }
 
 func (h *TransaksiHandler) UpdateStatusPesanan(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parameter ID harus berupa angka"})
-		return
-	}
+	noTransaksi := c.Param("id")
 
 	var req UpdateStatusPesananRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -138,7 +133,7 @@ func (h *TransaksiHandler) UpdateStatusPesanan(c *gin.Context) {
 		return
 	}
 
-	if err := h.usecase.UpdateStatusPesanan(c.Request.Context(), id, req.StatusPesanan); err != nil {
+	if err := h.usecase.UpdateStatusPesanan(c.Request.Context(), noTransaksi, req.StatusPesanan); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengupdate status pesanan", "detail": err.Error()})
 		return
 	}
