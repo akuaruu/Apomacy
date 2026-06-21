@@ -8,36 +8,31 @@ import (
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type transaksiRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
-func NewTransaksiRepository(db *pgxpool.Pool) model.TransaksiRepository {
+func NewTransaksiRepository(db DBTx) model.TransaksiRepository {
 	return &transaksiRepository{db: db}
 }
 
 func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.Transaksi) error {
-	// Mulai Database Transaction
 	dbTx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	// Pastikan rollback terpanggil jika fungsi return sebelum di-commit
 	defer dbTx.Rollback(ctx)
 
 	tx.TanggalTransaksi = time.Now()
 	if tx.Status == "" {
-		tx.Status = model.TxPending // Default status
+		tx.Status = model.TxPending
 	}
-	// Default status pesanan jika belum ada
 	if tx.StatusPesanan == "" {
 		tx.StatusPesanan = "Menunggu Pembayaran"
 	}
 
-	// 1. Insert ke tabel utama (transaksi)
 	queryTrx := `
 		INSERT INTO transaksi (
 			id_customer, id_user, no_transaksi, tanggal_transaksi, nama_customer, 
@@ -57,7 +52,6 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 		return err
 	}
 
-	// 2. Insert ke tabel detail_transaksi DAN update stok obat
 	queryDetail := `
 		INSERT INTO detail_transaksi (
 			id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal
@@ -82,7 +76,6 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 		}
 	}
 
-	// 3. BARIS BARU: Insert ke tabel logistik JIKA ada data pengiriman (Transaksi Online)
 	if tx.Pengiriman != nil {
 		queryPengiriman := `
 			INSERT INTO transaksi_pengiriman (
@@ -90,7 +83,7 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 			) VALUES ($1, $2, $3, $4, $5) RETURNING id_pengiriman`
 
 		err = dbTx.QueryRow(ctx, queryPengiriman,
-			tx.ID, // Gunakan ID transaksi yang baru saja di-generate
+			tx.ID,
 			tx.Pengiriman.MetodePenerimaan,
 			tx.Pengiriman.NamaPenerima,
 			tx.Pengiriman.NoHpPenerima,
@@ -103,26 +96,53 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 		}
 	}
 
-	// Jika semua lancar, commit transaksi
 	return dbTx.Commit(ctx)
 }
 
+// GetByID mengambil transaksi beserta detail item dan data pengiriman (jika ada) dalam query gabungan
 func (r *transaksiRepository) GetByID(ctx context.Context, id int) (*model.Transaksi, error) {
 	var t model.Transaksi
-	query := `SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi, nama_customer, 
-	          total_item, subtotal, total_bayar, metode_pembayaran, resep_required, no_resep, status, status_pesanan 
-	          FROM transaksi WHERE id_transaksi = $1`
+	var pIDPengiriman *int
+	var pMetode *string
+	var pNama, pHp, pAlamat *string
+	var pWaktu *time.Time
+
+	query := `
+		SELECT 
+			t.id_transaksi, t.id_customer, t.id_user, t.no_transaksi, t.tanggal_transaksi, t.nama_customer, 
+			t.total_item, t.subtotal, t.total_bayar, t.metode_pembayaran, t.resep_required, t.no_resep, 
+			t.status, t.status_pesanan,
+			p.id_pengiriman, p.metode_penerimaan, p.nama_penerima, p.no_hp_penerima, 
+			p.alamat_pengiriman, p.waktu_pesanan_sampai
+		FROM transaksi t
+		LEFT JOIN transaksi_pengiriman p ON p.id_transaksi = t.id_transaksi
+		WHERE t.id_transaksi = $1`
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi, &t.NamaCustomer,
 		&t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran, &t.ResepRequired,
 		&t.NoResep, &t.Status, &t.StatusPesanan,
+		&pIDPengiriman, &pMetode, &pNama, &pHp, &pAlamat, &pWaktu,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errors.New("transaksi tidak ditemukan")
 		}
 		return nil, err
+	}
+
+	if pIDPengiriman != nil {
+		t.Pengiriman = &model.Pengiriman{
+			IDPengiriman:     *pIDPengiriman,
+			IDTransaksi:      t.ID,
+			NamaPenerima:     pNama,
+			NoHpPenerima:     pHp,
+			AlamatPengiriman: pAlamat,
+			WaktuSampai:      pWaktu,
+		}
+		if pMetode != nil {
+			t.Pengiriman.MetodePenerimaan = *pMetode
+		}
 	}
 
 	queryDetails := `SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
@@ -203,6 +223,8 @@ func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*m
 	return result, nil
 }
 
+// GetAll mengambil seluruh transaksi beserta detail dan pengiriman menggunakan batch query
+// untuk menghindari N+1 query saat data transaksi berjumlah besar
 func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, error) {
 	queryTrx := `
 		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi, 
@@ -218,6 +240,8 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 	defer rows.Close()
 
 	var transactions []model.Transaksi
+	idIndex := make(map[int]int)
+
 	for rows.Next() {
 		var t model.Transaksi
 		err := rows.Scan(
@@ -229,31 +253,65 @@ func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, er
 			return nil, err
 		}
 		transactions = append(transactions, t)
+		idIndex[t.ID] = len(transactions) - 1
 	}
+	rows.Close()
 
 	if len(transactions) == 0 {
 		return transactions, nil
 	}
 
-	for i := range transactions {
-		queryDetails := `
-			SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
-			FROM detail_transaksi WHERE id_transaksi = $1
-		`
-		detailRows, err := r.db.Query(ctx, queryDetails, transactions[i].ID)
-		if err != nil {
-			continue
-		}
-
-		for detailRows.Next() {
-			var dt model.DetailTransaksi
-			err := detailRows.Scan(&dt.IDDetailTrx, &dt.IDTransaksi, &dt.IDObat, &dt.NamaObat, &dt.HargaSatuan, &dt.Qty, &dt.Subtotal)
-			if err == nil {
-				transactions[i].Details = append(transactions[i].Details, dt)
-			}
-		}
-		detailRows.Close()
+	ids := make([]int, 0, len(transactions))
+	for _, t := range transactions {
+		ids = append(ids, t.ID)
 	}
+
+	// Batch fetch semua detail dalam satu query
+	queryDetails := `
+		SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
+		FROM detail_transaksi WHERE id_transaksi = ANY($1)
+	`
+	detailRows, err := r.db.Query(ctx, queryDetails, ids)
+	if err != nil {
+		return nil, err
+	}
+	for detailRows.Next() {
+		var dt model.DetailTransaksi
+		if err := detailRows.Scan(&dt.IDDetailTrx, &dt.IDTransaksi, &dt.IDObat, &dt.NamaObat, &dt.HargaSatuan, &dt.Qty, &dt.Subtotal); err != nil {
+			detailRows.Close()
+			return nil, err
+		}
+		if idx, ok := idIndex[dt.IDTransaksi]; ok {
+			transactions[idx].Details = append(transactions[idx].Details, dt)
+		}
+	}
+	detailRows.Close()
+
+	// Batch fetch semua pengiriman dalam satu query
+	queryPengiriman := `
+		SELECT id_pengiriman, id_transaksi, metode_penerimaan, nama_penerima, 
+		       no_hp_penerima, alamat_pengiriman, waktu_pesanan_sampai
+		FROM transaksi_pengiriman WHERE id_transaksi = ANY($1)
+	`
+	pengirimanRows, err := r.db.Query(ctx, queryPengiriman, ids)
+	if err != nil {
+		return nil, err
+	}
+	for pengirimanRows.Next() {
+		var p model.Pengiriman
+		if err := pengirimanRows.Scan(
+			&p.IDPengiriman, &p.IDTransaksi, &p.MetodePenerimaan, &p.NamaPenerima,
+			&p.NoHpPenerima, &p.AlamatPengiriman, &p.WaktuSampai,
+		); err != nil {
+			pengirimanRows.Close()
+			return nil, err
+		}
+		if idx, ok := idIndex[p.IDTransaksi]; ok {
+			pCopy := p
+			transactions[idx].Pengiriman = &pCopy
+		}
+	}
+	pengirimanRows.Close()
 
 	return transactions, nil
 }

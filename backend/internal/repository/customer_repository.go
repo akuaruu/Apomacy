@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type customerRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
-func NewCustomerRepository(db *pgxpool.Pool) model.CustomerRepository {
+func NewCustomerRepository(db DBTx) model.CustomerRepository {
 	return &customerRepository{db: db}
 }
 

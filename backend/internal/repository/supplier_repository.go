@@ -7,14 +7,13 @@ import (
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type supplierRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
-func NewSupplierRepository(db *pgxpool.Pool) model.SupplierRepository {
+func NewSupplierRepository(db DBTx) model.SupplierRepository {
 	return &supplierRepository{db: db}
 }
 

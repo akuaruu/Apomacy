@@ -17,7 +17,6 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 	r := gin.Default()
 
-	// 1. CORS Middleware
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
@@ -30,7 +29,6 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// 2. Dependency Injection
 	userRepo := repository.NewUserRepository(dbPool)
 	userUsecase := usecase.NewUserUsecase(userRepo)
 	userHandler := NewUserHandler(userUsecase)
@@ -60,18 +58,14 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 	migrationHandler := NewMigrationHandler(dbPool)
 
-	// 3. Routing
 	api := r.Group("/api")
 	{
-		// --- AREA PUBLIK (Tanpa Middleware Auth) ---
-		// Bebas diakses siapa saja untuk mendaftar atau mengambil token
 		publicUsers := api.Group("/users")
 		{
 			publicUsers.POST("/register", userHandler.Register)
 			publicUsers.POST("/login", userHandler.Login)
 		}
 
-		// -AREA PRIVAT (Wajib Login/Bawa Token)
 		protectedUsers := api.Group("/users")
 		protectedUsers.Use(middleware.RequireAuth())
 		{
@@ -107,22 +101,27 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
 		}
 
+		// Endpoint yang boleh diakses semua role terautentikasi (customer, kasir, admin)
 		transaksi := api.Group("/transaksi")
 		transaksi.Use(middleware.RequireAuth())
 		{
 			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
-			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
-
-			transaksi.PATCH("/:id/status-pesanan", transaksiHandler.UpdateStatusPesanan)
 			transaksi.GET("", transaksiHandler.GetRiwayatUser)
-			transaksi.GET("/all", transaksiHandler.GetAll)
+		}
+
+		// Endpoint khusus staff (kasir/admin) untuk operasional toko
+		transaksiStaff := api.Group("/transaksi")
+		transaksiStaff.Use(middleware.RequireAuth(), middleware.RequireRole("Kasir", "Admin"))
+		{
+			transaksiStaff.PUT("/:id/batal", transaksiHandler.Batalkan)
+			transaksiStaff.PATCH("/:id/status-pesanan", transaksiHandler.UpdateStatusPesanan)
+			transaksiStaff.GET("/all", transaksiHandler.GetAll)
 		}
 
 		payment := api.Group("/checkout")
 		{
 			payment.POST("", paymentHandler.Checkout)
-			// Endpoint untuk menerima notifikasi dari Midtrans
 			payment.POST("/notification", paymentHandler.WebhookNotification)
 		}
 

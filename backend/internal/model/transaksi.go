@@ -53,13 +53,14 @@ type DetailTransaksi struct {
 	Subtotal    float64 `json:"subtotal"`
 }
 
+// Field nullable di database menggunakan pointer agar aman saat di-scan dari NULL
 type Pengiriman struct {
 	IDPengiriman     int        `json:"id_pengiriman,omitempty"`
 	IDTransaksi      int        `json:"id_transaksi,omitempty"`
 	MetodePenerimaan string     `json:"metode_penerimaan"`
-	NamaPenerima     string     `json:"nama_penerima"`
-	NoHpPenerima     string     `json:"no_hp_penerima"`
-	AlamatPengiriman string     `json:"alamat_pengiriman"`
+	NamaPenerima     *string    `json:"nama_penerima,omitempty"`
+	NoHpPenerima     *string    `json:"no_hp_penerima,omitempty"`
+	AlamatPengiriman *string    `json:"alamat_pengiriman,omitempty"`
 	WaktuSampai      *time.Time `json:"waktu_pesanan_sampai,omitempty"`
 }
 
@@ -75,7 +76,7 @@ type TransaksiRepository interface {
 
 type TransaksiUsecase interface {
 	Checkout(ctx context.Context, tx *Transaksi) error
-	GetDetailTransaksi(ctx context.Context, id int) (*Transaksi, error)
+	GetDetailTransaksi(ctx context.Context, idUser int, isStaff bool, id int) (*Transaksi, error)
 	BatalkanTransaksi(ctx context.Context, id int) error
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)

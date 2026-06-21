@@ -5,14 +5,13 @@ import (
 	"fmt"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type restockRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
-func NewRestockRepository(db *pgxpool.Pool) model.RestockRepository {
+func NewRestockRepository(db DBTx) model.RestockRepository {
 	return &restockRepository{db: db}
 }
 

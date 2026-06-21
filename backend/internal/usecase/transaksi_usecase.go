@@ -24,30 +24,36 @@ func (t *transaksiUsecase) Checkout(ctx context.Context, tx *model.Transaksi) er
 		return errors.New("total bayar tidak mencukupi")
 	}
 
-	// Validasi Pengiriman (Jika transaksi online dari frontend)
 	if tx.Pengiriman != nil {
 		if tx.Pengiriman.MetodePenerimaan == "delivery" {
-			if tx.Pengiriman.AlamatPengiriman == "" {
+			if tx.Pengiriman.AlamatPengiriman == nil || *tx.Pengiriman.AlamatPengiriman == "" {
 				return errors.New("alamat pengiriman wajib diisi untuk metode delivery")
 			}
 		} else if tx.Pengiriman.MetodePenerimaan == "pickup" {
-			if tx.Pengiriman.NamaPenerima == "" {
+			if tx.Pengiriman.NamaPenerima == nil || *tx.Pengiriman.NamaPenerima == "" {
 				return errors.New("nama pengambil wajib diisi untuk metode pickup")
 			}
 		}
 	}
 
-	// Pemanggilan repository yang sudah mencakup pemotongan stok via DB Transaction
 	return t.repo.CreateWithDetails(ctx, tx)
 }
 
-func (t *transaksiUsecase) GetDetailTransaksi(ctx context.Context, id int) (*model.Transaksi, error) {
-	return t.repo.GetByID(ctx, id)
+// GetDetailTransaksi memastikan hanya pemilik transaksi atau staff (kasir/admin) yang dapat mengakses data
+func (t *transaksiUsecase) GetDetailTransaksi(ctx context.Context, idUser int, isStaff bool, id int) (*model.Transaksi, error) {
+	trx, err := t.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isStaff && trx.IDUser != idUser {
+		return nil, errors.New("akses ditolak: transaksi ini bukan milik anda")
+	}
+
+	return trx, nil
 }
 
 func (t *transaksiUsecase) BatalkanTransaksi(ctx context.Context, id int) error {
-	// Catatan: Jika ingin lebih kompleks,harus menarik DetailTransaksi
-	// dan menambahkan kembali stoknya ke tabel obat.
 	return t.repo.UpdateStatus(ctx, id, model.TxBatal)
 }
 
@@ -71,7 +77,7 @@ func (t *transaksiUsecase) UpdateStatusPesanan(ctx context.Context, noTransaksi 
 		"Sedang Dikirim":      true,
 		"Siap Diambil":        true,
 		"Selesai":             true,
-		"Dibatalkan":          true, // Aman untuk Midtrans
+		"Dibatalkan":          true,
 	}
 
 	if !validStatus[statusPesanan] {

@@ -54,7 +54,7 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	})
 }
 
-// GetDetail mengambil riwayat spesifik transaksi beserta rincian obat yang dibeli
+// GetDetail mengambil riwayat spesifik transaksi beserta rincian obat dan pengiriman
 func (h *TransaksiHandler) GetDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -63,8 +63,27 @@ func (h *TransaksiHandler) GetDetail(c *gin.Context) {
 		return
 	}
 
-	trx, err := h.usecase.GetDetailTransaksi(c.Request.Context(), id)
+	idUserRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+	idUserFloat, ok := idUserRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+
+	// role diasumsikan di-set oleh middleware RequireAuth dari klaim JWT
+	role, _ := c.Get("role")
+	isStaff := role == "kasir" || role == "admin"
+
+	trx, err := h.usecase.GetDetailTransaksi(c.Request.Context(), int(idUserFloat), isStaff, id)
 	if err != nil {
+		if err.Error() == "akses ditolak: transaksi ini bukan milik anda" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
