@@ -30,3 +30,6 @@ backend/vendor/
 
 # Reports
 docs/laporan_integrasi_axios.md
+
+apomacy-api
+coverage.out

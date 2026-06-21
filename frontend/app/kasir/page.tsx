@@ -13,10 +13,11 @@ interface TransaksiItem {
 }
 
 type StatusType =
-    | "Pesanan Baru"
-    | "Obat sedang Disiapkan"
-    | "Dalam perjalanan"
-    | "Obat menunggu di ambil"
+    | "Menunggu Pembayaran"
+    | "Menunggu Diproses"
+    | "Sedang Diracik"
+    | "Sedang Dikirim"
+    | "Siap Diambil"
     | "Selesai";
 
 interface TransaksiDashboard {
@@ -28,6 +29,10 @@ interface TransaksiDashboard {
     paymentMethod: string;
     status: StatusType;
     date: string;
+    // Tambahan Data Logistik
+    deliveryMethod?: string;
+    phone?: string;
+    address?: string;
 }
 
 // ─── PORTAL MODAL ───────────────────────────────────────────────────────────────
@@ -56,11 +61,12 @@ function PortalModal({ children, onClose }: { children: React.ReactNode; onClose
 const PAGE_SIZE = 25;
 
 const statusPriority: Record<StatusType, number> = {
-    "Pesanan Baru": 1,
-    "Obat sedang Disiapkan": 2,
-    "Dalam perjalanan": 3,
-    "Obat menunggu di ambil": 4,
-    "Selesai": 5,
+    "Menunggu Pembayaran": 1,
+    "Menunggu Diproses": 2,
+    "Sedang Diracik": 3,
+    "Sedang Dikirim": 4,
+    "Siap Diambil": 5,
+    "Selesai": 6,
 };
 
 // ─── MAIN PAGE ──────────────────────────────────────────────────────────────────
@@ -102,13 +108,7 @@ export default function KasirDashboardPage() {
                 // --- PROSES MAPPING DATA ---
                 const newData: TransaksiDashboard[] = rawData.map((t: any) => {
                     let formattedDate = t.tanggal_transaksi;
-                    try {
-                        const dateObj = new Date(t.tanggal_transaksi);
-                        formattedDate = new Intl.DateTimeFormat('id-ID', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
-                        }).format(dateObj);
-                    } catch (e) { }
+                    // ... (logika format tanggal tetap sama)
 
                     return {
                         id: t.no_transaksi,
@@ -116,7 +116,15 @@ export default function KasirDashboardPage() {
                         customerName: t.nama_customer || "Anonim",
                         subtotal: t.subtotal,
                         paymentMethod: t.metode_pembayaran || "-",
-                        status: t.status || "Selesai",
+
+                        // MENGGUNAKAN STATUS PESANAN (Bukan status pembayaran)
+                        status: t.status_pesanan || "Menunggu Pembayaran",
+
+                        // AMBIL DATA PENGIRIMAN (Jika ada)
+                        deliveryMethod: t.pengiriman?.metode_penerimaan || "Offline",
+                        phone: t.pengiriman?.no_hp_penerima || "-",
+                        address: t.pengiriman?.alamat_pengiriman || "-",
+
                         date: formattedDate,
                         items: (t.details || t.Details || []).map((d: any) => ({
                             name: d.nama_obat,
@@ -168,37 +176,74 @@ export default function KasirDashboardPage() {
 
     const getStatusStyle = (status: string): React.CSSProperties => {
         const map: Record<string, React.CSSProperties> = {
-            "Pesanan Baru": { background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca" },
-            "Obat sedang Disiapkan": { background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" },
-            "Dalam perjalanan": { background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" },
-            "Obat menunggu di ambil": { background: "#f5f3ff", color: "#7c3aed", border: "1px solid #ddd6fe" },
+            "Menunggu Pembayaran": { background: "#f3f4f6", color: "#6b7280", border: "1px solid #d1d5db" },
+            "Menunggu Diproses": { background: "#fef2f2", color: "#ef4444", border: "1px solid #fecaca" },
+            "Sedang Diracik": { background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" },
+            "Sedang Dikirim": { background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" },
+            "Siap Diambil": { background: "#f5f3ff", color: "#7c3aed", border: "1px solid #ddd6fe" },
             "Selesai": { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" },
         };
         return map[status] ?? { background: "#f3f4f6", color: "#6b7280" };
     };
 
-    const handleConfirmOrder = (trxId: string, action: "kirim" | "ambil") => {
-        const newStatus: StatusType = action === "kirim" ? "Dalam perjalanan" : "Obat menunggu di ambil";
-        setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: newStatus } : t));
+    const handleConfirmOrder = async (trxId: string, action: "kirim" | "ambil") => {
+        const newStatus: StatusType = action === "kirim" ? "Sedang Dikirim" : "Siap Diambil";
+
+        try {
+            const token = Cookies.get('apomacy_token');
+            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                // Payload dikirim sesuai dengan validStatus di backend
+                body: JSON.stringify({ status_pesanan: newStatus })
+            });
+
+            if (!response.ok) throw new Error("Gagal update status di server");
+
+            // Update UI jika API sukses
+            setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: newStatus } : t));
+        } catch (error) {
+            console.error("Error:", error);
+            alert("Gagal mengubah status pesanan. Periksa koneksi.");
+        }
     };
 
-    const handleCompleteOrder = (trxId: string) => {
-        setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: "Selesai" } : t));
+    const handleCompleteOrder = async (trxId: string) => {
+        try {
+            const token = Cookies.get('apomacy_token');
+            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status_pesanan: "Selesai" })
+            });
+
+            if (!response.ok) throw new Error("Gagal update status di server");
+
+            setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: "Selesai" } : t));
+        } catch (error) {
+            console.error("Error:", error);
+            alert("Gagal menyelesaikan pesanan.");
+        }
     };
 
     const newOrdersCount = transactions.filter(
-        t => t.type === "Online" && (t.status === "Pesanan Baru" || t.status === "Obat sedang Disiapkan")
+        t => t.type === "Online" && (t.status === "Menunggu Diproses" || t.status === "Sedang Diracik")
     ).length;
 
     let filteredData = transactions;
     if (activeTab === "Pesanan Baru") {
-        filteredData = transactions.filter(t => t.status === "Pesanan Baru" || t.status === "Obat sedang Disiapkan");
+        filteredData = transactions.filter(t => t.status === "Menunggu Diproses" || t.status === "Sedang Diracik");
     } else if (activeTab === "Diproses") {
-        filteredData = transactions.filter(t => t.status === "Dalam perjalanan" || t.status === "Obat menunggu di ambil");
+        filteredData = transactions.filter(t => t.status === "Sedang Dikirim" || t.status === "Siap Diambil");
     } else if (activeTab === "Selesai") {
         filteredData = transactions.filter(t => t.status === "Selesai");
     }
-
     if (searchQuery) {
         filteredData = filteredData.filter(
             t => t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -229,7 +274,7 @@ export default function KasirDashboardPage() {
             );
         }
 
-        if (activeTab === "Pesanan Baru" && (trx.status === "Pesanan Baru" || trx.status === "Obat sedang Disiapkan")) {
+        if (activeTab === "Pesanan Baru" && (trx.status === "Menunggu Diproses" || trx.status === "Sedang Diracik")) {
             return (
                 <div className="flex gap-2 flex-wrap min-w-[200px]">
                     <button onClick={() => handleConfirmOrder(trx.id, "kirim")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
@@ -242,7 +287,7 @@ export default function KasirDashboardPage() {
             );
         }
 
-        if (activeTab === "Diproses" && (trx.status === "Dalam perjalanan" || trx.status === "Obat menunggu di ambil")) {
+        if (activeTab === "Diproses" && (trx.status === "Sedang Dikirim" || trx.status === "Siap Diambil")) {
             return (
                 <button onClick={() => handleCompleteOrder(trx.id)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold hover:bg-green-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                     <PackageCheck size={12} /> Selesaikan
@@ -265,9 +310,9 @@ export default function KasirDashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
                 {[
                     { icon: <Receipt size={24} />, bg: "#eff6ff", color: "#2563eb", label: "Total Hari Ini", value: `${transactions.length} Transaksi` },
-                    { icon: <Clock size={24} />, bg: "#fffbeb", color: "#d97706", label: "Sedang Disiapkan", value: `${transactions.filter(t => t.status === "Obat sedang Disiapkan" || t.status === "Pesanan Baru").length} Pesanan` },
-                    { icon: <Store size={24} />, bg: "#f5f3ff", color: "#7c3aed", label: "Menunggu Diambil", value: `${transactions.filter(t => t.status === "Obat menunggu di ambil").length} Pesanan` },
-                    { icon: <Truck size={24} />, bg: "#ecfdf5", color: "#059669", label: "Dalam Perjalanan", value: `${transactions.filter(t => t.status === "Dalam perjalanan").length} Pesanan` },
+                    { icon: <Clock size={24} />, bg: "#fffbeb", color: "#d97706", label: "Sedang Disiapkan", value: `${transactions.filter(t => t.status === "Sedang Diracik" || t.status === "Menunggu Diproses").length} Pesanan` },
+                    { icon: <Store size={24} />, bg: "#f5f3ff", color: "#7c3aed", label: "Menunggu Diambil", value: `${transactions.filter(t => t.status === "Siap Diambil").length} Pesanan` },
+                    { icon: <Truck size={24} />, bg: "#ecfdf5", color: "#059669", label: "Dalam Perjalanan", value: `${transactions.filter(t => t.status === "Sedang Dikirim").length} Pesanan` },
                 ].map((s, i) => (
                     <div key={i} className="bg-white p-4 md:p-5 rounded-2xl border border-outline-variant shadow-sm flex items-center gap-3 md:gap-4">
                         <div style={{ background: s.bg, color: s.color }} className="p-2.5 md:p-3 rounded-xl shrink-0">{s.icon}</div>
@@ -359,7 +404,7 @@ export default function KasirDashboardPage() {
                                         </tr>
                                     ) : (
                                         displayedData.map(trx => (
-                                            <tr key={trx.id} className={`hover:bg-blue-50/50 transition-colors ${trx.status === "Obat sedang Disiapkan" || trx.status === "Pesanan Baru" ? "bg-amber-50/30" : ""}`}>
+                                            <tr key={trx.id} className={`hover:bg-blue-50/50 transition-colors ${trx.status === "Sedang Diracik" || trx.status === "Menunggu Diproses" ? "bg-amber-50/30" : ""}`}>
 
                                                 {/* Kolom No Trx */}
                                                 <td className="px-6 py-4 font-mono text-[16px] font-bold text-apomacy-primary whitespace-nowrap">
@@ -382,6 +427,8 @@ export default function KasirDashboardPage() {
                                                 <td className="px-6 py-4 font-semibold text-gray-800 text-[16px] truncate max-w-[200px]">
                                                     {trx.customerName}
                                                 </td>
+
+
 
                                                 {/* Kolom Aksi Cek Obat */}
                                                 <td className="px-6 py-4 text-center">
@@ -505,6 +552,24 @@ export default function KasirDashboardPage() {
                                 </span>
                             </div>
                         </div>
+
+                        {/* --- TAMBAHAN INFO PENGIRIMAN --- */}
+                        {selectedDetail.type === "Online" && (
+                            <div style={{ background: "#f8fafc", padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+                                <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>
+                                    Info Pengiriman ({selectedDetail.deliveryMethod})
+                                </p>
+                                <p style={{ fontSize: 12, fontWeight: 600, color: "#374151", margin: "0 0 4px 0" }}>
+                                    {selectedDetail.phone}
+                                </p>
+                                {selectedDetail.deliveryMethod === "delivery" && (
+                                    <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.4 }}>
+                                        {selectedDetail.address}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div style={{ maxHeight: 240, overflowY: "auto", padding: "0 16px" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                 <thead>

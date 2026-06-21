@@ -24,6 +24,19 @@ func (t *transaksiUsecase) Checkout(ctx context.Context, tx *model.Transaksi) er
 		return errors.New("total bayar tidak mencukupi")
 	}
 
+	// Validasi Pengiriman (Jika transaksi online dari frontend)
+	if tx.Pengiriman != nil {
+		if tx.Pengiriman.MetodePenerimaan == "delivery" {
+			if tx.Pengiriman.AlamatPengiriman == "" {
+				return errors.New("alamat pengiriman wajib diisi untuk metode delivery")
+			}
+		} else if tx.Pengiriman.MetodePenerimaan == "pickup" {
+			if tx.Pengiriman.NamaPenerima == "" {
+				return errors.New("nama pengambil wajib diisi untuk metode pickup")
+			}
+		}
+	}
+
 	// Pemanggilan repository yang sudah mencakup pemotongan stok via DB Transaction
 	return t.repo.CreateWithDetails(ctx, tx)
 }
@@ -48,4 +61,22 @@ func (t *transaksiUsecase) GetRiwayatByUser(ctx context.Context, idUser int) ([]
 
 func (t *transaksiUsecase) GetAll(ctx context.Context) ([]model.Transaksi, error) {
 	return t.repo.GetAll(ctx)
+}
+
+func (t *transaksiUsecase) UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error {
+	validStatus := map[string]bool{
+		"Menunggu Pembayaran": true,
+		"Menunggu Diproses":   true,
+		"Sedang Diracik":      true,
+		"Sedang Dikirim":      true,
+		"Siap Diambil":        true,
+		"Selesai":             true,
+		"Dibatalkan":          true, // Aman untuk Midtrans
+	}
+
+	if !validStatus[statusPesanan] {
+		return errors.New("status pesanan tidak valid: " + statusPesanan)
+	}
+
+	return t.repo.UpdateStatusPesanan(ctx, noTransaksi, statusPesanan)
 }

@@ -17,6 +17,10 @@ func NewTransaksiHandler(usecase model.TransaksiUsecase) *TransaksiHandler {
 	return &TransaksiHandler{usecase: usecase}
 }
 
+type UpdateStatusPesananRequest struct {
+	StatusPesanan string `json:"status_pesanan" binding:"required"`
+}
+
 // Checkout memproses keranjang belanja dari kasir
 func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	var req model.Transaksi
@@ -117,5 +121,25 @@ func (h *TransaksiHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Berhasil menarik data transaksi",
 		"data":    transactions,
+	})
+}
+
+func (h *TransaksiHandler) UpdateStatusPesanan(c *gin.Context) {
+	noTransaksi := c.Param("id")
+
+	var req UpdateStatusPesananRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid"})
+		return
+	}
+
+	if err := h.usecase.UpdateStatusPesanan(c.Request.Context(), noTransaksi, req.StatusPesanan); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengupdate status pesanan", "detail": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Status pesanan berhasil diperbarui",
+		"status_baru": req.StatusPesanan,
 	})
 }
