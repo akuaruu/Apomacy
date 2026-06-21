@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
@@ -29,7 +30,7 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 
 	tx.TanggalTransaksi = time.Now()
 	if tx.Status == "" {
-		tx.Status = model.TxSelesai // Default status
+		tx.Status = model.TxPending // Default status
 	}
 
 	// 1. Insert ke tabel utama (transaksi)
@@ -48,6 +49,8 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 	).Scan(&tx.ID)
 
 	if err != nil {
+		// Tambah log detail
+		fmt.Printf("[REPO ERROR] Insert transaksi gagal: %+v\nPayload: %+v\n", err, tx)
 		return err
 	}
 
@@ -125,4 +128,104 @@ func (r *transaksiRepository) UpdateStatus(ctx context.Context, id int, status m
 	query := `UPDATE transaksi SET status = $1 WHERE id_transaksi = $2`
 	_, err := r.db.Exec(ctx, query, status, id)
 	return err
+}
+
+func (r *transaksiRepository) UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status model.StatusTransaksi) error {
+	query := `UPDATE transaksi SET status = $1 WHERE no_transaksi = $2`
+	result, err := r.db.Exec(ctx, query, status, noTransaksi)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("transaksi tidak ditemukan: " + noTransaksi)
+	}
+	return nil
+}
+
+func (r *transaksiRepository) GetByUserID(ctx context.Context, idUser int) ([]*model.Transaksi, error) {
+	query := `
+		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi,
+		       nama_customer, total_item, subtotal, total_bayar, metode_pembayaran,
+		       resep_required, no_resep, status
+		FROM transaksi
+		WHERE id_user = $1
+		ORDER BY tanggal_transaksi DESC`
+
+	rows, err := r.db.Query(ctx, query, idUser)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*model.Transaksi
+	for rows.Next() {
+		var t model.Transaksi
+		if err := rows.Scan(
+			&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi,
+			&t.NamaCustomer, &t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran,
+			&t.ResepRequired, &t.NoResep, &t.Status,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, &t)
+	}
+
+	return result, nil
+}
+func (r *transaksiRepository) GetAll(ctx context.Context) ([]model.Transaksi, error) {
+	// 1. Ambil semua data transaksi utama
+	queryTrx := `
+		SELECT id_transaksi, id_customer, id_user, no_transaksi, tanggal_transaksi, 
+		       nama_customer, total_item, subtotal, total_bayar, metode_pembayaran, 
+		       resep_required, no_resep, status
+		FROM transaksi
+		ORDER BY tanggal_transaksi DESC
+	`
+	rows, err := r.db.Query(ctx, queryTrx)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []model.Transaksi
+	for rows.Next() {
+		var t model.Transaksi
+		err := rows.Scan(
+			&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi,
+			&t.NamaCustomer, &t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran,
+			&t.ResepRequired, &t.NoResep, &t.Status,
+		)
+		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, t)
+	}
+
+	// Jika tidak ada transaksi, langsung kembalikan array kosong
+	if len(transactions) == 0 {
+		return transactions, nil
+	}
+
+	// 2. Ambil detail obat untuk setiap transaksi agar kasir bisa melihat rinciannya
+	for i := range transactions {
+		queryDetails := `
+			SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
+			FROM detail_transaksi WHERE id_transaksi = $1
+		`
+		detailRows, err := r.db.Query(ctx, queryDetails, transactions[i].ID)
+		if err != nil {
+			continue // Lanjutkan ke transaksi berikutnya jika detail gagal ditarik
+		}
+
+		for detailRows.Next() {
+			var dt model.DetailTransaksi
+			err := detailRows.Scan(&dt.IDDetailTrx, &dt.IDTransaksi, &dt.IDObat, &dt.NamaObat, &dt.HargaSatuan, &dt.Qty, &dt.Subtotal)
+			if err == nil {
+				transactions[i].Details = append(transactions[i].Details, dt)
+			}
+		}
+		detailRows.Close()
+	}
+
+	return transactions, nil
 }

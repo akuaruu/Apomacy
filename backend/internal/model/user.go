@@ -40,6 +40,16 @@ type User struct {
 	FotoProfil  string     `json:"foto_profil" db:"foto_profil"`
 }
 
+// Struct tambahan khusus untuk response halaman Profil Frontend
+type UserProfile struct {
+	NamaLengkap  string `json:"nama"`
+	Email        string `json:"email"`
+	NoTelp       string `json:"telepon"`
+	TanggalLahir string `json:"tanggalLahir"`
+	Alamat       string `json:"alamat"`
+	FotoProfil   string `json:"fotoProfil"`
+}
+
 // UserRepository contract
 type UserRepository interface {
 	Create(ctx context.Context, user *User) error
@@ -47,12 +57,15 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id int) (*User, error)
 	UpdateLastLogin(ctx context.Context, id int, loginTime time.Time) error
 	UpdateFotoProfil(ctx context.Context, userID int, fotoURL string) error
+	GetProfile(ctx context.Context, id int) (*UserProfile, error)
+	UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error
 }
 
 // UserUsecase contract
 type UserUsecase interface {
 	Register(ctx context.Context, user *User) error
 	Login(ctx context.Context, username, password string) (string, error)
-	GetProfile(ctx context.Context, id int) (*User, error)
+	GetProfile(ctx context.Context, id int) (*UserProfile, error)
 	UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error)
+	UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error
 }

@@ -77,32 +77,23 @@ export default function TransaksiOfflinePage() {
 
         if (token) {
             try {
-                // Bedah token persis seperti di halaman login
                 const decoded = jwtDecode<MyTokenPayload>(token);
-                console.log("Data Token Kasir:", decoded);
-
                 if (decoded.id_user) {
                     setCurrentUserId(decoded.id_user);
-                } else {
-                    console.warn("ID Kasir tidak ditemukan di dalam Payload JWT!");
                 }
             } catch (error) {
                 console.error("Gagal membedah token kasir", error);
             }
-        } else {
-            console.warn("Cookie apomacy_token tidak ditemukan!");
         }
 
         const fetchMasterData = async () => {
             setIsLoadingData(true);
             try {
-                // Fetch Data dari API Backend Golang
                 const [obatRes, custRes] = await Promise.all([
                     api.get("/obat/").catch(() => ({ data: { data: [] } })),
                     api.get("/customer/").catch(() => ({ data: { data: [] } }))
                 ]);
 
-                // Mapping Data Obat
                 const obatRaw = obatRes.data?.data || obatRes.data || [];
                 const mappedObat = obatRaw.map((o: any) => ({
                     id: o.id_obat || o.IDObat || o.id,
@@ -114,7 +105,6 @@ export default function TransaksiOfflinePage() {
                 }));
                 setMedicinesData(mappedObat);
 
-                // Mapping Data Customer (Member)
                 const custRaw = custRes.data?.data || custRes.data || [];
                 const mappedCust = custRaw.map((c: any) => ({
                     id: c.id_customer?.toString() || c.IDCustomer?.toString() || c.id?.toString(),
@@ -191,42 +181,48 @@ export default function TransaksiOfflinePage() {
     };
 
     const totalTagihan = cart.reduce((total, item) => total + item.subtotal, 0);
+    const totalItem = cart.reduce((total, item) => total + item.qty, 0);
     const kembalian = (typeof amountPaid === "number" ? amountPaid : 0) - totalTagihan;
-    const isPaymentValid = typeof amountPaid === "number" && amountPaid >= totalTagihan && cart.length > 0;
+
+    // VALIDASI KETAT: Tombol bayar tidak bisa ditekan jika belum pilih member
+    const isPaymentValid = typeof amountPaid === "number" && amountPaid >= totalTagihan && cart.length > 0 && selectedMember !== null;
 
     const handleCetakTransaksi = async () => {
-        if (!isPaymentValid) return;
+        if (!isPaymentValid) {
+            if (!selectedMember) alert("Silakan pilih Pelanggan (Member) terlebih dahulu!");
+            return;
+        }
 
         if (!currentUserId) {
             alert("Sesi login tidak valid. Silakan login ulang untuk memproses transaksi.");
-            return; // Hentikan proses jika kasir belum terdeteksi
+            return;
         }
 
+        // Struktur payload disesuaikan persis dengan Struct Golang model.Transaksi
         const payload = {
             no_transaksi: noTrx,
-            id_user: currentUserId,
-            id_customer: selectedMember ? parseInt(selectedMember.id) : 0,
+            id_customer: parseInt(selectedMember!.id),
+            nama_customer: selectedMember!.name,
+            total_item: totalItem,
+            subtotal: totalTagihan,
             total_bayar: totalTagihan,
             metode_pembayaran: paymentMethod,
-            nominal_bayar: amountPaid,
-            kembalian: kembalian,
-            status_transaksi: "Selesai",
+            status: "Selesai", // Langsung selesai karena dibayar di kasir
             details: cart.map(c => ({
                 id_obat: c.id,
-                jumlah: c.qty,
+                nama_obat: c.name,
                 harga_satuan: c.price,
+                qty: c.qty,
                 subtotal: c.subtotal
             }))
         };
 
         try {
-            // 2. Gunakan api.ts (Hapus pemanggilan axios langsung)
-            await api.post("/transaksi/", payload);
+            await api.post("/transaksi", payload);
 
-            alert(`Transaksi Berhasil Disimpan!\n\nNo Trx: ${noTrx}\nTotal: ${formatRupiah(totalTagihan)}\nKembalian: ${formatRupiah(kembalian)}\n\n(Struk Sedang Dicetak...)`);
+            alert(`Transaksi Berhasil Disimpan!\n\nNo Trx: ${noTrx}\nPelanggan: ${selectedMember!.name}\nTotal: ${formatRupiah(totalTagihan)}\nKembalian: ${formatRupiah(kembalian)}\n\n(Struk Sedang Dicetak...)`);
             window.location.reload();
         } catch (error: any) {
-            // Coba tangkap error dari Golang agar kita tahu pesan pastinya
             const errorMsg = error.response?.data?.error || error.message;
             console.error("Gagal menyimpan transaksi:", errorMsg);
             alert(`Transaksi Gagal: ${errorMsg}`);
@@ -245,7 +241,7 @@ export default function TransaksiOfflinePage() {
                     {/* PANEL IDENTITAS PELANGGAN */}
                     <div className="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm">
                         <h3 className="text-sm font-bold text-apomacy-dark flex items-center justify-between mb-5 border-b border-gray-100 pb-3">
-                            <span className="flex items-center gap-2"><User size={18} className="text-apomacy-primary" /> Identitas Pelanggan</span>
+                            <span className="flex items-center gap-2"><User size={18} className="text-apomacy-primary" /> Identitas Pelanggan (Wajib)</span>
                             {isLoadingData && <Loader2 size={16} className="animate-spin text-gray-400" />}
                         </h3>
 
@@ -256,12 +252,12 @@ export default function TransaksiOfflinePage() {
                             </div>
 
                             <div className="relative">
-                                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">Cari / Pilih Member (Opsional)</label>
+                                <label className="block text-[11px] font-bold uppercase tracking-wider text-red-500 mb-1.5">Cari / Pilih Member *</label>
                                 <div className="relative">
                                     <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                                     <input
                                         type="text"
-                                        placeholder={isLoadingData ? "Memuat data..." : "Ketik nama atau ketik 'Anonim'..."}
+                                        placeholder={isLoadingData ? "Memuat data..." : "Ketik Nama atau No. Telepon..."}
                                         value={memberSearch}
                                         disabled={isLoadingData}
                                         onChange={(e) => {
@@ -270,31 +266,34 @@ export default function TransaksiOfflinePage() {
                                             if (e.target.value === "") setSelectedMember(null);
                                         }}
                                         onFocus={() => setShowMemberDropdown(true)}
-                                        className="w-full rounded-xl bg-white py-2.5 pl-10 pr-4 text-sm text-gray-800 border border-gray-300 outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary transition-all disabled:bg-gray-50"
+                                        className={`w-full rounded-xl bg-white py-2.5 pl-10 pr-4 text-sm text-gray-800 border outline-none transition-all disabled:bg-gray-50 ${!selectedMember && memberSearch === "" ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500" : "border-gray-300 focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary"}`}
                                     />
                                 </div>
                                 {showMemberDropdown && memberSearch && (
                                     <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
-                                        {membersData.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase())).map(member => (
-                                            <li
-                                                key={member.id}
-                                                onClick={() => {
-                                                    setSelectedMember(member);
-                                                    setMemberSearch(member.name);
-                                                    setShowMemberDropdown(false);
-                                                }}
-                                                className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0"
-                                            >
-                                                <p className="font-bold text-gray-800">{member.name} <span className="text-blue-600 text-xs font-normal ml-1">(Member)</span></p>
-                                                <p className="text-xs text-gray-500">{member.id} - {member.phone}</p>
+                                        {membersData
+                                            // PENCARIAN GANDA: Filter berdasarkan nama ATAU nomor telepon
+                                            .filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()) || m.phone.includes(memberSearch))
+                                            .map(member => (
+                                                <li
+                                                    key={member.id}
+                                                    onClick={() => {
+                                                        setSelectedMember(member);
+                                                        setMemberSearch(`${member.name} (${member.phone})`);
+                                                        setShowMemberDropdown(false);
+                                                    }}
+                                                    className="px-4 py-2 text-sm hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0"
+                                                >
+                                                    <p className="font-bold text-gray-800">{member.name}</p>
+                                                    <p className="text-xs text-gray-500">{member.phone}</p>
+                                                </li>
+                                            ))}
+                                        {/* Opsi anonim dihapus sepenuhnya sesuai permintaan */}
+                                        {membersData.filter(m => m.name.toLowerCase().includes(memberSearch.toLowerCase()) || m.phone.includes(memberSearch)).length === 0 && (
+                                            <li className="px-4 py-3 text-sm text-center text-gray-500 italic">
+                                                Pelanggan tidak ditemukan. <br /> <span className="text-xs">Silakan daftarkan di menu Customer.</span>
                                             </li>
-                                        ))}
-                                        <li
-                                            onClick={() => { setSelectedMember(null); setMemberSearch("Anonim / Pembeli Umum"); setShowMemberDropdown(false); }}
-                                            className="px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer text-gray-600 italic"
-                                        >
-                                            Pilih sebagai Anonim / Umum
-                                        </li>
+                                        )}
                                     </ul>
                                 )}
                             </div>
@@ -511,7 +510,7 @@ export default function TransaksiOfflinePage() {
                                         type="button"
                                         onClick={handleCetakTransaksi}
                                         disabled={!isPaymentValid}
-                                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-apomacy-primary text-white text-sm font-bold shadow-md hover:bg-apomacy-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-white text-sm font-bold shadow-md transition-all ${!isPaymentValid ? "bg-gray-400 cursor-not-allowed" : "bg-apomacy-primary hover:bg-apomacy-dark"}`}
                                     >
                                         <Receipt size={18} /> Cetak & Simpan
                                     </button>

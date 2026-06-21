@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import {
     Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
-
+import Cookies from "js-cookie";
 interface TransaksiItem {
     name: string;
     qty: number;
@@ -78,43 +78,90 @@ export default function KasirDashboardPage() {
 
 
     useEffect(() => {
-        const fetchTransactions = async () => {
+        // Tambahkan parameter isInitial agar tahu ini load pertama atau polling
+        const fetchTransactions = async (isInitial = false) => {
             try {
-                setIsLoading(true);
-                const API_URL = "https://api.npoint.io/386af8416f1525ba8335";
+                // Hanya set loading (muter-muter) jika ini load pertama kali
+                if (isInitial) setIsLoading(true);
 
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error("Gagal memuat data ");
+                const API_URL = "/api/transaksi/all";
+                const token = Cookies.get('apomacy_token');
 
-                const data: TransaksiDashboard[] = await response.json();
-                setTransactions(data);
+                const response = await fetch(API_URL, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error("Gagal memuat data dari server");
+
+                const result = await response.json();
+                const rawData = result.data || [];
+
+                // --- PROSES MAPPING DATA ---
+                const newData: TransaksiDashboard[] = rawData.map((t: any) => {
+                    let formattedDate = t.tanggal_transaksi;
+                    try {
+                        const dateObj = new Date(t.tanggal_transaksi);
+                        formattedDate = new Intl.DateTimeFormat('id-ID', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                        }).format(dateObj);
+                    } catch (e) { }
+
+                    return {
+                        id: t.no_transaksi,
+                        type: t.id_user && t.id_user !== 0 ? "Online" : "Offline",
+                        customerName: t.nama_customer || "Anonim",
+                        subtotal: t.subtotal,
+                        paymentMethod: t.metode_pembayaran || "-",
+                        status: t.status || "Selesai",
+                        date: formattedDate,
+                        items: (t.details || t.Details || []).map((d: any) => ({
+                            name: d.nama_obat,
+                            qty: d.qty,
+                            price: d.harga_satuan
+                        }))
+                    };
+                });
+
+                // Set state dan munculkan notifikasi jika ada data baru
+                setTransactions(prevTransactions => {
+                    if (prevTransactions.length > 0 && newData.length > 0) {
+                        const existingIds = new Set(prevTransactions.map(t => t.id));
+                        const incomingNewOrders = newData.filter(t => !existingIds.has(t.id));
+
+                        if (incomingNewOrders.length > 0) {
+                            // Ini notifikasi agar kamu tahu ada transaksi masuk tanpa layar berkedip!
+                            setToast({
+                                visible: true,
+                                message: `Ada ${incomingNewOrders.length} pesanan baru masuk!`,
+                                id: incomingNewOrders[0].id
+                            });
+                            setTimeout(() => setToast({ visible: false, message: "", id: "" }), 5000);
+                        }
+                    }
+                    return newData;
+                });
 
             } catch (error) {
-                console.error("Koneksi API  Error:", error);
+                console.error("Koneksi API Error:", error);
             } finally {
-                setIsLoading(false);
+                // Matikan loading HANYA JIKA ini adalah proses load pertama
+                if (isInitial) setIsLoading(false);
             }
         };
 
-        fetchTransactions();
+        // 1. Panggilan Pertama (Dengan Loading Spinner)
+        fetchTransactions(true);
 
-        const timer = setTimeout(() => {
-            const newOrder: TransaksiDashboard = {
-                id: "TRX-099",
-                type: "Online",
-                customerName: "Ahmad Fauzi (Gojek)",
-                items: [{ name: "Tolak Angin Cair Box", qty: 1, price: 45000 }],
-                subtotal: 45000,
-                paymentMethod: "QRIS",
-                status: "Obat sedang Disiapkan",
-                date: "2026-05-19 14:35",
-            };
-            setTransactions(prev => [newOrder, ...prev]);
-            setToast({ visible: true, message: "Pesanan Online baru masuk! Obat perlu disiapkan.", id: "TRX-099" });
-            setTimeout(() => setToast({ visible: false, message: "", id: "" }), 5000);
-        }, 3000);
+        // 2. POLLING: Panggilan selanjutnya setiap 5 detik (Tanpa Loading Spinner / Silent)
+        const intervalId = setInterval(() => {
+            fetchTransactions(false);
+        }, 5000);
 
-        return () => clearTimeout(timer);
+        return () => clearInterval(intervalId);
     }, []);
 
     const formatRupiah = (num: number) => "Rp " + num.toLocaleString("id-ID");
@@ -276,8 +323,10 @@ export default function KasirDashboardPage() {
                     </p>
                 </div>
 
-                <div className="w-full border border-outline-variant rounded-xl overflow-hidden bg-white shadow-xs flex-1 min-h-0">
-                    <div className="overflow-y-auto overflow-x-auto max-h-[400px] md:max-h-[580px] block w-full scrollbar-thin scrollbar-thumb-gray-300 relative h-full">
+                <div className="w-full border border-outline-variant rounded-xl overflow-hidden bg-white shadow-xs flex-1 flex flex-col min-h-0">
+
+                    {/* HAPUS max-h-[...px] dan block, ganti dengan flex-1 */}
+                    <div className="overflow-y-auto overflow-x-auto w-full flex-1 scrollbar-thin scrollbar-thumb-gray-300 relative">
 
                         {isLoading ? (
                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 gap-2 z-50 min-h-[300px]">
@@ -285,44 +334,71 @@ export default function KasirDashboardPage() {
                                 <p className="text-xs md:text-sm font-bold text-gray-500 text-center px-4">Mengkoneksikan & Memproses Data </p>
                             </div>
                         ) : (
-                            <table className="w-full text-left border-collapse min-w-[800px] table-fixed">
-                                <thead className="sticky top-0 z-20 bg-gray-50 border-b border-outline-variant shadow-xs">
-                                    <tr className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                                        <th className="px-4 py-3 bg-gray-50 w-[100px] whitespace-nowrap">No Trx</th>
-                                        <th className="px-4 py-3 bg-gray-50 w-[130px] whitespace-nowrap">Waktu</th>
-                                        <th className="px-4 py-3 bg-gray-50 w-[90px] text-center whitespace-nowrap">Jenis</th>
-                                        <th className="px-4 py-3 bg-gray-50 w-[160px] whitespace-nowrap">Nama Pemesan</th>
-                                        <th className="px-4 py-3 bg-gray-50 w-[110px] text-center whitespace-nowrap">Data Obat</th>
-                                        <th className="px-4 py-3 bg-gray-50 w-[120px] text-right whitespace-nowrap">Subtotal</th>
-                                        <th className="px-4 py-3 bg-gray-50 w-[240px] whitespace-nowrap">Status Pesanan</th>
+                            <table className="w-full text-left border-collapse min-w-[1000px]">
+                                {/* HEADER TABEL */}
+                                <thead className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200">
+                                    <tr className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                                        <th className="px-6 py-4 w-[15%] whitespace-nowrap">No Trx</th>
+                                        <th className="px-6 py-4 w-[15%] whitespace-nowrap">Waktu</th>
+                                        <th className="px-6 py-4 w-[10%] text-center whitespace-nowrap">Jenis</th>
+                                        <th className="px-6 py-4 w-[22%] whitespace-nowrap">Nama Pemesan</th>
+                                        <th className="px-6 py-4 w-[8%] text-center whitespace-nowrap">Data Obat</th>
+                                        <th className="px-6 py-4 w-[14%] text-right whitespace-nowrap">Subtotal</th>
+                                        <th className="px-6 py-4 w-[16%] whitespace-nowrap">Status Pesanan</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-outline-variant text-sm text-on-surface bg-white">
+
+                                {/* BODY TABEL */}
+                                <tbody className="divide-y divide-gray-100 text-sm text-gray-700 bg-white">
                                     {displayedData.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="py-20 text-center text-gray-400">
-                                                <CheckCircle2 size={40} className="mx-auto mb-3 opacity-30" />
-                                                <p className="font-bold text-sm">Tidak ada data di tab ini.</p>
+                                            <td colSpan={7} className="py-24 text-center text-gray-400">
+                                                <CheckCircle2 size={48} className="mx-auto mb-4 opacity-30" />
+                                                <p className="font-bold text-base">Tidak ada data di tab ini.</p>
                                             </td>
                                         </tr>
                                     ) : (
                                         displayedData.map(trx => (
-                                            <tr key={trx.id} className={`hover:bg-surface-container-low transition-colors ${trx.status === "Obat sedang Disiapkan" || trx.status === "Pesanan Baru" ? "bg-amber-50/30" : ""}`}>
-                                                <td className="px-4 py-3.5 text-apomacy-primary font-mono text-[12px] font-bold whitespace-nowrap">{trx.id}</td>
-                                                <td className="px-4 py-3.5 text-on-surface-variant font-mono text-[11px] whitespace-nowrap">{trx.date}</td>
-                                                <td className="px-4 py-3.5 text-center">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${trx.type === "Online" ? "bg-indigo-50 text-indigo-600" : "bg-gray-100 text-gray-600"}`}>
+                                            <tr key={trx.id} className={`hover:bg-blue-50/50 transition-colors ${trx.status === "Obat sedang Disiapkan" || trx.status === "Pesanan Baru" ? "bg-amber-50/30" : ""}`}>
+
+                                                {/* Kolom No Trx */}
+                                                <td className="px-6 py-4 font-mono text-[16px] font-bold text-apomacy-primary whitespace-nowrap">
+                                                    {trx.id}
+                                                </td>
+
+                                                {/* Kolom Waktu */}
+                                                <td className="px-6 py-4 text-[16px] text-gray-600 whitespace-nowrap">
+                                                    {trx.date}
+                                                </td>
+
+                                                {/* Kolom Jenis (Online/Offline) */}
+                                                <td className="px-2 py-4 text-center">
+                                                    <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${trx.type === "Online" ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
                                                         {trx.type}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3.5 font-semibold text-apomacy-dark text-[13px] truncate">{trx.customerName}</td>
-                                                <td className="px-4 py-3.5 text-center">
-                                                    <button type="button" onClick={() => setSelectedDetail(trx)} className="inline-flex items-center gap-1.5 bg-apomacy-ice text-apomacy-primary hover:bg-apomacy-primary hover:text-white px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-xs whitespace-nowrap">
-                                                        <Eye size={14} /> Cek Obat
+
+                                                {/* Kolom Nama Pemesan */}
+                                                <td className="px-6 py-4 font-semibold text-gray-800 text-[16px] truncate max-w-[200px]">
+                                                    {trx.customerName}
+                                                </td>
+
+                                                {/* Kolom Aksi Cek Obat */}
+                                                <td className="px-6 py-4 text-center">
+                                                    <button type="button" onClick={() => setSelectedDetail(trx)} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-lg text-[12px] font-bold transition-all shadow-sm whitespace-nowrap">
+                                                        <Eye size={16} /> Cek Obat
                                                     </button>
                                                 </td>
-                                                <td className="px-4 py-3.5 font-mono text-[12px] font-bold text-apomacy-teal text-right whitespace-nowrap">{formatRupiah(trx.subtotal)}</td>
-                                                <td className="px-4 py-3.5 text-left">{renderAction(trx)}</td>
+
+                                                {/* Kolom Subtotal */}
+                                                <td className="px-6 py-4 font-mono text-[16px] font-bold text-emerald-600 text-right whitespace-nowrap">
+                                                    {formatRupiah(trx.subtotal)}
+                                                </td>
+
+                                                {/* Kolom Status Aksi */}
+                                                <td className="px-6 py-4 text-left">
+                                                    {renderAction(trx)}
+                                                </td>
                                             </tr>
                                         ))
                                     )}

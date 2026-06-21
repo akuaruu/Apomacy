@@ -39,13 +39,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         }
     };
 
-    const handleAddToCart = () => {
+    const handleAddToCart_related = (relProduct: ExtendedProduct) => {
+        if (relProduct) {
+            setQuantity(1)
+
+            addToCart(relProduct as any);
+        }
+
+    }
+
+    const handleAddToCart = (product: ExtendedProduct) => {
+
         if (product) {
             for (let i = 0; i < quantity; i++) {
                 addToCart(product as any);
             }
         }
     };
+
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -72,6 +83,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         "Komposisi": data.komposisi
                     }
                 };
+
                 setProduct(detail);
 
                 const relatedRes = await api.get("/obat");
@@ -218,11 +230,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                     </button>
                                 </div>
                                 <button
-                                    onClick={handleAddToCart}
+                                    onClick={() => handleAddToCart(product)}
                                     disabled={!product.inStock}
                                     className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-apomacy-primary px-8 font-bold text-white transition-all hover:bg-apomacy-dark active:scale-95 disabled:cursor-not-allowed disabled:bg-outline-variant"
                                 >
-                                    Add to Cart
+                                    Tambahkan ke Keranjang
                                 </button>
                             </div>
                         </div>
@@ -236,7 +248,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                     <ProductCard
                                         key={relProduct.id}
                                         product={relProduct}
-                                        onAddToCart={addToCart as any}
+                                        onAddToCart={() => handleAddToCart_related(relProduct)}
                                     />
                                 ))}
                             </div>

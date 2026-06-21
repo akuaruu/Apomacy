@@ -81,8 +81,8 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 	return tokenString, nil
 }
 
-func (u *userUsecase) GetProfile(ctx context.Context, id int) (*model.User, error) {
-	return u.repo.GetByID(ctx, id)
+func (u *userUsecase) GetProfile(ctx context.Context, id int) (*model.UserProfile, error) {
+	return u.repo.GetProfile(ctx, id)
 }
 
 func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error) {
@@ -127,4 +127,17 @@ func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileByte
 	}
 
 	return publicURL, nil
+}
+
+func (u *userUsecase) UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error {
+	// Validasi dasar
+	if userID <= 0 {
+		return errors.New("ID user tidak valid")
+	}
+	if nama == "" {
+		return errors.New("nama lengkap tidak boleh kosong")
+	}
+
+	// Teruskan ke repository untuk eksekusi query
+	return u.repo.UpdateProfileText(ctx, userID, nama, noTelp, tglLahir, alamat)
 }

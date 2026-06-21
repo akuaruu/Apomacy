@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -25,13 +26,17 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	// Validasi dasar di tingkat handler
-	if req.IDUser == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID User (Kasir) wajib diisi"})
+	// Ambil id_user dari JWT context (di-set oleh RequireAuth)  ← ganti blok validasi lama
+	idUser, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
 		return
 	}
+	req.IDUser = int(idUser.(float64))
 
 	if err := h.usecase.Checkout(c.Request.Context(), &req); err != nil {
+		// tambah log ini sementara
+		fmt.Printf("[ERROR] Checkout gagal: %+v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses transaksi", "detail": err.Error()})
 		return
 	}
@@ -78,4 +83,39 @@ func (h *TransaksiHandler) Batalkan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Status transaksi berhasil diubah menjadi Batal"})
+}
+
+func (h *TransaksiHandler) GetRiwayatUser(c *gin.Context) {
+	idUserRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+	idUserFloat, ok := idUserRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+
+	data, err := h.usecase.GetRiwayatByUser(c.Request.Context(), int(idUserFloat))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil riwayat transaksi", "detail": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": data})
+}
+
+// GetAll mengambil seluruh data transaksi untuk Dashboard Kasir / Admin
+func (h *TransaksiHandler) GetAll(c *gin.Context) {
+	transactions, err := h.usecase.GetAll(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil seluruh data transaksi", "detail": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Berhasil menarik data transaksi",
+		"data":    transactions,
+	})
 }

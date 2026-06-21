@@ -43,7 +43,12 @@ func (r *customerRepository) Create(ctx context.Context, customer *model.Custome
 }
 
 func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Customer, error) {
-	query := `SELECT * FROM customer WHERE id_customer = $1`
+	query := `
+		SELECT id_customer, no_member, nama_customer, no_telp, alamat, 
+		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at 
+		FROM customer 
+		WHERE id_customer = $1
+	`
 
 	var c model.Customer
 	err := r.db.QueryRow(ctx, query, id).Scan(
@@ -59,7 +64,12 @@ func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Custom
 }
 
 func (r *customerRepository) GetAll(ctx context.Context) ([]model.Customer, error) {
-	query := `SELECT * FROM customer ORDER BY nama_customer ASC`
+	query := `
+		SELECT id_customer, no_member, nama_customer, no_telp, alamat, 
+		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at 
+		FROM customer 
+		ORDER BY nama_customer ASC
+	`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -87,12 +97,24 @@ func (r *customerRepository) GetAll(ctx context.Context) ([]model.Customer, erro
 func (r *customerRepository) Update(ctx context.Context, customer *model.Customer) error {
 	query := `
 		UPDATE customer SET 
-			nama_customer = $1, no_telp = $2, alamat = $3, email = $4
-		WHERE id_customer = $5 RETURNING updated_at
+			nama_customer = $1, 
+			no_telp = $2, 
+			alamat = $3, 
+			email = $4,
+			tanggal_lahir = $5,
+			jenis_kelamin = $6
+		WHERE id_customer = $7 
+		RETURNING updated_at
 	`
 
 	err := r.db.QueryRow(ctx, query,
-		customer.NamaCustomer, customer.NoTelp, customer.Alamat, customer.Email, customer.ID,
+		customer.NamaCustomer,
+		customer.NoTelp,
+		customer.Alamat,
+		customer.Email,
+		customer.TanggalLahir,
+		customer.JenisKelamin,
+		customer.ID,
 	).Scan(&customer.UpdatedAt)
 
 	if err != nil {

@@ -5,6 +5,7 @@ import Navbar from "@/components/ui/Navbar";
 import NavbarSingkat from "@/components/ui/NavbarSingkat";
 import NavbarLanding from "@/components/ui/NavbarLanding";
 import { useCart } from "@/context/CartContext";
+import path from "path";
 
 export default function NavbarWrapper() {
     const pathname = usePathname();
@@ -19,11 +20,11 @@ export default function NavbarWrapper() {
         pathname === "/login" ||
         pathname === "/register" ||
         pathname.startsWith("/kasir/member") ||
-        pathname.startsWith("/kasir")
+        pathname.startsWith("/kasir") ||
+        pathname.startsWith("/pembayaran")
     ) {
         return null;
     }
-
 
 
     // cuman gunain navbar singkat uuntuk keranjang dan checkout
@@ -31,8 +32,11 @@ export default function NavbarWrapper() {
         return <NavbarSingkat />;
     }
 
-    // cuman gunain navbar singkat untuk dasbor pengguna
-    if (pathname.startsWith("/dasbor")) {
+    // Client side
+    if (
+        pathname.startsWith("/dasbor") ||
+        pathname.startsWith("/pembayaran")
+    ) {
         return null
     }
 

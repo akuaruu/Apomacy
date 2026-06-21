@@ -1,10 +1,9 @@
 package http
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
+	"github.com/akuaruu/apomacy/backend/internal/middleware"
 	"github.com/akuaruu/apomacy/backend/internal/repository"
 	"github.com/akuaruu/apomacy/backend/internal/usecase"
 	"github.com/gin-contrib/cors"
@@ -13,23 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// SetupRouter adalah satu-satunya tempat untuk Dependency Injection dan Routing
 func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
-	// Set Gin ke mode release untuk production
-	// gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
 
-	// 1. Global Middleware
+	// 1. CORS Middleware
 	r.Use(cors.New(cors.Config{
-		AllowOriginFunc: func(origin string) bool {
-			// Izinkan semua subdomain vercel.app milik project apomacy
-			return origin == "https://apomacy.vercel.app" ||
-				strings.HasSuffix(origin, "-aruu.vercel.app") ||
-				origin == "http://localhost:3000" ||
-				origin == "http://localhost:5173"
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"https://apomacy.vercel.app",
 		},
-
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -37,56 +30,56 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// 2. Dependency Injection Setup
-	// Domain: User
+	// 2. Dependency Injection
 	userRepo := repository.NewUserRepository(dbPool)
 	userUsecase := usecase.NewUserUsecase(userRepo)
 	userHandler := NewUserHandler(userUsecase)
 
-	// Domain: Obat
 	obatRepo := repository.NewObatRepository(dbPool)
 	obatUsecase := usecase.NewObatUsecase(obatRepo)
 	obatHandler := NewObatHandler(obatUsecase)
 
-	// Domain: Customer
-	// Catatan: Pastikan CustomerRepository dan CustomerUsecase sudah kamu buat ya!
 	customerRepo := repository.NewCustomerRepository(dbPool)
 	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
 	customerHandler := NewCustomerHandler(customerUsecase)
 
-	//Domain: Restock
 	restockRepo := repository.NewRestockRepository(dbPool)
 	restockUsecase := usecase.NewRestockUsecase(restockRepo)
 	restockHandler := NewRestockHandler(restockUsecase)
 
-	//Domain Supplier
 	supplierRepo := repository.NewSupplierRepository(dbPool)
 	supplierUsecase := usecase.NewSupplierUsecase(supplierRepo)
 	supplierHandler := NewSupplierHandler(supplierUsecase)
 
-	// Domain: payment
-	paymentUsecase := usecase.NewPaymentUsecase()
-	paymentHandler := NewPaymentHandler(paymentUsecase)
-
-	//Domain: transaksi
 	transaksiRepo := repository.NewTransaksiRepository(dbPool)
 	transaksiUsecase := usecase.NewTransaksiUsecase(transaksiRepo)
 	transaksiHandler := NewTransaksiHandler(transaksiUsecase)
-	//migration temporary
+
+	paymentUsecase := usecase.NewPaymentUsecase()
+	paymentHandler := NewPaymentHandler(paymentUsecase, transaksiUsecase)
+
 	migrationHandler := NewMigrationHandler(dbPool)
 
-	// 3. Routing Setup
+	// 3. Routing
 	api := r.Group("/api")
 	{
-		// Modul Auth
-		auth := api.Group("/users")
+		// --- AREA PUBLIK (Tanpa Middleware Auth) ---
+		// Bebas diakses siapa saja untuk mendaftar atau mengambil token
+		publicUsers := api.Group("/users")
 		{
-			auth.POST("/register", userHandler.Register)
-			auth.POST("/login", userHandler.Login)
-			auth.PUT("/:id/foto", userHandler.UploadFotoProfil)
+			publicUsers.POST("/register", userHandler.Register)
+			publicUsers.POST("/login", userHandler.Login)
 		}
 
-		// Modul Obat
+		// -AREA PRIVAT (Wajib Login/Bawa Token)
+		protectedUsers := api.Group("/users")
+		protectedUsers.Use(middleware.RequireAuth())
+		{
+			protectedUsers.PUT("/foto", userHandler.UploadFotoProfil)
+			protectedUsers.PUT("/profile", userHandler.Register)
+			protectedUsers.GET("/profile", userHandler.GetProfile)
+		}
+
 		obat := api.Group("/obat")
 		{
 			obat.POST("", obatHandler.CreateObat)
@@ -95,7 +88,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			obat.PUT("/:id", obatHandler.UpdateObat)
 			obat.DELETE("/:id", obatHandler.DeleteObat)
 		}
-		// Modul Customer
+
 		customer := api.Group("/customer")
 		{
 			customer.POST("", customerHandler.CreateCustomer)
@@ -115,28 +108,25 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
 		}
 
-		//Modul transaksi
 		transaksi := api.Group("/transaksi")
+		transaksi.Use(middleware.RequireAuth())
 		{
 			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
+			transaksi.GET("", transaksiHandler.GetRiwayatUser)
+			transaksi.GET("/all", transaksiHandler.GetAll)
 		}
 
-		// Modul Payment
 		payment := api.Group("/checkout")
 		{
 			payment.POST("", paymentHandler.Checkout)
+			// Endpoint untuk menerima notifikasi dari Midtrans
+			payment.POST("/notification", paymentHandler.WebhookNotification)
 		}
 
-		api.GET("/migrate-images", migrationHandler.RunImageMigration)
 		api.POST("/restock", restockHandler.CreateRestock)
-
-	}
-
-	for _, route := range r.Routes() {
-		fmt.Printf("Rute Terdaftar: %s %s\n", route.Method, route.Path)
-		//debug gwah den
+		api.GET("/migrate-images", migrationHandler.RunImageMigration)
 	}
 
 	return r

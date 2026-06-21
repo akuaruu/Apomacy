@@ -107,7 +107,7 @@ function KatalogContent() {
     }, [apiProducts, currentPage]);
 
     return (
-        <main className="pb-20 max-w-[1400px] mx-auto px-6">
+        <main className="mt-8 pb-20 max-w-[1400px] mx-auto px-6">
             {!isFiltering && (
                 <PromoBanner
                     badge="-20% OFF WEEKEND SALE"
@@ -171,14 +171,14 @@ function KatalogContent() {
                                 <button
                                     disabled={currentPage === 1}
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                    className="px-5 py-2.5 border border-outline-variant rounded-lg font-bold text-sm text-apomacy-dark transition-colors hover:bg-apomacy-bg disabled:opacity-50 disabled:hover:bg-transparent"
+                                    className="px-5 py-2.5 border border-outline-variant rounded-lg font-bold text-sm text-apomacy-dark transition-all hover:bg-apomacy-primary hover:text-white disabled:opacity-50 disabled:hover:bg-transparent"
                                 >
                                     &larr; Prev
                                 </button>
                                 <button
                                     disabled={currentPage === totalPages}
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    className="px-5 py-2.5 border border-outline-variant rounded-lg font-bold text-sm text-apomacy-dark transition-colors hover:bg-apomacy-bg disabled:opacity-50 disabled:hover:bg-transparent"
+                                    className="px-5 py-2.5 border border-outline-variant rounded-lg font-bold text-sm text-apomacy-dark transition-all hover:bg-apomacy-primary hover:text-white disabled:opacity-50 disabled:hover:bg-transparent"
                                 >
                                     Next &rarr;
                                 </button>

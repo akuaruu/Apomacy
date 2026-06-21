@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
@@ -86,13 +85,20 @@ func (h *UserHandler) Login(c *gin.Context) {
 }
 
 func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
-	// 1. Tangkap ID User (Bisa dari parameter URL, idealnya dari claim JWT JWT Middleware)
-	idParam := c.Param("id")
-	userID, err := strconv.Atoi(idParam)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID user tidak valid"})
+	// 1. Tangkap ID User langsung dari claim JWT Middleware (Aman & Dinamis)
+	userIDRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
 		return
 	}
+
+	// Konversi tipe data float64 dari JWT ke integer
+	userIDFloat, ok := userIDRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
+		return
+	}
+	userID := int(userIDFloat)
 
 	// 2. Tangkap file dengan key "foto" dari form-data
 	file, header, err := c.Request.FormFile("foto")
@@ -125,4 +131,77 @@ func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
 		"message": "Foto profil berhasil diperbarui",
 		"url":     fotoURL,
 	})
+}
+
+// GetProfile menangani request pengambilan data gabungan profil
+func (h *UserHandler) GetProfile(c *gin.Context) {
+	// 1. Tangkap ID User dari JWT Middleware yang sudah diamankan
+	userIDRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
+		return
+	}
+
+	// 2. Konversi tipe data (JWT id_user biasanya dibaca sebagai float64 oleh golang)
+	userIDFloat, ok := userIDRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
+		return
+	}
+	userID := int(userIDFloat)
+
+	// 3. Panggil usecase
+	profile, err := h.usecase.GetProfile(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data profil"})
+		return
+	}
+
+	// 4. Kirim response sesuai harapan Frontend
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Berhasil memuat profil",
+		"data":    profile,
+	})
+}
+
+// UpdateProfile menangani request untuk mengubah data teks profil user
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	// 1. Ambil ID User dari token JWT (Aman, tidak bisa dipalsukan)
+	userIDRaw, exists := c.Get("id_user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
+		return
+	}
+
+	// Konversi float64 (bawaan JWT) ke int
+	userIDFloat, ok := userIDRaw.(float64)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
+		return
+	}
+	userID := int(userIDFloat)
+
+	// 2. Buat struct penangkap JSON yang datang dari Frontend (page.tsx)
+	var req struct {
+		NamaLengkap  string `json:"nama_lengkap"`
+		NoTelp       string `json:"no_telp"`
+		TanggalLahir string `json:"tanggal_lahir"`
+		Alamat       string `json:"alamat"`
+	}
+
+	// 3. Pasangkan (Bind) data JSON ke dalam struct
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid: " + err.Error()})
+		return
+	}
+
+	// 4. Panggil Usecase untuk mengeksekusi logika dan simpan ke DB
+	err := h.usecase.UpdateProfileText(c.Request.Context(), userID, req.NamaLengkap, req.NoTelp, req.TanggalLahir, req.Alamat)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan profil: " + err.Error()})
+		return
+	}
+
+	// 5. Kembalikan response 200 OK ke frontend
+	c.JSON(http.StatusOK, gin.H{"message": "Data profil berhasil diperbarui"})
 }
