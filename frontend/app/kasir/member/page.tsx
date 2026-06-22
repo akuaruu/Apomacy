@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User, RefreshCw
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation"; // Ditambahkan untuk fungsi redirect
+import {
+    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User, RefreshCw,
+    Users, ShieldCheck, ShieldAlert, Phone, Cake, BadgeCheck
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
 
 interface Member {
     id: number;
@@ -13,18 +17,24 @@ interface Member {
     name: string;
     gender: string;
     phone: string;
-    email: string;
-    address: string;
-    birthDate: string;
-    joinDate: string;
+    age: number | string;
+    rawBirthDate: string;
+    address: string; 
+    email: string | null;
 }
 
+type Role = "admin" | "kasir";
+
 export default function MemberPage() {
+    const router = useRouter();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
+
+    // State untuk menyimpan Role (Admin / Kasir)
+    const [userRole, setUserRole] = useState<Role>("kasir");
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
@@ -37,324 +47,487 @@ export default function MemberPage() {
     });
 
     const [formData, setFormData] = useState({
-        id: "", noMember: "", name: "", phone: "", email: "", address: "", gender: "Laki-laki", birthDate: ""
+        noMember: "",
+        name: "",
+        gender: "L",
+        phone: "",
+        age: ""
     });
 
-    // 1. FETCH DATA (DENGAN PENGAMANAN ID MEMBER)
-    const fetchMembers = async () => {
+    const canDelete = userRole === "admin";
+
+    // 1. Fetching Role User & Data Member
+    useEffect(() => {
+        // PERBAIKAN: Menggunakan nama cookie yang benar "apomacy_token"
+        const token = Cookies.get("apomacy_token"); 
+        
+        if (!token) {
+            router.replace("/login"); // Lempar ke login jika tidak ada token
+            return;
+        }
+
         try {
-            setLoading(true);
-            const response = await api.get("/customer");
-            const data = response.data?.data || response.data || [];
+            const decoded: any = jwtDecode(token);
+            const role = (decoded.role || decoded.Role || decoded.role_name || "").toLowerCase();
             
-            const mappedMembers = data.map((item: any) => ({
-                id: item.id_customer,
-                // Fallback: Jika no_member dari DB kosong, gunakan id_customer sebagai MBR-XXX
-                noMember: item.no_member || `MBR-${String(item.id_customer).padStart(3, '0')}`, 
-                name: item.nama_customer,
-                gender: item.jenis_kelamin === "P" ? "Perempuan" : "Laki-laki",
-                phone: item.no_telp,
-                email: item.email || "",
-                address: item.alamat || "",
-                birthDate: item.tanggal_lahir ? item.tanggal_lahir.split("T")[0] : "",
-                joinDate: item.tanggal_daftar ? item.tanggal_daftar.split("T")[0] : ""
-            }));
-            
-            setMembers(mappedMembers);
-            if (mappedMembers.length > 0 && mode === "view") {
-                initSelectMember(mappedMembers[0]);
-            } else if (mappedMembers.length === 0) {
-                handleClearSelection();
+            // Set role jadi admin jika di dalam token ada kata 'admin'
+            if (role.includes("admin")) {
+                setUserRole("admin");
+            } else {
+                setUserRole("kasir");
             }
         } catch (error) {
-            console.error("Gagal mengambil data member:", error);
+            console.error("Gagal membaca token:", error);
+        }
+        
+        fetchMembers();
+    }, [router]);
+
+    const fetchMembers = async () => {
+        setLoading(true);
+        try {
+            const response = await api.get('/customer');
+            const rawData = response.data?.data || response.data || [];
+
+            const mappedData = rawData.map((item: any) => {
+                let calculatedAge: number | string = "";
+
+                if (item.tanggal_lahir) {
+                    const birthYear = new Date(item.tanggal_lahir).getFullYear();
+                    const currentYear = new Date().getFullYear();
+                    calculatedAge = currentYear - birthYear;
+                }
+
+                return {
+                    id: item.id_customer,
+                    noMember: item.no_member || `MBR-${String(item.id_customer).padStart(3, '0')}`,
+                    name: item.nama_customer,
+                    gender: item.jenis_kelamin || "L",
+                    phone: item.no_telp || "-",
+                    age: calculatedAge,
+                    rawBirthDate: item.tanggal_lahir || "",
+                    address: item.alamat || "-", 
+                    email: item.email || null
+                };
+            });
+
+            setMembers(mappedData);
+        } catch (error) {
+            console.error("Gagal mengambil data:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchMembers();
-    }, []);
+    
+    const handleAddClick = () => {
+        setMode("add");
 
-    const initSelectMember = (member: Member) => {
-        setSelectedMember(member);
-        setMode("view");
+       
+        let nextSequence = 1;
+        if (members.length > 0) {
+            
+            const numbers = members.map(m => {
+                const match = m.noMember.match(/\d+/);
+                return match ? parseInt(match[0], 10) : 0;
+            });
+            // Cari angka terbesar, lalu tambah 1
+            nextSequence = Math.max(...numbers) + 1;
+        }
+        
+        // Format menjadi 3 digit (contoh: MBR-005)
+        const generatedNo = `MBR-${String(nextSequence).padStart(3, '0')}`;
+
         setFormData({
-            id: member.id.toString(),
+            noMember: generatedNo, 
+            name: "",
+            gender: "L",
+            phone: "",
+            age: ""
+        });
+        setSelectedMember(null);
+    };
+
+    const handleRowClick = (member: Member) => {
+        setMode("view");
+        setSelectedMember(member);
+    };
+
+    const handleEditClick = (member: Member) => {
+        setMode("edit");
+        setSelectedMember(member);
+        setFormData({
             noMember: member.noMember,
-            name: member.name, phone: member.phone, email: member.email,
-            address: member.address, gender: member.gender, birthDate: member.birthDate
+            name: member.name,
+            gender: member.gender,
+            phone: member.phone,
+            age: member.age.toString()
         });
     };
 
-    const handleClearSelection = () => {
-        setSelectedMember(null);
-        setMode("view");
-        setFormData({ id: "", noMember: "", name: "", phone: "", email: "", address: "", gender: "Laki-laki", birthDate: "" });
-    };
+    const handleDeleteClick = (member: Member) => {
+        if (!canDelete) return;
 
- const handleAddClick = async () => {
-    setMode("add");
-    setSelectedMember(null);
-    
-    
-    const nextSequence = members.length + 1;
-    
-    const generatedNo = `MBR-${String(nextSequence).padStart(3, '0')}`;
-    
-    setFormData({ 
-        id: "", 
-        noMember: generatedNo, 
-        name: "", 
-        phone: "", 
-        email: "", 
-        address: "", 
-        gender: "Laki-laki", 
-        birthDate: "" 
-    });
-};
-
-    const handleEditClick = () => { if (selectedMember) setMode("edit"); };
-
-    const handleCancelClick = () => {
-        setMode("view");
-        if (selectedMember) initSelectMember(selectedMember);
-        else if (members.length > 0) initSelectMember(members[0]);
-        else handleClearSelection();
-    };
-
-    // 2. DELETE ACTION
-    const handleDeleteClick = () => {
-        if (!selectedMember) return;
         setConfirmModal({
             isOpen: true,
             type: "hapus",
-            title: "Hapus Data Member",
-            message: `Data member "${selectedMember.name}" akan dihapus permanen.`,
+            title: "Hapus Member",
+            message: `Apakah Anda yakin ingin menghapus member ${member.name}?`,
             action: async () => {
                 try {
-                    await api.delete(`/customer/${selectedMember.id}`);
-                    setSelectedMember(null);
+                    await api.delete(`/customer/${member.id}`);
+                    fetchMembers();
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
-                    await fetchMembers();
-                } catch (error: any) {
-                    console.error("Error Detail:", error);
-                    alert("Gagal menghapus! Pastikan API DELETE sudah dibuat di backend Golang.");
+                    setSelectedMember(null);
+                } catch (error) {
+                    console.error("Gagal menghapus:", error);
                 }
-            },
+            }
         });
     };
 
-    // 3. SAVE ACTION
-    const handleSaveSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
-        const isAdd = mode === "add";
+
+        if (!formData.age || isNaN(Number(formData.age))) {
+            alert("Umur harus berupa angka valid!");
+            return;
+        }
+
+        const actionText = mode === "add" ? "menambahkan" : "memperbarui";
+
         setConfirmModal({
             isOpen: true,
-            type: isAdd ? "tambah" : "edit",
-            title: isAdd ? "Tambah Member Baru" : "Simpan Perubahan Data",
-            message: isAdd ? `Data "${formData.name}" akan disimpan.` : `Perubahan data "${formData.name}" akan diperbarui.`,
+            type: mode === "add" ? "tambah" : "edit",
+            title: mode === "add" ? "Tambah Member Baru" : "Simpan Perubahan",
+            message: `Apakah Anda yakin ingin ${actionText} data member ini?`,
             action: async () => {
                 try {
-                    const genderValue = formData.gender === "Perempuan" ? "P" : "L";
-                    const formattedDate = formData.birthDate ? `${formData.birthDate}T00:00:00Z` : null;
+                    const birthYear = new Date().getFullYear() - Number(formData.age);
+                    const birthDatePayload = `${birthYear}-01-01T00:00:00Z`;
 
                     const payload = {
                         no_member: formData.noMember, 
                         nama_customer: formData.name,
-                        jenis_kelamin: genderValue,
                         no_telp: formData.phone,
-                        email: formData.email.trim() !== "" ? formData.email : null,
-                        alamat: formData.address,
-                        tanggal_lahir: formattedDate
+                        jenis_kelamin: formData.gender,
+                        tanggal_lahir: birthDatePayload,
+                        alamat: selectedMember?.address || "-", 
+                        email: selectedMember?.email || null 
                     };
 
-                    if (isAdd) {
-                        await api.post("/customer", payload);
-                    } else if (!isAdd && selectedMember) {
+                    if (mode === "add") {
+                        await api.post('/customer', payload);
+                    } else if (mode === "edit" && selectedMember) {
                         await api.put(`/customer/${selectedMember.id}`, payload);
                     }
-                    
+
+                    fetchMembers();
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
-                    await fetchMembers(); 
-                } catch (error: any) {
-                    console.error("Gagal menyimpan data:", error);
-                    alert(`Gagal menyimpan data! Error: ${error.response?.data?.error || "500 Internal Server Error"}`);
+                } catch (error) {
+                    console.error("Gagal menyimpan:", error);
                 }
-            },
+            }
         });
     };
 
-    const closeModal = () => setConfirmModal({ ...confirmModal, isOpen: false });
-
-    const filteredMembers = members.filter(member =>
-        member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.phone.includes(searchQuery) ||
-        member.noMember.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredMembers = useMemo(() => {
+        const q = searchQuery.toLowerCase();
+        return members.filter(m =>
+            m.name.toLowerCase().includes(q) ||
+            m.noMember.toLowerCase().includes(q) ||
+            m.phone.toLowerCase().includes(q)
+        );
+    }, [members, searchQuery]);
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch w-full">
-
-            {/* PANEL DAFTAR MEMBER */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between min-w-0">
-                <div className="flex flex-col flex-1 min-h-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0">
-                        <div>
-                            <h2 className="text-xl font-bold text-apomacy-dark">Daftar Member</h2>
-                            <p className="text-xs text-on-surface-variant mt-0.5">Status Panel: <span className="font-bold uppercase text-apomacy-primary">{mode}</span></p>
-                        </div>
-                        <div className="relative w-full sm:w-72">
-                            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
-                            <input type="text" placeholder="Cari nama atau no member..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full rounded-xl bg-surface-container-low py-2 pl-10 pr-4 text-sm text-on-surface border border-outline-variant outline-none focus:border-apomacy-primary transition-all" />
-                        </div>
-                    </div>
-
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-3 text-apomacy-primary flex-1 bg-white rounded-xl border border-outline-variant h-[545px]">
-                            <Loader2 className="h-10 w-10 animate-spin" />
-                            <p className="text-sm font-medium animate-pulse">Memuat data member...</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto overflow-y-auto h-[545px] rounded-xl border border-outline-variant shadow-sm bg-white">
-                            <table className="w-full text-left border-collapse whitespace-nowrap">
-                                <thead className="sticky top-0 z-10 bg-surface-container shadow-sm">
-                                    <tr className="text-xs font-bold uppercase tracking-wider text-on-surface-variant border-b border-outline-variant">
-                                        <th className="px-4 py-3 bg-surface-container">No Member</th>
-                                        <th className="px-4 py-3 bg-surface-container">Nama Member</th>
-                                        <th className="px-4 py-3 bg-surface-container">Jenis Kelamin</th>
-                                        <th className="px-4 py-3 bg-surface-container">Telepon</th>
-                                        <th className="px-4 py-3 bg-surface-container">Email</th>
-                                        <th className="px-4 py-3 bg-surface-container">Alamat Lengkap</th>
-                                        <th className="px-4 py-3 bg-surface-container">Tanggal Lahir</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-outline-variant text-sm text-on-surface bg-white">
-                                    {filteredMembers.map((member) => (
-                                        <tr key={member.id} onClick={() => mode === "view" && initSelectMember(member)}
-                                            className={`hover:bg-surface-container-low cursor-pointer transition-colors ${selectedMember?.id === member.id ? 'bg-apomacy-ice/30 font-medium' : ''} ${mode !== 'view' ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                                            <td className="px-4 py-3.5 text-apomacy-primary font-mono text-xs font-bold">{member.noMember}</td>
-                                            <td className="px-4 py-3.5 font-semibold text-apomacy-dark text-[13px]">{member.name}</td>
-                                            <td className="px-4 py-3.5">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${member.gender === 'Laki-laki' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'}`}>{member.gender}</span>
-                                            </td>
-                                            <td className="px-4 py-3.5 font-mono text-xs">{member.phone}</td>
-                                            <td className="px-4 py-3.5 text-on-surface-variant text-[12px]">{member.email || "-"}</td>
-                                            <td className="px-4 py-3.5 text-on-surface-variant text-[12px] truncate max-w-[200px]">{member.address}</td>
-                                            <td className="px-4 py-3.5 font-mono text-xs">{member.birthDate}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+        <div className="flex flex-col h-[calc(100vh-90px)] bg-background relative max-w-full overflow-hidden p-6 gap-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+                <div>
+                    <h1 className="text-2xl font-bold text-apomacy-dark flex items-center gap-2">
+                        <Users className="text-apomacy-primary" size={28} />
+                        Manajemen Customer
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Kelola data Customer apotek.
+                    </p>
                 </div>
 
-                <div className="flex justify-between mt-6 border-t border-outline-variant pt-4 shrink-0">
-                    <div className="flex gap-3">
-                        <button type="button" onClick={handleAddClick} disabled={mode !== "view"} 
-                            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all border ${
-                                mode !== "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white border-apomacy-primary shadow-sm hover:bg-apomacy-dark"
-                            }`}>
-                            <Plus size={16} /> Tambah
-                        </button>
-                        <button type="button" onClick={handleEditClick} disabled={!selectedMember || mode !== "view"} 
-                            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all border ${
-                                !selectedMember || mode !== "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-dark text-white border-apomacy-dark shadow-sm hover:bg-apomacy-primary"
-                            }`}>
-                            <Edit2 size={16} /> Edit
-                        </button>
-                        <button type="button" onClick={handleDeleteClick} disabled={!selectedMember || mode !== "view"} 
-                            className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all border ${
-                                !selectedMember || mode !== "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-error border-outline-variant hover:bg-error-container/20"
-                            }`}>
-                            <Trash2 size={16} /> Hapus
-                        </button>
-                    </div>
-                    <button type="button" onClick={fetchMembers} disabled={mode !== "view"} 
-                        className={`flex items-center justify-center rounded-full border w-10 h-10 transition-colors ${
-                            mode !== "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white border-outline-variant text-apomacy-dark hover:bg-surface-container-low"
-                        }`}>
-                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                    </button>
+                {/* Badge Role User */}
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 ${
+                    userRole === "admin"
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
+                }`}>
+                    {userRole === "admin" ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
+                    {userRole === "admin"
+                        ? "Admin · Akses Penuh"
+                        : "Kasir · Tambah & Edit"}
                 </div>
             </div>
 
-            {/* PANEL FORM INPUT */}
-            <form onSubmit={handleSaveSubmit} className="lg:col-span-1 bg-white rounded-2xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between w-full">
-                <div className="flex flex-col flex-1 min-h-0">
-                    <div className="flex items-center gap-2.5 border-b border-outline-variant pb-4 mb-5 shrink-0">
-                        <div className="p-2 bg-apomacy-ice rounded-xl text-apomacy-primary"><User size={20} /></div>
-                        <div>
-                            <h2 className="text-lg font-bold text-apomacy-dark">{mode === "add" ? "Tambah Member" : mode === "edit" ? "Edit Member" : "Detail Member"}</h2>
-                            <p className="text-xs text-on-surface-variant">Kelola data informasi pelanggan</p>
+            <div className="flex flex-col lg:flex-row gap-6 h-full min-h-0 overflow-hidden">
+                {/* Bagian Kiri: Tabel */}
+                <div className="w-full lg:w-7/12 flex flex-col bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden min-h-0">
+                    <div className="p-4 border-b border-outline-variant flex flex-col sm:flex-row gap-3 shrink-0 bg-surface-container-lowest">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Cari ID, nama, atau no. telepon..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-white border border-outline-variant rounded-xl text-sm focus:outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary transition-all"
+                            />
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                            <button
+                                onClick={fetchMembers}
+                                title="Muat ulang data"
+                                className="p-2 border border-outline-variant rounded-xl hover:bg-gray-50 text-gray-600 transition-colors"
+                            >
+                                <RefreshCw size={18} className={loading ? "animate-spin text-apomacy-primary" : ""} />
+                            </button>
+                            <button
+                                onClick={handleAddClick}
+                                className="flex items-center gap-2 bg-apomacy-primary text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-apomacy-dark transition-colors shadow-sm whitespace-nowrap"
+                            >
+                                <Plus size={18} /> Tambah
+                            </button>
                         </div>
                     </div>
 
-                    <div className="space-y-4 overflow-y-auto flex-1 pr-1 scrollbar-hide min-h-0">
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">ID Member</label>
-                            <input type="text" value={formData.noMember} disabled className="w-full rounded-xl py-2.5 px-4 text-sm font-mono font-bold bg-gray-100 text-gray-500 border border-gray-200 outline-none cursor-not-allowed" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Nama</label>
-                            <input type="text" required value={formData.name} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                                className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold border outline-none transition-all ${mode === "view" ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline focus:border-apomacy-primary"}`} />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Telepon</label>
-                            <input type="text" required value={formData.phone} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^0-9+\-]/g, "") })} 
-                                className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold border outline-none transition-all ${mode === "view" ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline focus:border-apomacy-primary"}`} />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Tanggal Lahir</label>
-                            <input type="date" required value={formData.birthDate} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })} 
-                                className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold border outline-none transition-all ${mode === "view" ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline focus:border-apomacy-primary"}`} />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Email</label>
-                            <input type="email" value={formData.email} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                                className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold border outline-none transition-all ${mode === "view" ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline focus:border-apomacy-primary"}`} />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Alamat Lengkap</label>
-                            <textarea rows={3} required value={formData.address} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
-                                className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold border outline-none transition-all resize-none ${mode === "view" ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline focus:border-apomacy-primary"}`} />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-2">Gender</label>
-                            <div className="flex gap-6">
-                                <label className={`flex items-center gap-2 text-sm font-bold ${mode === "view" ? "text-gray-400 cursor-not-allowed" : "text-apomacy-dark cursor-pointer"}`}>
-                                    <input type="radio" name="gender" value="Laki-laki" disabled={mode === "view"} checked={formData.gender === "Laki-laki"} onChange={() => setFormData({ ...formData, gender: "Laki-laki" })} className="h-4 w-4 text-apomacy-primary" />Laki-laki
-                                </label>
-                                <label className={`flex items-center gap-2 text-sm font-bold ${mode === "view" ? "text-gray-400 cursor-not-allowed" : "text-apomacy-dark cursor-pointer"}`}>
-                                    <input type="radio" name="gender" value="Perempuan" disabled={mode === "view"} checked={formData.gender === "Perempuan"} onChange={() => setFormData({ ...formData, gender: "Perempuan" })} className="h-4 w-4 text-apomacy-primary" />Perempuan
-                                </label>
+                    <div className="px-4 py-2 border-b border-outline-variant bg-white text-xs text-gray-500 flex justify-between items-center shrink-0">
+                        <span>
+                            Menampilkan <span className="font-semibold text-apomacy-dark">{filteredMembers.length}</span> dari{" "}
+                            <span className="font-semibold text-apomacy-dark">{members.length}</span> member
+                        </span>
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery("")}
+                                className="text-apomacy-primary hover:underline font-medium"
+                            >
+                                Reset pencarian
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        <table className="w-full text-sm border-collapse">
+                            <thead className="sticky top-0 z-10 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider shadow-sm">
+                                <tr>
+                                    <th className="px-4 py-3 text-left font-semibold w-12">No</th>
+                                    <th className="px-4 py-3 text-left font-semibold w-28">No. Member</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Nama Customer</th>
+                                    <th className="px-4 py-3 text-center font-semibold w-24">Gender</th>
+                                    <th className="px-4 py-3 text-left font-semibold w-36">No. Telepon</th>
+                                    <th className="px-4 py-3 text-center font-semibold w-16">Usia</th>
+                                    <th className="px-4 py-3 text-center font-semibold w-24">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-outline-variant">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={7} className="py-16 text-center text-gray-400">
+                                            <div className="flex flex-col items-center justify-center gap-3">
+                                                <Loader2 className="animate-spin text-apomacy-primary" size={32} />
+                                                <span className="text-sm font-medium">Memuat data member...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredMembers.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="py-16 text-center text-gray-400">
+                                            <div className="flex flex-col items-center justify-center gap-2">
+                                                <Search size={40} className="opacity-20" />
+                                                <span className="text-sm font-medium">Tidak ada data member.</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredMembers.map((member, idx) => {
+                                        const isSelected = selectedMember?.id === member.id;
+                                        return (
+                                            <tr
+                                                key={member.id}
+                                                onClick={() => handleRowClick(member)}
+                                                className={`cursor-pointer transition-colors ${
+                                                    isSelected
+                                                        ? "bg-blue-50/70 hover:bg-blue-50"
+                                                        : "hover:bg-gray-50"
+                                                }`}
+                                            >
+                                                <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
+                                                        {member.noMember}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 font-semibold text-apomacy-dark max-w-[180px] truncate" title={member.name}>
+                                                    {member.name}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                        member.gender === "P"
+                                                            ? "bg-pink-50 text-pink-600 border border-pink-100"
+                                                            : "bg-sky-50 text-sky-600 border border-sky-100"
+                                                    }`}>
+                                                        {member.gender === "P" ? "Perempuan" : "Laki-laki"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{member.phone}</td>
+                                                <td className="px-4 py-3 text-center text-gray-600">
+                                                    {member.age ? `${member.age}` : "-"}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleEditClick(member); }}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+
+                                                        {/* TOMBOL HAPUS HANYA UNTUK ADMIN */}
+                                                        {canDelete && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(member); }}
+                                                                className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                                title="Hapus"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Bagian Kanan: Form */}
+                <div className="w-full lg:w-5/12 bg-white rounded-2xl shadow-sm border border-outline-variant flex flex-col min-h-0">
+                    <div className="p-4 border-b border-outline-variant bg-surface-container-lowest shrink-0">
+                        <h2 className="font-bold text-apomacy-dark flex items-center gap-2">
+                            {mode === "add" && <Plus size={18} className="text-apomacy-primary" />}
+                            {mode === "edit" && <Edit2 size={18} className="text-blue-600" />}
+                            {mode === "view" && <User size={18} className="text-gray-500" />}
+                            {mode === "add" ? "Tambah Member Baru" : mode === "edit" ? "Edit Data Member" : "Detail Member"}
+                        </h2>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                        {!selectedMember && mode === "view" ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-3">
+                                <User size={48} className="opacity-20" />
+                                <p className="text-sm text-center">Pilih member dari daftar untuk melihat detail,<br />atau klik Tambah.</p>
                             </div>
-                        </div>
-                    </div>
-                </div>
+                        ) : (
+                            <>
+                                {mode === "view" && selectedMember && (
+                                    <div className="flex items-center gap-3 mb-2 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant">
+                                        <div className="w-10 h-10 rounded-full bg-apomacy-primary/10 flex items-center justify-center text-apomacy-primary shrink-0">
+                                            <User size={20} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-apomacy-dark truncate">{selectedMember.name}</p>
+                                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                <BadgeCheck size={12} /> {selectedMember.noMember}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
-                {/* TOMBOL SIMPAN & BATAL FORM (DIPERBAIKI MENJADI SOLID BLUE) */}
-                <div className="flex gap-3 mt-8 border-t border-outline-variant pt-4 shrink-0">
-                    <button type="submit" disabled={mode === "view"} 
-                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
-                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary"
-                        }`}>
-                        <Save size={16} /> Simpan
-                    </button>
-                    <button type="button" onClick={handleCancelClick} disabled={mode === "view"} 
-                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
-                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low"
-                        }`}>
-                        <XCircle size={16} /> Batal
-                    </button>
-                </div>
-            </form>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ID Member</label>
+                                    <input type="text"
+                                        value={formData.noMember}
+                                        disabled
+                                        className="w-full px-3 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-500 cursor-not-allowed font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama Lengkap</label>
+                                    <input type="text" required disabled={mode === "view"}
+                                        value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        placeholder="Masukkan nama member"
+                                        className="w-full px-3 py-2.5 bg-white border border-outline-variant rounded-xl text-sm focus:outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium"
+                                    />
+                                </div>
 
-            <ModalConfirm isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message} onConfirm={() => { confirmModal.action(); closeModal(); }} onCancel={closeModal} />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                            <Cake size={12} /> Umur
+                                        </label>
+                                        <div className="relative">
+                                            <input type="number" required disabled={mode === "view"} min="1" max="120"
+                                                value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                                                placeholder="Contoh: 25"
+                                                className="w-full px-3 py-2.5 bg-white border border-outline-variant rounded-xl text-sm focus:outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all pr-12 font-medium"
+                                            />
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">Tahun</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Gender</label>
+                                        <select disabled={mode === "view"}
+                                            value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                            className="w-full px-3 py-2.5 bg-white border border-outline-variant rounded-xl text-sm focus:outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium"
+                                        >
+                                            <option value="L">Laki-laki</option>
+                                            <option value="P">Perempuan</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                        <Phone size={12} /> No. Telepon / WA
+                                    </label>
+                                    <input type="tel" required disabled={mode === "view"}
+                                        value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        placeholder="08xxxxxxxxxx"
+                                        className="w-full px-3 py-2.5 bg-white border border-outline-variant rounded-xl text-sm focus:outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 mt-8 border-t border-outline-variant pt-4 shrink-0">
+                                    <button type="submit" disabled={mode === "view"}
+                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
+                                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary"
+                                        }`}>
+                                        <Save size={16} /> Simpan
+                                    </button>
+                                    <button type="button" onClick={() => { setMode("view"); setSelectedMember(null); }} disabled={mode === "view"}
+                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
+                                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low"
+                                        }`}>
+                                        <XCircle size={16} /> Batal
+                                    </button>
+                                </div>
+
+                                {mode === "view" && selectedMember && !canDelete && (
+                                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                                        <ShieldAlert size={14} className="shrink-0" />
+                                        Akun Anda tidak memiliki izin untuk menghapus Data Customer.
+                                    </p>
+                                )}
+                            </>
+                        )}
+                    </form>
+
+                    <ModalConfirm isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message}
+                        onConfirm={confirmModal.action} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} />
+                </div>
+            </div>
         </div>
     );
 }

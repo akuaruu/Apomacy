@@ -96,6 +96,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
 			customer.DELETE("/:id", customerHandler.DeleteCustomer)
+
 		}
 
 		supplier := api.Group("/supplier")
