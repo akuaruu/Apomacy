@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import api from "@/lib/api";
@@ -39,6 +39,11 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
     const router = useRouter();
+    const pathname = usePathname();
+
+    const logoHref = /^\/katalog\/[^/]+$/.test(pathname)
+        ? "/katalog"
+        : "/";
 
     const [userName, setUserName] = useState<string | null>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -94,6 +99,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
     const handleLoginSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
         setLoginError("");
         setIsLoggingIn(true);
 
@@ -103,37 +109,93 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                 password: loginPassword,
             });
 
-            const { token } = response.data;
+            const token = response.data?.token;
 
-            if (token) {
-                Cookies.set("apomacy_token", token, { expires: 1 });
-                const decoded = jwtDecode<MyTokenPayload>(token);
-                const userRole = decoded.role;
-
-                if (userRole === "Admin") {
-                    window.location.href = "/admin";
-                } else if (userRole === "Kasir") {
-                    window.location.href = "/kasir";
-                } else {
-                    window.location.reload();
-                }
+            if (!token) {
+                throw new Error("Token tidak ditemukan pada respons login.");
             }
+
+            const decoded = jwtDecode<MyTokenPayload>(token);
+
+            const normalizedRole = decoded.role
+                ?.trim()
+                .toLowerCase();
+
+            const userRole =
+                normalizedRole === "admin" ||
+                    normalizedRole === "kasir"
+                    ? normalizedRole
+                    : "member";
+
+            Cookies.remove("apomacy_token", { path: "/" });
+            Cookies.remove("apomacy_role", { path: "/" });
+
+            Cookies.set("apomacy_token", token, {
+                expires: 1,
+                path: "/",
+                sameSite: "lax",
+            });
+
+            Cookies.set("apomacy_role", userRole, {
+                expires: 1,
+                path: "/",
+                sameSite: "lax",
+            });
+
+            setIsLoggedIn(true);
+            setUserName(
+                decoded.nama ||
+                decoded.name ||
+                decoded.username ||
+                "Akun Saya"
+            );
+
+            setShowLoginModal(false);
+            setLoginPassword("");
+
+            if (userRole === "admin") {
+                router.replace("/admin");
+            } else if (userRole === "kasir") {
+                router.replace("/kasir");
+            } else {
+                router.replace("/katalog");
+            }
+
+            router.refresh();
         } catch (err: any) {
-            const msg = err.response?.data?.error || "Gagal masuk. Periksa kembali email dan password Anda.";
-            setLoginError(msg);
+            const message =
+                err.response?.data?.error ||
+                err.response?.data?.message ||
+                err.message ||
+                "Gagal masuk. Periksa kembali email dan password Anda.";
+
+            setLoginError(message);
         } finally {
             setIsLoggingIn(false);
         }
     };
+
 
     return (
         <>
             <header className="sticky top-0 z-40 w-full">
                 <div className="bg-white shadow-sm">
                     <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-8 px-4 lg:px-8">
-                        <Link href="" className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container">
-                            <Image src="/image/logo_apomacy.png" alt="Logo Apomacy" width={40} height={40} className="object-contain" />
-                            <span className="text-xl font-black tracking-[-0.02em]">Apomacy</span>
+                        <Link
+                            href={logoHref}
+                            className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
+                        >
+                            <Image
+                                src="/image/logo_apomacy.png"
+                                alt="Logo Apomacy"
+                                width={40}
+                                height={40}
+                                className="object-contain"
+                            />
+
+                            <span className="text-xl font-black tracking-[-0.02em]">
+                                Apomacy
+                            </span>
                         </Link>
 
                         <form onSubmit={handleSearch} className="flex flex-1 items-stretch overflow-hidden rounded-full border border-apomacy-ice focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
@@ -199,11 +261,22 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             {categoryMenuOpen && (
                                 <div className="absolute left-0 top-full z-50 min-w-64 rounded-b-xl bg-white py-2 shadow-xl ring-1 ring-black/5 border-t border-gray-100">
                                     {[
-                                        { label: "Pereda Nyeri & Demam", href: "/katalog?cat=pereda-nyeri" },
-                                        { label: "Batuk & Flu", href: "/katalog?cat=batuk-flu" },
-                                        { label: "Pencernaan & Lambung", href: "/katalog?cat=pencernaan" },
-                                        { label: "Vitamin & Suplemen", href: "/katalog?cat=vitamin" },
-                                        { label: "Ibu & Anak", href: "/katalog?cat=ibu-anak" },
+                                        {
+                                            label: "Flu & Batuk",
+                                            href: "/katalog?cat=flu-batuk",
+                                        },
+                                        {
+                                            label: "Demam",
+                                            href: "/katalog?cat=demam",
+                                        },
+                                        {
+                                            label: "Vitamin & Suplemen",
+                                            href: "/katalog?cat=vitamin-suplemen",
+                                        },
+                                        {
+                                            label: "Pencernaan",
+                                            href: "/katalog?cat=pencernaan",
+                                        },
                                     ].map((item) => (
                                         <Link
                                             key={item.href}

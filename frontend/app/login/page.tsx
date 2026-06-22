@@ -114,7 +114,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6 flex-grow">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email / Username</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Mail size={18} />
@@ -124,7 +124,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin_apomacy"
+                  placeholder="example@gmail.com"
                   className="w-full pl-11 pr-4 py-3.5 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                 />
               </div>
