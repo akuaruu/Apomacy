@@ -6,6 +6,9 @@ import {
     Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
 import Cookies from "js-cookie";
+import ModalConfirm from "@/components/shared/ModalConfirm";
+import Toast from "@/components/shared/Toast";
+
 interface TransaksiItem {
     name: string;
     qty: number;
@@ -35,6 +38,14 @@ interface TransaksiDashboard {
     address?: string;
 }
 
+type PendingAction = {
+    trxId: string;
+    action: "kirim" | "ambil" | "selesai";
+    newStatus: StatusType;
+    title: string;
+    message: string;
+};
+
 // ─── PORTAL MODAL ───────────────────────────────────────────────────────────────
 function PortalModal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
     if (typeof document === "undefined") return null;
@@ -58,6 +69,27 @@ function PortalModal({ children, onClose }: { children: React.ReactNode; onClose
     );
 }
 
+// Key untuk menyimpan kapan sebuah transaksi mulai masuk tab "Diproses"
+// (Sedang Dikirim / Siap Diambil). Backend belum punya kolom timestamp untuk ini,
+// jadi dilacak di sisi browser supaya auto-complete 1 jam bisa berjalan tanpa
+// menyentuh file backend.
+const PROCESS_TIMER_KEY = "apomacy_diproses_timestamps";
+const AUTO_COMPLETE_MS = 60 * 60 * 1000; // 1 jam
+
+function loadProcessTimers(): Record<string, number> {
+    if (typeof window === "undefined") return {};
+    try {
+        return JSON.parse(window.localStorage.getItem(PROCESS_TIMER_KEY) || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function saveProcessTimers(timers: Record<string, number>) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(PROCESS_TIMER_KEY, JSON.stringify(timers));
+}
+
 const PAGE_SIZE = 25;
 
 const statusPriority: Record<StatusType, number> = {
@@ -79,6 +111,14 @@ export default function KasirDashboardPage() {
     const [activeTab, setActiveTab] = useState<"Semua" | "Pesanan Baru" | "Diproses" | "Selesai">("Semua");
     const [toast, setToast] = useState<{ visible: boolean; message: string; id: string }>({ visible: false, message: "", id: "" });
     const [currentPage, setCurrentPage] = useState(1);
+    const [confirmModal, setConfirmModal] = useState<PendingAction | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    const showFeedback = (message: string, type: "success" | "error") => {
+        setFeedback({ message, type });
+        setTimeout(() => setFeedback(null), 3500);
+    };
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -110,15 +150,24 @@ export default function KasirDashboardPage() {
                     let formattedDate = t.tanggal_transaksi;
                     // ... (logika format tanggal tetap sama)
 
+                    const isOffline = !t.id_user || t.id_user === 0;
+                    let statusPesanan: StatusType = t.status_pesanan || "Menunggu Pembayaran";
+
+                    // Transaksi offline (kasir, tanpa data pengiriman) dianggap langsung
+                    // selesai begitu dibuat, tanpa perlu melewati pipeline pengiriman.
+                    if (isOffline && !t.pengiriman && statusPesanan === "Menunggu Pembayaran") {
+                        statusPesanan = "Selesai";
+                    }
+
                     return {
                         id: t.no_transaksi,
-                        type: t.id_user && t.id_user !== 0 ? "Online" : "Offline",
+                        type: isOffline ? "Offline" : "Online",
                         customerName: t.nama_customer || "Anonim",
                         subtotal: t.subtotal,
                         paymentMethod: t.metode_pembayaran || "-",
 
                         // MENGGUNAKAN STATUS PESANAN (Bukan status pembayaran)
-                        status: t.status_pesanan || "Menunggu Pembayaran",
+                        status: statusPesanan,
 
                         // AMBIL DATA PENGIRIMAN (Jika ada)
                         deliveryMethod: t.pengiriman?.metode_penerimaan || "Offline",
@@ -133,6 +182,44 @@ export default function KasirDashboardPage() {
                         }))
                     };
                 });
+
+                // --- LACAK WAKTU MASUK TAB "DIPROSES" UNTUK AUTO-COMPLETE 1 JAM ---
+                const timers = loadProcessTimers();
+                let timersChanged = false;
+                const toAutoComplete: string[] = [];
+                const now = Date.now();
+
+                newData.forEach(t => {
+                    const isDiproses = t.status === "Sedang Dikirim" || t.status === "Siap Diambil";
+
+                    if (isDiproses) {
+                        if (!timers[t.id]) {
+                            timers[t.id] = now;
+                            timersChanged = true;
+                        } else if (now - timers[t.id] >= AUTO_COMPLETE_MS) {
+                            toAutoComplete.push(t.id);
+                        }
+                    } else if (timers[t.id]) {
+                        // Sudah tidak di tab Diproses lagi (mis. sudah Selesai/dibatalkan), bersihkan
+                        delete timers[t.id];
+                        timersChanged = true;
+                    }
+                });
+
+                if (timersChanged) saveProcessTimers(timers);
+
+                // Auto-selesaikan pesanan yang sudah lebih dari 1 jam di tab Diproses
+                if (toAutoComplete.length > 0) {
+                    toAutoComplete.forEach(trxId => {
+                        autoCompleteOrder(trxId);
+                        delete timers[trxId];
+                    });
+                    saveProcessTimers(timers);
+                    toAutoComplete.forEach(trxId => {
+                        const idx = newData.findIndex(t => t.id === trxId);
+                        if (idx !== -1) newData[idx] = { ...newData[idx], status: "Selesai" };
+                    });
+                }
 
                 // Set state dan munculkan notifikasi jika ada data baru
                 setTransactions(prevTransactions => {
@@ -186,9 +273,52 @@ export default function KasirDashboardPage() {
         return map[status] ?? { background: "#f3f4f6", color: "#6b7280" };
     };
 
-    const handleConfirmOrder = async (trxId: string, action: "kirim" | "ambil") => {
-        const newStatus: StatusType = action === "kirim" ? "Sedang Dikirim" : "Siap Diambil";
+    const autoCompleteOrder = async (trxId: string) => {
+        try {
+            const token = Cookies.get('apomacy_token');
+            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status_pesanan: "Selesai" })
+            });
 
+            if (!response.ok) throw new Error("Gagal auto-update status di server");
+
+            showFeedback(`Pesanan ${trxId} otomatis diselesaikan (lebih dari 1 jam diproses)`, "success");
+        } catch (error) {
+            console.error("Auto-complete error:", error);
+        }
+    };
+
+    const requestConfirm = (trxId: string, action: "kirim" | "ambil" | "selesai") => {
+        const map: Record<typeof action, { newStatus: StatusType; title: string; message: string }> = {
+            kirim: {
+                newStatus: "Sedang Dikirim",
+                title: "Konfirmasi Pengiriman",
+                message: `Tandai pesanan ${trxId} sebagai sudah dikirim ke customer?`,
+            },
+            ambil: {
+                newStatus: "Siap Diambil",
+                title: "Konfirmasi Siap Diambil",
+                message: `Tandai pesanan ${trxId} sebagai siap diambil oleh customer?`,
+            },
+            selesai: {
+                newStatus: "Selesai",
+                title: "Selesaikan Pesanan",
+                message: `Tandai pesanan ${trxId} sebagai selesai? Status ini akan langsung terlihat oleh customer.`,
+            },
+        };
+        setConfirmModal({ trxId, action, ...map[action] });
+    };
+
+    const handleConfirmedStatusUpdate = async () => {
+        if (!confirmModal) return;
+        const { trxId, newStatus } = confirmModal;
+
+        setIsSubmitting(true);
         try {
             const token = Cookies.get('apomacy_token');
             const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
@@ -205,30 +335,13 @@ export default function KasirDashboardPage() {
 
             // Update UI jika API sukses
             setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: newStatus } : t));
+            showFeedback(`Status pesanan ${trxId} berhasil diubah menjadi "${newStatus}"`, "success");
         } catch (error) {
             console.error("Error:", error);
-            alert("Gagal mengubah status pesanan. Periksa koneksi.");
-        }
-    };
-
-    const handleCompleteOrder = async (trxId: string) => {
-        try {
-            const token = Cookies.get('apomacy_token');
-            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ status_pesanan: "Selesai" })
-            });
-
-            if (!response.ok) throw new Error("Gagal update status di server");
-
-            setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: "Selesai" } : t));
-        } catch (error) {
-            console.error("Error:", error);
-            alert("Gagal menyelesaikan pesanan.");
+            showFeedback("Gagal mengubah status pesanan. Periksa koneksi.", "error");
+        } finally {
+            setIsSubmitting(false);
+            setConfirmModal(null);
         }
     };
 
@@ -275,21 +388,32 @@ export default function KasirDashboardPage() {
         }
 
         if (activeTab === "Pesanan Baru" && (trx.status === "Menunggu Diproses" || trx.status === "Sedang Diracik")) {
-            return (
-                <div className="flex gap-2 flex-wrap min-w-[200px]">
-                    <button onClick={() => handleConfirmOrder(trx.id, "kirim")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
+            // Hanya tampilkan SATU tombol sesuai metode yang dipilih customer saat checkout
+            if (trx.deliveryMethod === "delivery") {
+                return (
+                    <button onClick={() => requestConfirm(trx.id, "kirim")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                         <Truck size={12} /> Sudah Dikirim
                     </button>
-                    <button onClick={() => handleConfirmOrder(trx.id, "ambil")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-bold hover:bg-purple-600 hover:text-white transition-all cursor-pointer">
+                );
+            }
+            if (trx.deliveryMethod === "pickup") {
+                return (
+                    <button onClick={() => requestConfirm(trx.id, "ambil")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-bold hover:bg-purple-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                         <Store size={12} /> Siap Diambil
                     </button>
-                </div>
+                );
+            }
+            // Fallback jika data pengiriman tidak ada sama sekali
+            return (
+                <span style={getStatusStyle(trx.status)} className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap">
+                    {trx.status}
+                </span>
             );
         }
 
         if (activeTab === "Diproses" && (trx.status === "Sedang Dikirim" || trx.status === "Siap Diambil")) {
             return (
-                <button onClick={() => handleCompleteOrder(trx.id)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold hover:bg-green-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
+                <button onClick={() => requestConfirm(trx.id, "selesai")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold hover:bg-green-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                     <PackageCheck size={12} /> Selesaikan
                 </button>
             );
@@ -387,7 +511,7 @@ export default function KasirDashboardPage() {
                                         <th className="px-6 py-4 w-[15%] whitespace-nowrap">Waktu</th>
                                         <th className="px-6 py-4 w-[10%] text-center whitespace-nowrap">Jenis</th>
                                         <th className="px-6 py-4 w-[22%] whitespace-nowrap">Nama Pemesan</th>
-                                        <th className="px-6 py-4 w-[8%] text-center whitespace-nowrap">Data Obat</th>
+                                        <th className="px-6 py-4 w-[8%] text-center whitespace-nowrap">Detail</th>
                                         <th className="px-6 py-4 w-[14%] text-right whitespace-nowrap">Subtotal</th>
                                         <th className="px-6 py-4 w-[16%] whitespace-nowrap">Status Pesanan</th>
                                     </tr>
@@ -433,7 +557,7 @@ export default function KasirDashboardPage() {
                                                 {/* Kolom Aksi Cek Obat */}
                                                 <td className="px-6 py-4 text-center">
                                                     <button type="button" onClick={() => setSelectedDetail(trx)} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-lg text-[12px] font-bold transition-all shadow-sm whitespace-nowrap">
-                                                        <Eye size={16} /> Cek Obat
+                                                        <Eye size={16} /> Cek Detail
                                                     </button>
                                                 </td>
 
@@ -606,6 +730,21 @@ export default function KasirDashboardPage() {
                     </div>
                 </PortalModal>
             )}
+
+            {/* ── MODAL KONFIRMASI PERUBAHAN STATUS PESANAN ── */}
+            {mounted && confirmModal && (
+                <ModalConfirm
+                    isOpen={!!confirmModal}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    type="edit"
+                    onConfirm={handleConfirmedStatusUpdate}
+                    onCancel={() => !isSubmitting && setConfirmModal(null)}
+                />
+            )}
+
+            {/* ── TOAST FEEDBACK SUKSES/GAGAL UNTUK SETIAP AKSI STATUS ── */}
+            {mounted && <Toast toast={feedback} />}
 
         </div>
     );
