@@ -54,20 +54,48 @@ export default function ProfilPage() {
 
         // Parsing JSON jika responsnya sukses (200 OK)
         const responseData = await res.json();
-        const data = responseData.data;
+        const data = responseData.data ?? {};
 
-        // Mengisi form dengan data dari database
+        const tanggalLahir =
+          data.tanggalLahir ??
+          data.tanggal_lahir ??
+          "";
+
+        const fotoProfil =
+          data.fotoProfil ??
+          data.foto_profil ??
+          "";
+
         setFormData({
-          nama: data.nama_lengkap || "",
-          email: data.email || "",
-          telepon: data.no_telp || "",
-          tanggalLahir: data.tanggal_lahir || "",
-          alamat: data.alamat || "",
+          nama:
+            data.nama ??
+            data.nama_lengkap ??
+            "",
+
+          email:
+            data.email ??
+            "",
+
+          telepon:
+            data.telepon ??
+            data.no_telp ??
+            "",
+
+          tanggalLahir: tanggalLahir
+            ? String(tanggalLahir).slice(0, 10)
+            : "",
+
+          alamat:
+            data.alamat ??
+            "",
         });
 
-        if (data.foto_profil) {
-          setFotoProfil(data.foto_profil);
-        }
+        setFotoProfil(
+          fotoProfil
+            ? encodeURI(fotoProfil)
+            : ""
+        );
+        console.log("PROFILE RESPONSE:", responseData);
 
       } catch (error: any) {
         console.error("Error fetching profile:", error);
@@ -112,7 +140,7 @@ export default function ProfilPage() {
         const formDataFoto = new FormData();
         formDataFoto.append("foto", selectedFile);
 
-        const resFoto = await fetch(`/api/users/foto`, {
+        const resFoto = await fetch("/api/users/foto", {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -121,16 +149,13 @@ export default function ProfilPage() {
         });
 
         if (!resFoto.ok) {
-          const errText = await resFoto.text();
-          let errMessage = "Gagal mengunggah foto profil";
-          try {
-            const errData = JSON.parse(errText);
-            errMessage = errData.error || errMessage;
-          } catch {
-            errMessage = `Error Server (${resFoto.status}): ${errText}`;
-          }
-          throw new Error(errMessage);
+          const errorData = await resFoto.json();
+          throw new Error(errorData.error || "Gagal mengunggah foto profil");
         }
+
+        const fotoData = await resFoto.json();
+        setFotoProfil(fotoData.url);
+        setSelectedFile(null);
 
       }
 
