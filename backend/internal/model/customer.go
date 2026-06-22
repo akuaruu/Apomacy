@@ -20,10 +20,11 @@ type Customer struct {
 	Alamat        string       `json:"alamat"`
 	TanggalLahir  time.Time    `json:"tanggal_lahir"`
 	JenisKelamin  JenisKelamin `json:"jenis_kelamin"`
-	Email         *string      `json:"email"`
+	Email         string       `json:"email"`
 	TanggalDaftar time.Time    `json:"tanggal_daftar"`
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`
+	IDUser        int          `json:"id_user"`
 }
 
 type CustomerRepository interface {

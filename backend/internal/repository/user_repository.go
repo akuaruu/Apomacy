@@ -128,39 +128,37 @@ func (r *userRepository) UpdateProfileText(
 	tglLahir string,
 	alamat string,
 ) error {
-	_, err := r.db.Exec(
-		ctx,
-		`
-		UPDATE public.user
-		SET nama_lengkap = $1,
-		    no_telp = $2
+	_, err := r.db.Exec(ctx, `
+		UPDATE public."user"
+		SET
+			nama_lengkap = $1,
+			no_telp = $2
 		WHERE id_user = $3
-		`,
-		nama,
-		noTelp,
-		userID,
-	)
+	`, nama, noTelp, userID)
 
 	if err != nil {
 		return fmt.Errorf("gagal memperbarui data user: %v", err)
 	}
 
-	_, err = r.db.Exec(
-		ctx,
-		`
+	result, err := r.db.Exec(ctx, `
 		UPDATE public.customer
-		SET no_telp = $1,
-		    tanggal_lahir = NULLIF($2, '')::date,
-		    alamat = $3
-		WHERE id_user = $4
-		`,
-		noTelp,
-		tglLahir,
-		alamat,
-		userID,
-	)
+		SET
+			nama_customer = $1,
+			no_telp = $2,
+			alamat = $3,
+			tanggal_lahir = CASE
+				WHEN $4 = '' THEN tanggal_lahir
+				ELSE $4::date
+			END
+		WHERE id_user = $5
+	`, nama, noTelp, alamat, tglLahir, userID)
+
 	if err != nil {
 		return fmt.Errorf("gagal memperbarui data customer: %v", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("data customer untuk user %d belum tersedia", userID)
 	}
 
 	return nil

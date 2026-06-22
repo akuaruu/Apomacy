@@ -17,27 +17,43 @@ func NewCustomerRepository(db DBTx) model.CustomerRepository {
 }
 
 func (r *customerRepository) Create(ctx context.Context, customer *model.Customer) error {
-	query := `
-		INSERT INTO customer (
-			no_member, nama_customer, no_telp, alamat, tanggal_lahir, jenis_kelamin, email, tanggal_daftar
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
-		) RETURNING id_customer, created_at, updated_at
-	`
-
-	// Set tanggal daftar ke hari ini jika belum diisi
 	if customer.TanggalDaftar.IsZero() {
 		customer.TanggalDaftar = time.Now()
 	}
 
-	err := r.db.QueryRow(ctx, query,
-		customer.NoMember, customer.NamaCustomer, customer.NoTelp, customer.Alamat,
-		customer.TanggalLahir, customer.JenisKelamin, customer.Email, customer.TanggalDaftar,
-	).Scan(&customer.ID, &customer.CreatedAt, &customer.UpdatedAt)
+	query := `
+		INSERT INTO public.customer (
+			no_member,
+			nama_customer,
+			no_telp,
+			email,
+			tanggal_daftar,
+			id_user
+		) VALUES (
+			$1, $2, $3, $4, $5, $6
+		)
+		RETURNING id_customer, created_at, updated_at
+	`
+
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		customer.NoMember,
+		customer.NamaCustomer,
+		customer.NoTelp,
+		customer.Email,
+		customer.TanggalDaftar,
+		customer.IDUser,
+	).Scan(
+		&customer.ID,
+		&customer.CreatedAt,
+		&customer.UpdatedAt,
+	)
 
 	if err != nil {
 		return fmt.Errorf("gagal insert customer: %v", err)
 	}
+
 	return nil
 }
 

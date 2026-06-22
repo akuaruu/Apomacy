@@ -30,16 +30,17 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	}))
 
 	userRepo := repository.NewUserRepository(dbPool)
-	userUsecase := usecase.NewUserUsecase(userRepo)
+	customerRepo := repository.NewCustomerRepository(dbPool)
+
+	userUsecase := usecase.NewUserUsecase(userRepo, customerRepo)
 	userHandler := NewUserHandler(userUsecase)
+
+	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
+	customerHandler := NewCustomerHandler(customerUsecase)
 
 	obatRepo := repository.NewObatRepository(dbPool)
 	obatUsecase := usecase.NewObatUsecase(obatRepo)
 	obatHandler := NewObatHandler(obatUsecase)
-
-	customerRepo := repository.NewCustomerRepository(dbPool)
-	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
-	customerHandler := NewCustomerHandler(customerUsecase)
 
 	restockRepo := repository.NewRestockRepository(dbPool)
 	restockUsecase := usecase.NewRestockUsecase(restockRepo)

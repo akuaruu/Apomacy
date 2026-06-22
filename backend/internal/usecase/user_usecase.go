@@ -15,35 +15,58 @@ import (
 )
 
 type userUsecase struct {
-	repo model.UserRepository
+	userRepo     model.UserRepository
+	customerRepo model.CustomerRepository
 }
 
-func NewUserUsecase(repo model.UserRepository) model.UserUsecase {
-	return &userUsecase{repo: repo}
+func NewUserUsecase(
+	userRepo model.UserRepository,
+	customerRepo model.CustomerRepository,
+) model.UserUsecase {
+	return &userUsecase{
+		userRepo:     userRepo,
+		customerRepo: customerRepo,
+	}
 }
 
 func (u *userUsecase) Register(ctx context.Context, user *model.User) error {
-	// 1. Hash Password menggunakan bcrypt
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.PasswordHash), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword(
+		[]byte(user.PasswordHash),
+		bcrypt.DefaultCost,
+	)
 	if err != nil {
 		return errors.New("gagal memproses password")
 	}
 
-	// 2. Timpa password asli dengan hash
 	user.PasswordHash = string(hashedPassword)
 
-	// 3. Set default status jika belum diisi
 	if user.Status == "" {
 		user.Status = model.StatusAktif
 	}
 
-	// 4. Lempar ke database
-	return u.repo.Create(ctx, user)
+	if err := u.userRepo.Create(ctx, user); err != nil {
+		return err
+	}
+
+	customer := model.Customer{
+		NoMember:      fmt.Sprintf("MBR%06d", user.ID),
+		NamaCustomer:  user.NamaLengkap,
+		NoTelp:        user.NoTelp,
+		Email:         user.Email,
+		TanggalDaftar: time.Now(),
+		IDUser:        user.ID,
+	}
+
+	if err := u.customerRepo.Create(ctx, &customer); err != nil {
+		return fmt.Errorf("gagal membuat customer: %v", err)
+	}
+
+	return nil
 }
 
 func (u *userUsecase) Login(ctx context.Context, username, password string) (string, error) {
 	// 1. Cari user di database
-	user, err := u.repo.GetByUsername(ctx, username)
+	user, err := u.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		return "", errors.New("username atau password salah")
 	}
@@ -60,7 +83,7 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 	}
 
 	// 4. Update Last Login di background
-	_ = u.repo.UpdateLastLogin(ctx, user.ID, time.Now())
+	_ = u.userRepo.UpdateLastLogin(ctx, user.ID, time.Now())
 
 	// 5. Generate JWT Token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -82,7 +105,7 @@ func (u *userUsecase) Login(ctx context.Context, username, password string) (str
 }
 
 func (u *userUsecase) GetProfile(ctx context.Context, id int) (*model.UserProfile, error) {
-	return u.repo.GetProfile(ctx, id)
+	return u.userRepo.GetProfile(ctx, id)
 }
 
 func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error) {
@@ -121,7 +144,7 @@ func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileByte
 	publicURL := fmt.Sprintf("%s/storage/v1/object/public/%s/%s", supabaseURL, bucketName, fileName)
 
 	// 5. Simpan URL ke Database menggunakan Repository
-	err = u.repo.UpdateFotoProfil(ctx, userID, publicURL)
+	err = u.userRepo.UpdateFotoProfil(ctx, userID, publicURL)
 	if err != nil {
 		return "", errors.New("gagal menyimpan link foto ke database")
 	}
@@ -139,5 +162,5 @@ func (u *userUsecase) UpdateProfileText(ctx context.Context, userID int, nama st
 	}
 
 	// Teruskan ke repository untuk eksekusi query
-	return u.repo.UpdateProfileText(ctx, userID, nama, noTelp, tglLahir, alamat)
+	return u.userRepo.UpdateProfileText(ctx, userID, nama, noTelp, tglLahir, alamat)
 }
