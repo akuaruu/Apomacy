@@ -32,4 +32,5 @@ backend/vendor/
 docs/laporan_integrasi_axios.md
 
 apomacy-api
+apomacy-bin
 coverage.out
