@@ -4,8 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import Cookies from "js-cookie";
 
 export default function ProfilPage() {
-  // Asumsi: ID User ini digunakan sementara untuk endpoint upload foto (PUT /api/users/:id/foto)
-  const userID = 1;
 
   // State untuk menyimpan isian form
   const [formData, setFormData] = useState({
@@ -61,16 +59,17 @@ export default function ProfilPage() {
 
         // Mengisi form dengan data dari database
         setFormData({
-          nama: data.nama || '',
-          email: data.email || '',
-          telepon: data.telepon || '',
-          tanggalLahir: data.tanggalLahir || '',
-          alamat: data.alamat || '',
+          nama: data.nama_lengkap || "",
+          email: data.email || "",
+          telepon: data.no_telp || "",
+          tanggalLahir: data.tanggal_lahir || "",
+          alamat: data.alamat || "",
         });
 
-        if (data.fotoProfil) {
-          setFotoProfil(data.fotoProfil);
+        if (data.foto_profil) {
+          setFotoProfil(data.foto_profil);
         }
+
       } catch (error: any) {
         console.error("Error fetching profile:", error);
         setPesanError(error.message);
@@ -114,13 +113,12 @@ export default function ProfilPage() {
         const formDataFoto = new FormData();
         formDataFoto.append("foto", selectedFile);
 
-        const resFoto = await fetch(`/api/users/${userID}/foto`, {
-          method: 'PUT',
+        const resFoto = await fetch(`/api/users/foto`, {
+          method: "PUT",
           headers: {
-            'Authorization': `Bearer ${token}`
-            // Jangan set Content-Type secara manual saat menggunakan FormData!
+            Authorization: `Bearer ${token}`,
           },
-          body: formDataFoto
+          body: formDataFoto,
         });
 
         if (!resFoto.ok) {
