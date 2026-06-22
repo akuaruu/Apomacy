@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import Cookies from "js-cookie";
 
 export default function ProfilPage() {
-
   // State untuk menyimpan isian form
   const [formData, setFormData] = useState({
     nama: '',

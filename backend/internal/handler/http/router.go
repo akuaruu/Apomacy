@@ -125,7 +125,6 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			payment.POST("", paymentHandler.Checkout)
 			payment.POST("/notification", paymentHandler.WebhookNotification)
 		}
-
 		api.POST("/restock", restockHandler.CreateRestock)
 		api.GET("/migrate-images", migrationHandler.RunImageMigration)
 	}

@@ -140,6 +140,7 @@ func (r *userRepository) UpdateProfileText(
 		noTelp,
 		userID,
 	)
+
 	if err != nil {
 		return fmt.Errorf("gagal memperbarui data user: %v", err)
 	}
