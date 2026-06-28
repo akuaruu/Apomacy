@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
@@ -14,6 +14,7 @@ const FREE_SHIPPING_THRESHOLD = 150000;
 export default function CheckoutPage() {
     const router = useRouter();
     const { cartItems, selectedIds, cartTotal } = useCart();
+    const profileEffectHandledRef = useRef(false);
     const [method, setMethod] = useState<"delivery" | "pickup">("delivery");
     const [payment, setPayment] = useState("qris");
 
@@ -30,6 +31,9 @@ export default function CheckoutPage() {
 
     // ── Auth guard: redirect ke login jika belum punya token ─────────────────
     useEffect(() => {
+        if (profileEffectHandledRef.current) return;
+        profileEffectHandledRef.current = true;
+
         const token = Cookies.get("apomacy_token");
         if (!token) {
             router.replace("/login?redirect=/checkout");

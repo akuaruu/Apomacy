@@ -5,7 +5,8 @@ import { Eye, EyeOff, Lock, Mail, ShieldCheck, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode"; // Tambahan baru untuk membedah token
+import { jwtDecode } from "jwt-decode";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,6 +16,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,49 +25,59 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // 1. Kirim request ke backend (perhatikan endpoint-nya, sesuaikan dengan router.go milikmu)
       const response = await api.post("/users/login", {
-        username: email, // Backend meminta "username", kita kirim state "email"
-        password: password,
+        username: email,
+        password,
       });
 
-      // 2. Tangkap respons dari backend
-      const { token } = response.data;
+      const token = response.data?.token;
 
-      if (token) {
-        // 3. Simpan token di Cookies
-        Cookies.set("apomacy_token", token, { expires: 1 });
-
-        // 4. Bedah Token JWT untuk mengambil "role"
-        // Sesuaikan interface dengan MapClaims yang ada di backend Go
-        interface MyTokenPayload {
-          id_user: number;
-          role: string;
-          exp: number;
-        }
-
-        const decoded = jwtDecode<MyTokenPayload>(token);
-        const userRole = decoded.role;
-
-        setSuccess("Login berhasil! Mengalihkan...");
-
-        // 5. Redirect berdasarkan role yang ada di dalam Token
-        setTimeout(() => {
-          if (userRole === "Admin") {
-            window.location.href = "/admin";
-          } else if (userRole === "Kasir") {
-            window.location.href = "/kasir";
-          } else {
-            window.location.href = "/katalog"; // Halaman default untuk user biasa
-          }
-        }, 1500);
+      if (!token) {
+        throw new Error("Token tidak ditemukan pada respons login.");
       }
 
+      const decoded = jwtDecode<{ role?: string }>(token);
+      const normalizedRole = decoded.role?.trim().toLowerCase();
+
+      const userRole =
+        normalizedRole === "admin" || normalizedRole === "kasir"
+          ? normalizedRole
+          : "member";
+
+      Cookies.remove("apomacy_token", { path: "/" });
+      Cookies.remove("apomacy_role", { path: "/" });
+
+      Cookies.set("apomacy_token", token, {
+        expires: 1,
+        path: "/",
+        sameSite: "lax",
+      });
+
+      Cookies.set("apomacy_role", userRole, {
+        expires: 1,
+        path: "/",
+        sameSite: "lax",
+      });
+
+      setSuccess("Login berhasil! Mengalihkan...");
+
+      if (userRole === "admin") {
+        router.replace("/admin");
+      } else if (userRole === "kasir") {
+        router.replace("/kasir");
+      } else {
+        router.replace("/katalog");
+      }
+
+      router.refresh();
     } catch (err: any) {
-      console.error("Login Error:", err);
-      // Tangkap pesan error spesifik dari backend (seperti "username atau password salah")
-      const msg = err.response?.data?.error || "Gagal masuk. Silakan periksa kembali kredensial Anda.";
-      setError(msg);
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        "Gagal masuk. Silakan periksa kembali kredensial Anda.";
+
+      setError(message);
     } finally {
       setIsLoading(false);
     }

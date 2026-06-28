@@ -153,6 +153,14 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
             setShowLoginModal(false);
             setLoginPassword("");
 
+            if (
+                userRole === "member" &&
+                /^\/katalog\/[^/]+$/.test(pathname)
+            ) {
+                window.location.reload();
+                return;
+            }
+
             if (userRole === "admin") {
                 router.replace("/admin");
             } else if (userRole === "kasir") {
@@ -162,6 +170,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
             }
 
             router.refresh();
+
         } catch (err: any) {
             const message =
                 err.response?.data?.error ||
@@ -180,10 +189,10 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
         <>
             <header className="sticky top-0 z-40 w-full">
                 <div className="bg-white shadow-sm">
-                    <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-8 px-4 lg:px-8">
+                    <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-2 px-4 sm:gap-4 lg:gap-8 lg:px-8">
                         <Link
                             href={logoHref}
-                            className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
+                            className="group flex shrink-0 items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
                         >
                             <Image
                                 src="/image/logo_apomacy.png"
@@ -193,7 +202,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                                 className="object-contain"
                             />
 
-                            <span className="text-xl font-black tracking-[-0.02em]">
+                            <span className="hidden text-xl font-black tracking-[-0.02em] md:inline">
                                 Apomacy
                             </span>
                         </Link>
@@ -205,20 +214,20 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Cari obat, vitamin, atau produk kesehatan..."
-                                className="min-w-0 flex-1 bg-white px-5 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none"
+                                className="min-w-0 flex-1 bg-white px-3 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none sm:px-5"
                             />
-                            <button type="submit" suppressHydrationWarning className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
+                            <button type="submit" suppressHydrationWarning className="shrink-0 bg-apomacy-primary px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark sm:px-6">
                                 CARI
                             </button>
                         </form>
 
-                        <div className="flex shrink-0 items-center gap-5">
-                            <a href="/dasbor" onClick={(e) => handleProtectedNavigation(e, "/dasbor")} className="hidden items-center gap-1.5 text-apomacy-dark cursor-pointer transition-colors hover:text-apomacy-primary sm:flex">
+                        <div className="flex shrink-0 items-center gap-2 sm:gap-5">
+                            <a href="/dasbor" onClick={(e) => handleProtectedNavigation(e, "/dasbor")} className="flex items-center gap-1.5 text-apomacy-dark cursor-pointer transition-colors hover:text-apomacy-primary">
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
                                 {/* Nampilin nama user secara dinamis stelah login */}
-                                <span className="text-sm font-semibold">
+                                <span className="hidden text-sm font-semibold xl:inline">
                                     {isLoggedIn ? `Hi, ${userName}` : "Akun Saya"}
                                 </span>
                             </a>
@@ -293,12 +302,12 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
                         <div className="mx-4 hidden h-5 w-px bg-white/20 lg:block" />
 
-                        <nav className="hidden items-center gap-2 lg:flex">
+                        <nav className="flex items-center gap-0 sm:gap-2">
                             {navCategories.map((cat) => (
                                 <Link
                                     key={cat.href}
                                     href={cat.href}
-                                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:bg-white/15 ${cat.isPromo ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]" : "text-white/90 hover:text-white"}`}
+                                    className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors hover:bg-white/15 sm:px-3 sm:text-xs ${cat.isPromo ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]" : "text-white/90 hover:text-white"}`}
                                 >
                                     {cat.isPromo && <Image src="/Deal.png" alt="Promo" width={16} height={16} className="object-contain" />}
                                     <span>{cat.label}</span>

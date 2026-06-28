@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useCart } from "@/context/CartContext";
@@ -173,6 +173,7 @@ export default function CheckoutButton({
     const [isLoading, setIsLoading] = useState(false);
     const [notifStatus, setNotifStatus] = useState<NotifStatus>(null);
     const [orderId, setOrderId] = useState("");
+    const snapCallbackHandledRef = useRef(false);
 
     const handleRedirect = () => {
         setNotifStatus(null);
@@ -256,27 +257,55 @@ export default function CheckoutButton({
                 throw new Error("Snap script belum termuat");
             }
 
+            snapCallbackHandledRef.current = false;
             window.snap.pay(snapToken, {
                 onSuccess: function (result: any) {
-                    console.log("Payment Success:", result);
+                    if (snapCallbackHandledRef.current) return;
+                    snapCallbackHandledRef.current = true;
+
                     if (clearCart) clearCart();
-                    router.push(`/pembayaran/sukses?order_id=${result.order_id}`);
+
+                    const params = new URLSearchParams({
+                        order_id: result.order_id,
+                        status_code: result.status_code,
+                        transaction_status: result.transaction_status,
+                    });
+
+                    router.replace(`/pembayaran/sukses?${params.toString()}`);
                 },
+
                 onPending: function (result: any) {
-                    console.log("Payment Pending:", result);
+                    if (snapCallbackHandledRef.current) return;
+                    snapCallbackHandledRef.current = true;
+
                     if (clearCart) clearCart();
-                    router.push(`/pembayaran/pending?order_id=${result.order_id}&token=${snapToken}`);
+
+                    const params = new URLSearchParams({
+                        order_id: result.order_id,
+                        status_code: result.status_code,
+                        transaction_status: result.transaction_status,
+                        token: snapToken,
+                    });
+
+                    router.replace(`/pembayaran/pending?${params.toString()}`);
                 },
+
                 onError: function (result: any) {
-                    console.log("Payment Error/Canceled:", result);
-                    alert("Pembayaran gagal atau dibatalkan oleh sistem. Silakan coba lagi.");
+                    if (snapCallbackHandledRef.current) return;
+                    snapCallbackHandledRef.current = true;
+
+                    console.error("Payment Error:", result);
+                    setNotifStatus("error");
                     setIsLoading(false);
                 },
+
                 onClose: function () {
-                    console.log("Pop-up Closed");
-                    alert("Kamu menutup jendela pembayaran. Klik bayar lagi jika ingin melanjutkan.");
+                    if (snapCallbackHandledRef.current) return;
+                    snapCallbackHandledRef.current = true;
+
+                    setNotifStatus("closed");
                     setIsLoading(false);
-                }
+                },
             });
 
         } catch (error: unknown) {

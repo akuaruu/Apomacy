@@ -271,6 +271,38 @@ function KatalogContent() {
         return apiProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [apiProducts, currentPage]);
 
+    const paginationItems = useMemo<(number | "ellipsis")[]>(() => {
+        if (totalPages <= 7) {
+            return Array.from({ length: totalPages }, (_, index) => index + 1);
+        }
+
+        if (currentPage <= 4) {
+            return [1, 2, 3, 4, 5, "ellipsis", totalPages];
+        }
+
+        if (currentPage >= totalPages - 3) {
+            return [
+                1,
+                "ellipsis",
+                totalPages - 4,
+                totalPages - 3,
+                totalPages - 2,
+                totalPages - 1,
+                totalPages,
+            ];
+        }
+
+        return [
+            1,
+            "ellipsis",
+            currentPage - 1,
+            currentPage,
+            currentPage + 1,
+            "ellipsis",
+            totalPages,
+        ];
+    }, [currentPage, totalPages]);
+
     return (
         <main className="mt-8 pb-20 max-w-[1400px] mx-auto px-6">
             {!isFiltering && (
@@ -402,7 +434,7 @@ function KatalogContent() {
                         </div>
 
                         {totalPages > 1 && (
-                            <div className="mt-12 flex items-center justify-center gap-3">
+                            <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
                                 <button
                                     disabled={currentPage === 1}
                                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -410,6 +442,32 @@ function KatalogContent() {
                                 >
                                     &larr; Prev
                                 </button>
+
+                                {paginationItems.map((item, index) =>
+                                    item === "ellipsis" ? (
+                                        <span
+                                            key={`ellipsis-${index}`}
+                                            className="px-1 text-sm font-bold text-apomacy-muted"
+                                        >
+                                            ...
+                                        </span>
+                                    ) : (
+                                        <button
+                                            key={item}
+                                            type="button"
+                                            onClick={() => setCurrentPage(item)}
+                                            aria-label={`Buka halaman ${item}`}
+                                            aria-current={currentPage === item ? "page" : undefined}
+                                            className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-all ${currentPage === item
+                                                ? "border-apomacy-primary bg-apomacy-primary text-white"
+                                                : "border-outline-variant text-apomacy-dark hover:bg-apomacy-primary hover:text-white"
+                                                }`}
+                                        >
+                                            {item}
+                                        </button>
+                                    )
+                                )}
+
                                 <button
                                     disabled={currentPage === totalPages}
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
