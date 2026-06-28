@@ -160,8 +160,6 @@ function KatalogContent() {
 
     const { addToCart } = useCart();
 
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-
     const fetchCatalogData = async () => {
         setIsLoadingAPI(true);
         setApiError(null);
@@ -218,7 +216,6 @@ function KatalogContent() {
     };
 
     useEffect(() => {
-        setIsLoggedIn(!!Cookies.get("apomacy_token"));
         fetchCatalogData();
     }, [searchQuery, categoryFilter, badgeFilter, sortBy]);
 
@@ -257,7 +254,7 @@ function KatalogContent() {
     };
 
     const handleAddToCartClick = (product: ExtendedProduct) => {
-        if (!isLoggedIn) {
+        if (!Cookies.get("apomacy_token")) {
             window.dispatchEvent(new Event("openLoginModal"));
             return;
         }

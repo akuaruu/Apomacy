@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
 import { Suspense, useRef } from "react";
@@ -71,9 +72,13 @@ function PendingContent() {
 
             <div className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full text-center">
                 <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
+                    <Image
+                        src="/icons/payment/loading.svg"
+                        alt="Menunggu pembayaran"
+                        width={40}
+                        height={40}
+                        className="text-yellow-500"
+                    />
                 </div>
 
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">Menunggu Pembayaran</h1>

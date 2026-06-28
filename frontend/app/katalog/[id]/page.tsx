@@ -32,8 +32,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
     const [quantity, setQuantity] = useState(1);
 
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-
     const handleQuantityChange = (type: 'plus' | 'minus') => {
         if (type === 'plus') {
             setQuantity(prev => prev + 1);
@@ -43,7 +41,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     };
 
     const handleAddToCart_related = (relProduct: ExtendedProduct) => {
-        if (!isLoggedIn) {
+        if (!Cookies.get("apomacy_token")) {
             window.dispatchEvent(new Event("openLoginModal"));
             return;
         }
@@ -53,7 +51,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     };
 
     const handleAddToCart = (product: ExtendedProduct) => {
-        if (!isLoggedIn) {
+        if (!Cookies.get("apomacy_token")) {
             window.dispatchEvent(new Event("openLoginModal"));
             return;
         }
@@ -62,10 +60,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             addToCart(product as any);
         }
     };
-
-    useEffect(() => {
-        setIsLoggedIn(!!Cookies.get("apomacy_token"));
-    }, []);
 
     useEffect(() => {
         const fetchProduct = async () => {
