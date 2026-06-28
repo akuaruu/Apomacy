@@ -20,10 +20,10 @@ Layanan backend REST API untuk platform Apomacy. Dibangun dengan **Golang** meng
 
 | Komponen | Teknologi |
 |----------|-----------|
-| **Language** | Golang (v1.22.0+) |
+| **Language** | Go 1.25.0 |
 | **Web Framework** | Gin Gonic |
 | **Database Driver** | PGX (PostgreSQL) |
-| **ORM** | GORM |
+| **Database Access** | pgx v5 connection pool |
 | **Authentication** | JWT + Bcrypt |
 | **Payment Gateway** | Midtrans Go SDK |
 
@@ -33,7 +33,7 @@ Layanan backend REST API untuk platform Apomacy. Dibangun dengan **Golang** meng
 
 Sebelum menjalankan aplikasi ini secara lokal, pastikan environment kamu telah memenuhi persyaratan berikut:
 
-- **Go** versi 1.22.0 atau lebih baru → [Download Go](https://go.dev/dl/)
+- **Go** versi 1.25.0 sesuai `go.mod` → [Download Go](https://go.dev/dl/)
 - **PostgreSQL** aktif (lokal atau via Supabase)
 - **Midtrans Account** dengan Server Key (Sandbox untuk development)
 
@@ -54,12 +54,13 @@ backend/
 │   ├── middleware/           # Middleware HTTP (JWT Auth, CORS, Logger)
 │   │
 │   ├── model/                # Entitas & DTO (structs) — inti domain
-│   ├── repository/           # Lapisan akses data (query SQL/GORM)
+│   ├── repository/           # Lapisan akses data PostgreSQL melalui pgx
 │   ├── usecase/              # Lapisan logika bisnis utama
 │   └── handler/              # Lapisan HTTP/Transport (REST endpoint handlers)
 │
-├── pkg/                      # Utilitas yang bisa dipakai ulang (opsional)
-├── docs/                     # Dokumentasi API (OpenAPI/Swagger spec)
+├── pkg/                      # Database, response, storage, dan Midtrans
+├── unit-test/                # Unit test repository/use case
+├── docs/                     # Swagger (`swagger.yaml`, `swagger.json`)
 ├── .env.example              # Contoh variabel environment
 ├── go.mod                    # Definisi modul Go
 └── go.sum                    # Checksum dependensi
@@ -100,6 +101,11 @@ API_INTERNAL_URL=http://localhost:8080
 # Midtrans Payment Gateway
 MIDTRANS_SERVER_KEY=
 MIDTRANS_IS_PRODUCTION=false
+
+# Supabase Storage (foto profil dan migrasi gambar)
+SUPABASE_URL=
+SUPABASE_KEY=
+SUPABASE_BUCKET=
 ```
 
 > ⚠️ **Peringatan Keamanan:** File `.env` memuat informasi sensitif (credentials, secret keys). Pastikan file ini sudah masuk ke `.gitignore` dan **tidak pernah** di-commit ke repositori publik.
@@ -162,31 +168,44 @@ backend/docs/swagger.yaml
 1. Buka Postman → Import
 2. Pilih file `docs/swagger.yaml`
 
-### Ringkasan Endpoint
+### Ringkasan Endpoint dari `internal/handler/http/router.go`
 
-| Tag       | Method | Endpoint                     | Deskripsi                         |
-|---------- |--------|------------------------------|-----------------------------------|
-| Auth      | POST   | `/api/users/register`        | Registrasi user baru              |
-| Auth      | POST   | `/api/users/login`           | Login dan mendapatkan JWT token   |
-| Obat      | GET    | `/api/obat`                  | Ambil semua data obat             |
-| Obat      | POST   | `/api/obat`                  | Tambah obat baru                  |
-| Obat      | GET    | `/api/obat/{id}`             | Detail obat                       |
-| Obat      | PUT    | `/api/obat/{id}`             | Update obat                       |
-| Obat      | DELETE | `/api/obat/{id}`             | Hapus obat                        |
-| Customer  | GET    | `/api/customer`              | Ambil semua pelanggan             |
-| Customer  | POST   | `/api/customer`              | Daftarkan pelanggan baru          |
-| Customer  | GET    | `/api/customer/{id}`         | Detail pelanggan                  |
-| Customer  | PUT    | `/api/customer/{id}`         | Update pelanggan                  |
-| Supplier  | GET    | `/api/supplier`              | Ambil semua supplier              |
-| Supplier  | POST   | `/api/supplier`              | Tambah supplier baru              |
-| Supplier  | GET    | `/api/supplier/{id}`         | Detail supplier                   |
-| Supplier  | PUT    | `/api/supplier/{id}`         | Update supplier                   |
-| Supplier  | DELETE | `/api/supplier/{id}`         | Hapus supplier                    |
-| Transaksi | POST   | `/api/transaksi`             | Update pelanggan                  |
-| Transaksi | GET    | `/api/transaksi/{id}`        | Ambil semua supplier              |
-| Transaksi | PUT    | `/api/transaksi/{id}/batal`  | Tambah supplier baru              |
-| Payment   | POST   | `/api/checkout`              | Payment & midtrans token          |
-| Restock   | POST   | `/api/restock`               | Tambah data restock barang        |
+Base URL lokal: `http://localhost:8080/api`. Endpoint bertanda **JWT** memerlukan header `Authorization: Bearer <token>`.
+
+| Grup | Method | Endpoint | Akses | Deskripsi |
+|------|--------|----------|-------|-----------|
+| Auth | POST | `/api/users/register` | Publik | Registrasi user/member |
+| Auth | POST | `/api/users/login` | Publik | Login dan memperoleh JWT |
+| Profil | GET | `/api/users/profile` | JWT | Mengambil profil user aktif |
+| Profil | PUT | `/api/users/profile` | JWT | Memperbarui profil user |
+| Profil | PUT | `/api/users/foto` | JWT | Mengunggah foto profil |
+| Obat | GET | `/api/obat` | Publik | Daftar seluruh obat |
+| Obat | POST | `/api/obat` | Publik* | Membuat data obat |
+| Obat | GET | `/api/obat/{id}` | Publik | Detail obat berdasarkan ID |
+| Obat | PUT | `/api/obat/{id}` | Publik* | Memperbarui data obat |
+| Obat | DELETE | `/api/obat/{id}` | Publik* | Menghapus data obat |
+| Customer | GET | `/api/customer` | Publik* | Daftar customer |
+| Customer | POST | `/api/customer` | Publik* | Membuat customer |
+| Customer | GET | `/api/customer/{id}` | Publik* | Detail customer |
+| Customer | PUT | `/api/customer/{id}` | Publik* | Memperbarui customer |
+| Customer | DELETE | `/api/customer/{id}` | Publik* | Menghapus customer |
+| Supplier | GET | `/api/supplier` | Publik* | Daftar supplier |
+| Supplier | POST | `/api/supplier` | Publik* | Membuat supplier |
+| Supplier | GET | `/api/supplier/{id}` | Publik* | Detail supplier |
+| Supplier | PUT | `/api/supplier/{id}` | Publik* | Memperbarui supplier |
+| Supplier | DELETE | `/api/supplier/{id}` | Publik* | Menghapus supplier |
+| Transaksi | POST | `/api/transaksi` | JWT | Membuat transaksi/checkout |
+| Transaksi | GET | `/api/transaksi` | JWT | Riwayat transaksi user aktif |
+| Transaksi | GET | `/api/transaksi/{id}` | JWT | Detail transaksi |
+| Transaksi | GET | `/api/transaksi/all` | Kasir/Admin | Seluruh transaksi |
+| Transaksi | PUT | `/api/transaksi/{id}/batal` | Kasir/Admin | Membatalkan transaksi |
+| Transaksi | PATCH | `/api/transaksi/{id}/status-pesanan` | Kasir/Admin | Memperbarui status pesanan |
+| Payment | POST | `/api/checkout` | Publik* | Membuat token transaksi Midtrans Snap |
+| Payment | POST | `/api/checkout/notification` | Midtrans webhook | Memproses notifikasi status Midtrans |
+| Restock | POST | `/api/restock` | Publik* | Membuat restock obat |
+| Migration | GET | `/api/migrate-images` | Publik* | Menjalankan migrasi gambar |
+
+> **Catatan keamanan:** `Publik*` berarti route tersebut belum dipasangi middleware autentikasi pada `router.go`, bukan rekomendasi akses. Endpoint mutasi dan migrasi sebaiknya dilindungi sebelum deployment production.
 
 ---
 
@@ -194,7 +213,7 @@ backend/docs/swagger.yaml
 
 - **Engine:** PostgreSQL
 - **Hosting:** Supabase (cloud) atau lokal
-- **ORM:** GORM dengan auto-migrate
+- **Database access:** pgx v5 connection pool
 
 Schema dan relasi antar tabel dapat dilihat di **Entity Relationship Diagram (ERD)** yang tersedia di:
 
