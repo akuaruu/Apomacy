@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
     Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User, RefreshCw,
@@ -9,7 +9,6 @@ import {
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
 
 interface Member {
     id: number;
@@ -21,8 +20,29 @@ interface Member {
     rawBirthDate: string;
     address: string;
     email: string | null;
-    source: "customer" | "user";
 }
+
+interface CustomerApiItem {
+    id_customer: number;
+    no_member?: string;
+    nama_customer?: string;
+    jenis_kelamin?: string | null;
+    no_telp?: string;
+    tanggal_lahir?: string | null;
+    alamat?: string | null;
+    email?: string | null;
+}
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+    if (typeof error === "object" && error !== null && "response" in error) {
+        const response = (error as {
+            response?: { data?: { error?: string; detail?: string } };
+        }).response;
+        return response?.data?.detail || response?.data?.error || fallback;
+    }
+
+    return error instanceof Error ? error.message : fallback;
+};
 
 export default function MemberPage() {
     const router = useRouter();
@@ -54,61 +74,65 @@ export default function MemberPage() {
     // Admin selalu bisa delete
     const canDelete = true;
 
-    useEffect(() => {
-        const token = Cookies.get("apomacy_token");
-        if (!token) {
-            router.replace("/login");
-            return;
-        }
-        fetchMembers();
-    }, [router]);
-
-    const fetchMembers = async () => {
+    const fetchMembers = useCallback(async () => {
+        await Promise.resolve();
         setLoading(true);
         setError(null);
+
         try {
-            // Karena backend GET /customer mengalami error 500 akibat NULL scan, 
-            // kita ambil data customer dari history transaksi sesuai permintaan
-            const response = await api.get('/transaksi/all');
-            const transactions = response.data?.data || response.data || [];
+            const response = await api.get('/customer');
+            const rawData: CustomerApiItem[] = Array.isArray(response.data?.data)
+                ? response.data.data
+                : Array.isArray(response.data)
+                    ? response.data
+                    : [];
 
-            const customerMap = new Map<string, Member>();
+            const mappedData = rawData.map((item): Member => {
+                let calculatedAge: number | string = "";
 
-            transactions.forEach((tx: any) => {
-                const nama = tx.nama_customer || tx.pengiriman?.nama_penerima;
-                if (!nama) return;
-                
-                // Jika sudah ada dan ini transaksi lama, skip (kita ambil yang terbaru)
-                if (customerMap.has(nama.toLowerCase())) return;
+                if (item.tanggal_lahir) {
+                    const birthDate = new Date(item.tanggal_lahir);
+                    if (!Number.isNaN(birthDate.getTime())) {
+                        calculatedAge = new Date().getFullYear() - birthDate.getFullYear();
+                    }
+                }
 
-                const memberData: Member = {
-                    id: tx.id_customer || -(tx.id_transaksi), // Fallback ke id negatif jika null agar tidak tabrakan
-                    noMember: tx.id_customer ? `MBR-${String(tx.id_customer).padStart(3, '0')}` : `MBR-TX${tx.id_transaksi}`,
-                    name: nama,
-                    gender: "L", // Default karena di transaksi tidak ada gender
-                    phone: tx.pengiriman?.no_hp_penerima || "-",
-                    age: "-",
-                    rawBirthDate: "",
-                    address: tx.pengiriman?.alamat_pengiriman || "-",
-                    email: null,
-                    source: "customer"
+                return {
+                    id: item.id_customer,
+                    noMember: item.no_member || `MBR-${String(item.id_customer).padStart(3, '0')}`,
+                    name: item.nama_customer || "Tanpa Nama",
+                    gender: item.jenis_kelamin || "L",
+                    phone: item.no_telp || "-",
+                    age: calculatedAge,
+                    rawBirthDate: item.tanggal_lahir || "",
+                    address: item.alamat || "-",
+                    email: item.email || null,
                 };
-
-                customerMap.set(nama.toLowerCase(), memberData);
             });
 
-            setMembers(Array.from(customerMap.values()));
-        } catch (err: any) {
-            console.error("Gagal mengambil data:", err);
-            if (err.response?.status === 401 || err.response?.status === 403) {
-                setError("Akses ditolak. Silakan login kembali.");
-            } else {
-                setError("Gagal memuat data customer. Pastikan server berjalan.");
-            }
+            setMembers(mappedData);
+        } catch (error) {
+            const message = getApiErrorMessage(error, "Gagal mengambil data member.");
+            console.error("Gagal mengambil data:", message);
+            setMembers([]);
+            setError(message);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!Cookies.get("apomacy_token")) {
+            router.replace("/login");
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            void fetchMembers();
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [fetchMembers, router]);
 
     const handleAddClick = () => {
         setMode("add");
@@ -174,8 +198,9 @@ export default function MemberPage() {
                     setMode("view");
                     setSelectedMember(null);
                 } catch (error) {
-                    console.error("Gagal menghapus:", error);
-                    alert("Gagal menghapus member!");
+                    const message = getApiErrorMessage(error, "Gagal menghapus member.");
+                    console.error("Gagal menghapus:", message);
+                    alert(message);
                 }
             }
         });
@@ -222,8 +247,9 @@ export default function MemberPage() {
                     setMode("view");
                     setSelectedMember(null);
                 } catch (error) {
-                    console.error("Gagal menyimpan:", error);
-                    alert("Gagal menyimpan data member!");
+                    const message = getApiErrorMessage(error, "Gagal menyimpan data member.");
+                    console.error("Gagal menyimpan:", message);
+                    alert(message);
                 }
             }
         });

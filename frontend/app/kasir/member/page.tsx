@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-    Search, Plus, Edit2, Save, XCircle, Loader2, User, RefreshCw,
+    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User, RefreshCw,
     Users, ShieldAlert, Phone, Cake, BadgeCheck, AlertTriangle
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
@@ -22,11 +22,33 @@ interface Member {
     email: string | null;
 }
 
+interface CustomerApiItem {
+    id_customer: number;
+    no_member?: string;
+    nama_customer?: string;
+    jenis_kelamin?: string | null;
+    no_telp?: string;
+    tanggal_lahir?: string | null;
+    alamat?: string | null;
+    email?: string | null;
+}
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+    if (typeof error === "object" && error !== null && "response" in error) {
+        const response = (error as {
+            response?: { data?: { error?: string; detail?: string } };
+        }).response;
+        return response?.data?.detail || response?.data?.error || fallback;
+    }
+
+    return error instanceof Error ? error.message : fallback;
+};
+
 export default function MemberPage() {
     const router = useRouter();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
@@ -38,7 +60,7 @@ export default function MemberPage() {
         message: string;
         action: () => void;
     }>({
-        isOpen: false, type: "tambah", title: "", message: "", action: () => {},
+        isOpen: false, type: "tambah", title: "", message: "", action: () => { },
     });
 
     const [formData, setFormData] = useState({
@@ -49,73 +71,85 @@ export default function MemberPage() {
         age: ""
     });
 
-    useEffect(() => {
-        const token = Cookies.get("apomacy_token");
-        if (!token) {
-            router.replace("/login");
-            return;
-        }
-        fetchMembers();
-    }, [router]);
+    const canDelete = false;
 
-    const fetchMembers = async () => {
+    const fetchMembers = useCallback(async () => {
+        await Promise.resolve();
         setLoading(true);
-        setError(null);
+        setLoadError(null);
+
         try {
-            // Karena backend GET /customer mengalami error 500, kita fetch 
-            // dari history transaksi agar sesuai dengan kebutuhan
-            const response = await api.get('/transaksi/all');
-            const transactions = response.data?.data || response.data || [];
+            const response = await api.get('/customer');
+            const rawData: CustomerApiItem[] = Array.isArray(response.data?.data)
+                ? response.data.data
+                : Array.isArray(response.data)
+                    ? response.data
+                    : [];
 
-            const customerMap = new Map<string, Member>();
+            const mappedData = rawData.map((item): Member => {
+                let calculatedAge: number | string = "";
 
-            transactions.forEach((tx: any) => {
-                const nama = tx.nama_customer || tx.pengiriman?.nama_penerima;
-                if (!nama) return;
-                
-                // Jika sudah ada dan ini transaksi lama, skip (kita ambil yang terbaru)
-                if (customerMap.has(nama.toLowerCase())) return;
+                if (item.tanggal_lahir) {
+                    const birthDate = new Date(item.tanggal_lahir);
+                    if (!Number.isNaN(birthDate.getTime())) {
+                        calculatedAge = new Date().getFullYear() - birthDate.getFullYear();
+                    }
+                }
 
-                const memberData: Member = {
-                    id: tx.id_customer || -(tx.id_transaksi), // Fallback ke id negatif jika null agar tidak tabrakan
-                    noMember: tx.id_customer ? `MBR-${String(tx.id_customer).padStart(3, '0')}` : `MBR-TX${tx.id_transaksi}`,
-                    name: nama,
-                    gender: "L", // Default karena di transaksi tidak ada gender
-                    phone: tx.pengiriman?.no_hp_penerima || "-",
-                    age: "-",
-                    rawBirthDate: "",
-                    address: tx.pengiriman?.alamat_pengiriman || "-",
-                    email: null
+                return {
+                    id: item.id_customer,
+                    noMember: item.no_member || `MBR-${String(item.id_customer).padStart(3, '0')}`,
+                    name: item.nama_customer || "Tanpa Nama",
+                    gender: item.jenis_kelamin || "L",
+                    phone: item.no_telp || "-",
+                    age: calculatedAge,
+                    rawBirthDate: item.tanggal_lahir || "",
+                    address: item.alamat || "-",
+                    email: item.email || null,
                 };
-
-                customerMap.set(nama.toLowerCase(), memberData);
             });
 
-            setMembers(Array.from(customerMap.values()));
-        } catch (err: any) {
-            console.error("Gagal mengambil data:", err);
-            if (err.response?.status === 401 || err.response?.status === 403) {
-                setError("Akses ditolak. Silakan login kembali.");
-            } else {
-                setError("Gagal memuat data customer. Pastikan server berjalan.");
-            }
+            setMembers(mappedData);
+        } catch (error) {
+            const message = getApiErrorMessage(error, "Gagal mengambil data member.");
+            console.error("Gagal mengambil data:", message);
+            setMembers([]);
+            setLoadError(message);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (!Cookies.get("apomacy_token")) {
+            router.replace("/login");
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            void fetchMembers();
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [fetchMembers, router]);
+
 
     const handleAddClick = () => {
         setMode("add");
 
+
         let nextSequence = 1;
         if (members.length > 0) {
+
             const numbers = members.map(m => {
                 const match = m.noMember.match(/\d+/);
                 return match ? parseInt(match[0], 10) : 0;
             });
+            // Cari angka terbesar, lalu tambah 1
             nextSequence = Math.max(...numbers) + 1;
         }
 
+        // Format menjadi 3 digit (contoh: MBR-005)
         const generatedNo = `MBR-${String(nextSequence).padStart(3, '0')}`;
 
         setFormData({
@@ -136,7 +170,7 @@ export default function MemberPage() {
             name: member.name,
             gender: member.gender,
             phone: member.phone,
-            age: member.age.toString()
+            age: member.age.toString(),
         });
     };
 
@@ -149,6 +183,30 @@ export default function MemberPage() {
             gender: member.gender,
             phone: member.phone,
             age: member.age.toString()
+        });
+    };
+
+    const handleDeleteClick = (member: Member) => {
+        if (!canDelete) return;
+
+        setConfirmModal({
+            isOpen: true,
+            type: "hapus",
+            title: "Hapus Member",
+            message: `Apakah Anda yakin ingin menghapus member ${member.name}?`,
+            action: async () => {
+                try {
+                    await api.delete(`/customer/${member.id}`);
+                    fetchMembers();
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                    setMode("view");
+                    setSelectedMember(null);
+                } catch (error) {
+                    const message = getApiErrorMessage(error, "Gagal menghapus member.");
+                    console.error("Gagal menghapus:", message);
+                    alert(message);
+                }
+            }
         });
     };
 
@@ -191,10 +249,10 @@ export default function MemberPage() {
                     fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
-                    setSelectedMember(null);
                 } catch (error) {
-                    console.error("Gagal menyimpan:", error);
-                    alert("Gagal menyimpan data member!");
+                    const message = getApiErrorMessage(error, "Gagal menyimpan data member.");
+                    console.error("Gagal menyimpan:", message);
+                    alert(message);
                 }
             }
         });
@@ -209,22 +267,6 @@ export default function MemberPage() {
         );
     }, [members, searchQuery]);
 
-    // Error state
-    if (error && !loading) {
-        return (
-            <div className="flex h-[80vh] items-center justify-center p-8">
-                <div className="bg-discount-red/10 border border-discount-red text-discount-red p-6 rounded-2xl max-w-md text-center space-y-3">
-                    <AlertTriangle size={32} className="mx-auto" />
-                    <h2 className="font-black text-lg">Gagal Memuat Data</h2>
-                    <p className="text-sm font-medium">{error}</p>
-                    <button onClick={fetchMembers} className="mt-2 px-4 py-2 bg-apomacy-primary text-white rounded-xl text-sm font-bold hover:bg-apomacy-dark transition-colors">
-                        Coba Lagi
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col h-[calc(100vh-90px)] bg-background relative max-w-full overflow-hidden p-6 gap-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
@@ -238,7 +280,6 @@ export default function MemberPage() {
                     </p>
                 </div>
 
-                {/* Badge Role Kasir */}
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 bg-amber-50 text-amber-700 border-amber-200">
                     <ShieldAlert size={14} />
                     Kasir · Tambah & Edit
@@ -248,6 +289,12 @@ export default function MemberPage() {
             <div className="flex flex-col lg:flex-row gap-6 h-full min-h-0 overflow-hidden">
                 {/* Bagian Kiri: Tabel */}
                 <div className="w-full lg:w-7/12 flex flex-col bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden min-h-0">
+                    {loadError && (
+                        <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                            <span>{loadError}</span>
+                        </div>
+                    )}
                     <div className="p-4 border-b border-outline-variant flex flex-col sm:flex-row gap-3 shrink-0 bg-surface-container-lowest">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -301,7 +348,7 @@ export default function MemberPage() {
                                     <th className="px-4 py-3 text-center font-semibold w-24">Gender</th>
                                     <th className="px-4 py-3 text-left font-semibold w-36">No. Telepon</th>
                                     <th className="px-4 py-3 text-center font-semibold w-16">Usia</th>
-                                    <th className="px-4 py-3 text-center font-semibold w-20">Aksi</th>
+                                    <th className="px-4 py-3 text-center font-semibold w-24">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-outline-variant">
@@ -310,7 +357,7 @@ export default function MemberPage() {
                                         <td colSpan={7} className="py-16 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-3">
                                                 <Loader2 className="animate-spin text-apomacy-primary" size={32} />
-                                                <span className="text-sm font-medium">Memuat data customer...</span>
+                                                <span className="text-sm font-medium">Memuat data member...</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -319,22 +366,21 @@ export default function MemberPage() {
                                         <td colSpan={7} className="py-16 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-2">
                                                 <Search size={40} className="opacity-20" />
-                                                <span className="text-sm font-medium">Tidak ada data customer.</span>
+                                                <span className="text-sm font-medium">Tidak ada data member.</span>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredMembers.map((member, idx) => {
-                                        const isSelected = selectedMember?.noMember === member.noMember;
+                                        const isSelected = selectedMember?.id === member.id;
                                         return (
                                             <tr
-                                                key={member.noMember}
+                                                key={member.id}
                                                 onClick={() => handleRowClick(member)}
-                                                className={`cursor-pointer transition-colors ${
-                                                    isSelected
+                                                className={`cursor-pointer transition-colors ${isSelected
                                                         ? "bg-blue-50/70 hover:bg-blue-50"
                                                         : "hover:bg-gray-50"
-                                                }`}
+                                                    }`}
                                             >
                                                 <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
                                                 <td className="px-4 py-3">
@@ -346,11 +392,10 @@ export default function MemberPage() {
                                                     {member.name}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                        member.gender === "P"
+                                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${member.gender === "P"
                                                             ? "bg-pink-50 text-pink-600 border border-pink-100"
                                                             : "bg-sky-50 text-sky-600 border border-sky-100"
-                                                    }`}>
+                                                        }`}>
                                                         {member.gender === "P" ? "Perempuan" : "Laki-laki"}
                                                     </span>
                                                 </td>
@@ -367,7 +412,17 @@ export default function MemberPage() {
                                                         >
                                                             <Edit2 size={16} />
                                                         </button>
-                                                        {/* Kasir TIDAK bisa delete - tombol hapus tidak ditampilkan */}
+
+                                                        {/* TOMBOL HAPUS HANYA UNTUK ADMIN */}
+                                                        {canDelete && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(member); }}
+                                                                className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                                title="Hapus"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -468,23 +523,21 @@ export default function MemberPage() {
 
                                 <div className="flex gap-3 mt-8 border-t border-outline-variant pt-4 shrink-0">
                                     <button type="submit" disabled={mode === "view"}
-                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
-                                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary"
-                                        }`}>
+                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary"
+                                            }`}>
                                         <Save size={16} /> Simpan
                                     </button>
                                     <button type="button" onClick={() => { setMode("view"); setSelectedMember(null); }} disabled={mode === "view"}
-                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
-                                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low"
-                                        }`}>
+                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low"
+                                            }`}>
                                         <XCircle size={16} /> Batal
                                     </button>
                                 </div>
 
-                                {mode === "view" && selectedMember && (
+                                {mode === "view" && selectedMember && !canDelete && (
                                     <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
                                         <ShieldAlert size={14} className="shrink-0" />
-                                        Akun Anda (Kasir) tidak memiliki izin untuk menghapus data Customer.
+                                        Akun Anda tidak memiliki izin untuk menghapus Data Customer.
                                     </p>
                                 )}
                             </>

@@ -6,15 +6,9 @@ import {
     Search, Plus, Trash2, ShoppingCart, User, Pill, CreditCard, Banknote, QrCode, Receipt, XCircle, Loader2, AlertTriangle
 } from "lucide-react";
 import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 
-interface MyTokenPayload {
-    id_user: number;
-    role: string;
-    exp: number;
-}
 interface Member {
     id: string;
     name: string;
@@ -40,10 +34,47 @@ interface CartItem {
     isKeras: boolean;
 }
 
+interface MedicineApiItem {
+    id_obat?: number;
+    IDObat?: number;
+    id?: number;
+    kode_obat?: string;
+    KodeObat?: string;
+    nama_obat?: string;
+    NamaObat?: string;
+    jenis_obat?: string;
+    JenisObat?: string;
+    harga_jual?: number;
+    HargaJual?: number;
+    stok?: number;
+    Stok?: number;
+}
+
+interface CustomerApiItem {
+    id_customer?: number;
+    IDCustomer?: number;
+    id?: number;
+    nama_customer?: string;
+    NamaCustomer?: string;
+    nama?: string;
+    no_telp?: string;
+    NoTelp?: string;
+}
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+    if (typeof error === "object" && error !== null && "response" in error) {
+        const response = (error as {
+            response?: { data?: { error?: string; detail?: string } };
+        }).response;
+        return response?.data?.detail || response?.data?.error || fallback;
+    }
+
+    return error instanceof Error ? error.message : fallback;
+};
+
 export default function TransaksiOfflinePage() {
-    const [isMounted, setIsMounted] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [masterDataError, setMasterDataError] = useState<string | null>(null);
 
     const [noTrx, setNoTrx] = useState("");
 
@@ -72,10 +103,11 @@ export default function TransaksiOfflinePage() {
     const [isSaving, setIsSaving] = useState(false);
 
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+    const toastTimerRef = useRef<number | null>(null);
     const showToast = (message: string, type: "success" | "error" = "success") => {
         setToast({ message, type });
-        window.clearTimeout((window as any).__toastTimer);
-        (window as any).__toastTimer = window.setTimeout(() => setToast(null), 3500);
+        if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 3500);
     };
 
     const [confirmModal, setConfirmModal] = useState<{
@@ -84,7 +116,7 @@ export default function TransaksiOfflinePage() {
         message: string;
         type: "tambah" | "edit" | "hapus" | "batal";
         onConfirm: () => void;
-    }>({ isOpen: false, title: "", message: "", type: "batal", onConfirm: () => {} });
+    }>({ isOpen: false, title: "", message: "", type: "batal", onConfirm: () => { } });
 
     const closeConfirmModal = () => setConfirmModal((prev) => ({ ...prev, isOpen: false }));
 
@@ -93,53 +125,53 @@ export default function TransaksiOfflinePage() {
     const cartHasObatKeras = cart.some((item) => item.isKeras);
 
     useEffect(() => {
-        setIsMounted(true);
-        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-        const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
-        setNoTrx(`TRX-${dateStr}-${randomNum}`);
-
-        const token = Cookies.get("apomacy_token");
-
-        if (token) {
-            try {
-                const decoded = jwtDecode<MyTokenPayload>(token);
-                if (decoded.id_user) {
-                    setCurrentUserId(decoded.id_user);
-                }
-            } catch (error) {
-                console.error("Gagal membedah token kasir", error);
-            }
-        }
-
         const fetchMasterData = async () => {
             setIsLoadingData(true);
-            try {
-                const [obatRes, custRes] = await Promise.all([
-                    api.get("/obat/").catch(() => ({ data: { data: [] } })),
-                    api.get("/customer/").catch(() => ({ data: { data: [] } }))
-                ]);
+            setMasterDataError(null);
 
+            const [obatResult, customerResult] = await Promise.allSettled([
+                api.get("/obat"),
+                api.get("/customer"),
+            ]);
+
+            setNoTrx(`TRX-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
+
+            try {
+                if (obatResult.status === "rejected") {
+                    throw new Error(getApiErrorMessage(obatResult.reason, "Gagal memuat data obat."));
+                }
+
+                const obatRes = obatResult.value;
                 const obatRaw = obatRes.data?.data || obatRes.data || [];
-                const mappedObat = obatRaw.map((o: any) => ({
+                const mappedObat = obatRaw.map((o: MedicineApiItem) => ({
                     id: o.id_obat || o.IDObat || o.id,
                     code: o.kode_obat || o.KodeObat,
                     name: o.nama_obat || o.NamaObat,
                     category: o.jenis_obat || o.JenisObat || "Umum",
-                    price: o.harga_jual || o.HargaJual || 0,
-                    stock: o.stok || o.Stok || 0,
+                    price: Number(o.harga_jual ?? o.HargaJual ?? 0),
+                    stock: Number(o.stok ?? o.Stok ?? 0),
                 }));
                 setMedicinesData(mappedObat);
 
-                const custRaw = custRes.data?.data || custRes.data || [];
-                const mappedCust = custRaw.map((c: any) => ({
-                    id: c.id_customer?.toString() || c.IDCustomer?.toString() || c.id?.toString(),
-                    name: c.nama_customer || c.NamaCustomer || c.nama || "Tanpa Nama",
-                    phone: c.no_telp || c.NoTelp || "-",
-                }));
-                setMembersData(mappedCust);
+                if (customerResult.status === "rejected") {
+                    throw new Error(getApiErrorMessage(customerResult.reason, "Gagal memuat data member."));
+                }
 
+                const custRes = customerResult.value;
+                const custRaw = custRes.data?.data || custRes.data || [];
+                const mappedCust = custRaw
+                    .map((c: CustomerApiItem) => ({
+                        id: String(c.id_customer ?? c.IDCustomer ?? c.id ?? ""),
+                        name: c.nama_customer || c.NamaCustomer || c.nama || "Tanpa Nama",
+                        phone: c.no_telp || c.NoTelp || "-",
+                    }))
+                    .filter((customer: Member) => /^\d+$/.test(customer.id));
+                setMembersData(mappedCust);
             } catch (error) {
                 console.error("Gagal mengambil data referensi:", error);
+                const message = getApiErrorMessage(error, "Gagal memuat data referensi transaksi.");
+                setMasterDataError(message);
+                showToast(message, "error");
             } finally {
                 setIsLoadingData(false);
                 if (medSearchInputRef.current) {
@@ -209,30 +241,17 @@ export default function TransaksiOfflinePage() {
     const totalTagihan = cart.reduce((total, item) => total + item.subtotal, 0);
     const totalItem = cart.reduce((total, item) => total + item.qty, 0);
     const isCashless = paymentMethod === "QRIS" || paymentMethod === "Debit";
-    const kembalian = (typeof amountPaid === "number" ? amountPaid : 0) - totalTagihan;
+    const effectiveAmountPaid = isCashless ? totalTagihan : amountPaid;
+    const kembalian = (typeof effectiveAmountPaid === "number" ? effectiveAmountPaid : 0) - totalTagihan;
 
-    // Pembayaran kartu/QRIS tidak punya konsep "kembalian" — nominal selalu
-    // pas senilai total tagihan, karena yang memproses approval adalah mesin
-    // EDC/QRIS itu sendiri. Sistem kasir hanya mencatat metodenya.
-    useEffect(() => {
-        if (isCashless) {
-            setAmountPaid(totalTagihan);
-        } else {
-            setAmountPaid("");
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [paymentMethod]);
-
-    useEffect(() => {
-        if (isCashless) {
-            setAmountPaid(totalTagihan);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [totalTagihan]);
+    const handlePaymentMethodChange = (method: "Tunai" | "QRIS" | "Debit") => {
+        setPaymentMethod(method);
+        setAmountPaid("");
+    };
 
     // VALIDASI KETAT: Tombol bayar tidak bisa ditekan jika belum pilih member,
     // atau jika ada obat keras tapi nomor resep belum diisi
-    const isPaymentValid = typeof amountPaid === "number" && amountPaid >= totalTagihan && cart.length > 0 && selectedMember !== null && totalTagihan > 0 && (!cartHasObatKeras || noResep.trim() !== "");
+    const isPaymentValid = typeof effectiveAmountPaid === "number" && effectiveAmountPaid >= totalTagihan && cart.length > 0 && selectedMember !== null && totalTagihan > 0 && (!cartHasObatKeras || noResep.trim() !== "");
 
     const handleCetakTransaksi = () => {
         if (!isPaymentValid) {
@@ -243,7 +262,7 @@ export default function TransaksiOfflinePage() {
             return;
         }
 
-        if (!currentUserId) {
+        if (!Cookies.get("apomacy_token")) {
             showToast("Sesi login tidak valid. Silakan login ulang untuk memproses transaksi.", "error");
             return;
         }
@@ -261,14 +280,22 @@ export default function TransaksiOfflinePage() {
     };
 
     const submitTransaksi = async () => {
+        if (isSaving || !selectedMember || cart.length === 0) return;
+
+        const customerId = Number(selectedMember.id);
+        if (!Number.isInteger(customerId) || customerId <= 0) {
+            showToast("ID member tidak valid. Muat ulang data member lalu pilih kembali.", "error");
+            return;
+        }
+
         // Struktur payload disesuaikan persis dengan Struct Golang model.Transaksi
         const payload = {
             no_transaksi: noTrx,
-            id_customer: parseInt(selectedMember!.id),
-            nama_customer: selectedMember!.name,
+            id_customer: customerId,
+            nama_customer: selectedMember.name,
             total_item: totalItem,
             subtotal: totalTagihan,
-            total_bayar: totalTagihan,
+            total_bayar: effectiveAmountPaid,
             metode_pembayaran: paymentMethod,
             status: "Selesai",         // Langsung selesai karena dibayar di kasir
             status_pesanan: "Selesai", // Transaksi offline kasir langsung selesai di tempat
@@ -289,8 +316,8 @@ export default function TransaksiOfflinePage() {
 
             showToast(`Transaksi ${noTrx} berhasil disimpan. Struk sedang dicetak...`, "success");
             setTimeout(() => window.location.reload(), 1200);
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.error || error.message;
+        } catch (error: unknown) {
+            const errorMsg = getApiErrorMessage(error, "Gagal menyimpan transaksi.");
             console.error("Gagal menyimpan transaksi:", errorMsg);
             showToast(`Transaksi Gagal: ${errorMsg}`, "error");
         } finally {
@@ -317,10 +344,14 @@ export default function TransaksiOfflinePage() {
         });
     };
 
-    if (!isMounted) return null;
-
     return (
         <div className="flex flex-col w-full h-[calc(100vh-40px)] relative">
+            {masterDataError && (
+                <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                    <span>{masterDataError}</span>
+                </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
 
                 {/* ================= PANEL KIRI: FORM INPUT ================= */}
@@ -575,7 +606,7 @@ export default function TransaksiOfflinePage() {
                                             <button
                                                 key={method}
                                                 type="button"
-                                                onClick={() => setPaymentMethod(method)}
+                                                onClick={() => handlePaymentMethodChange(method)}
                                                 className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${paymentMethod === method ? "border-apomacy-primary bg-apomacy-primary/10 text-apomacy-primary shadow-sm" : "border-gray-200 text-gray-500 hover:bg-gray-50"
                                                     }`}
                                             >
@@ -602,7 +633,7 @@ export default function TransaksiOfflinePage() {
                                     <input
                                         type="number"
                                         placeholder="Masukkan jumlah uang..."
-                                        value={amountPaid}
+                                        value={effectiveAmountPaid}
                                         disabled={isCashless}
                                         onChange={(e) => setAmountPaid(e.target.value === "" ? "" : Number(e.target.value))}
                                         className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold font-mono border outline-none transition-all ${isCashless ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary"}`}
