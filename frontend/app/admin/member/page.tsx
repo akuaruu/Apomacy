@@ -67,33 +67,37 @@ export default function MemberPage() {
         setLoading(true);
         setError(null);
         try {
-            const response = await api.get('/customer');
-            const rawData = response.data?.data || response.data || [];
+            // Karena backend GET /customer mengalami error 500 akibat NULL scan, 
+            // kita ambil data customer dari history transaksi sesuai permintaan
+            const response = await api.get('/transaksi/all');
+            const transactions = response.data?.data || response.data || [];
 
-            const mappedData: Member[] = rawData.map((item: any) => {
-                let calculatedAge: number | string = "";
+            const customerMap = new Map<string, Member>();
 
-                if (item.tanggal_lahir) {
-                    const birthYear = new Date(item.tanggal_lahir).getFullYear();
-                    const currentYear = new Date().getFullYear();
-                    calculatedAge = currentYear - birthYear;
-                }
+            transactions.forEach((tx: any) => {
+                const nama = tx.nama_customer || tx.pengiriman?.nama_penerima;
+                if (!nama) return;
+                
+                // Jika sudah ada dan ini transaksi lama, skip (kita ambil yang terbaru)
+                if (customerMap.has(nama.toLowerCase())) return;
 
-                return {
-                    id: item.id_customer,
-                    noMember: item.no_member || `MBR-${String(item.id_customer).padStart(3, '0')}`,
-                    name: item.nama_customer,
-                    gender: item.jenis_kelamin || "L",
-                    phone: item.no_telp || "-",
-                    age: calculatedAge,
-                    rawBirthDate: item.tanggal_lahir || "",
-                    address: item.alamat || "-",
-                    email: item.email || null,
-                    source: "customer" as const
+                const memberData: Member = {
+                    id: tx.id_customer || -(tx.id_transaksi), // Fallback ke id negatif jika null agar tidak tabrakan
+                    noMember: tx.id_customer ? `MBR-${String(tx.id_customer).padStart(3, '0')}` : `MBR-TX${tx.id_transaksi}`,
+                    name: nama,
+                    gender: "L", // Default karena di transaksi tidak ada gender
+                    phone: tx.pengiriman?.no_hp_penerima || "-",
+                    age: "-",
+                    rawBirthDate: "",
+                    address: tx.pengiriman?.alamat_pengiriman || "-",
+                    email: null,
+                    source: "customer"
                 };
+
+                customerMap.set(nama.toLowerCase(), memberData);
             });
 
-            setMembers(mappedData);
+            setMembers(Array.from(customerMap.values()));
         } catch (err: any) {
             console.error("Gagal mengambil data:", err);
             if (err.response?.status === 401 || err.response?.status === 403) {
@@ -350,10 +354,10 @@ export default function MemberPage() {
                                     </tr>
                                 ) : (
                                     filteredMembers.map((member, idx) => {
-                                        const isSelected = selectedMember?.id === member.id;
+                                        const isSelected = selectedMember?.noMember === member.noMember;
                                         return (
                                             <tr
-                                                key={member.id}
+                                                key={member.noMember}
                                                 onClick={() => handleRowClick(member)}
                                                 className={`cursor-pointer transition-colors ${
                                                     isSelected
