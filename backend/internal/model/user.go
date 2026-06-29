@@ -59,6 +59,9 @@ type UserRepository interface {
 	UpdateFotoProfil(ctx context.Context, userID int, fotoURL string) error
 	GetProfile(ctx context.Context, id int) (*UserProfile, error)
 	UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error
+	GetAllStaff(ctx context.Context) ([]User, error)
+	Delete(ctx context.Context, id int) error
+	UpdateByAdmin(ctx context.Context, user *User) error
 }
 
 // UserUsecase contract
@@ -68,4 +71,7 @@ type UserUsecase interface {
 	GetProfile(ctx context.Context, id int) (*UserProfile, error)
 	UploadFotoProfil(ctx context.Context, userID int, fileBytes []byte, fileName, contentType string) (string, error)
 	UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error
+	GetAllStaff(ctx context.Context) ([]User, error)
+	DeleteUser(ctx context.Context, id int) error
+	UpdateUserByAdmin(ctx context.Context, user *User) error
 }

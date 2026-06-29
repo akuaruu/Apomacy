@@ -164,3 +164,15 @@ func (u *userUsecase) UpdateProfileText(ctx context.Context, userID int, nama st
 	// Teruskan ke repository untuk eksekusi query
 	return u.userRepo.UpdateProfileText(ctx, userID, nama, noTelp, tglLahir, alamat)
 }
+
+func (u *userUsecase) GetAllStaff(ctx context.Context) ([]model.User, error) {
+	return u.userRepo.GetAllStaff(ctx)
+}
+
+func (u *userUsecase) DeleteUser(ctx context.Context, id int) error {
+	return u.userRepo.Delete(ctx, id)
+}
+
+func (u *userUsecase) UpdateUserByAdmin(ctx context.Context, user *model.User) error {
+	return u.userRepo.UpdateByAdmin(ctx, user)
+}

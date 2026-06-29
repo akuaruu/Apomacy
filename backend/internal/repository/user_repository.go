@@ -163,3 +163,62 @@ func (r *userRepository) UpdateProfileText(
 
 	return nil
 }
+
+func (r *userRepository) GetAllStaff(ctx context.Context) ([]model.User, error) {
+	query := `
+		SELECT id_user, username, nama_lengkap, role, no_telp, email, status, created_at, last_login
+		FROM "user"
+		WHERE role IN ('Admin', 'Kasir')
+		ORDER BY id_user ASC
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("gagal mengambil data staff: %v", err)
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		var u model.User
+		err := rows.Scan(
+			&u.ID, &u.Username, &u.NamaLengkap,
+			&u.Role, &u.NoTelp, &u.Email, &u.Status, &u.CreatedAt, &u.LastLogin,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("gagal membaca data staff: %v", err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+func (r *userRepository) Delete(ctx context.Context, id int) error {
+	query := `DELETE FROM "user" WHERE id_user = $1`
+	result, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("gagal menghapus user: %v", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user dengan ID %d tidak ditemukan", id)
+	}
+	return nil
+}
+
+func (r *userRepository) UpdateByAdmin(ctx context.Context, user *model.User) error {
+	query := `
+		UPDATE "user"
+		SET nama_lengkap = $1, no_telp = $2, email = $3, role = $4, status = $5
+		WHERE id_user = $6
+	`
+	result, err := r.db.Exec(ctx, query,
+		user.NamaLengkap, user.NoTelp, user.Email, user.Role, user.Status, user.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("gagal memperbarui data staff: %v", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user dengan ID %d tidak ditemukan", user.ID)
+	}
+	return nil
+}

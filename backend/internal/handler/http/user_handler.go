@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
@@ -204,4 +205,71 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	// 5. Kembalikan response 200 OK ke frontend
 	c.JSON(http.StatusOK, gin.H{"message": "Data profil berhasil diperbarui"})
+}
+
+// GetAllStaff mengambil semua user dengan role Admin/Kasir
+func (h *UserHandler) GetAllStaff(c *gin.Context) {
+	users, err := h.usecase.GetAllStaff(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data karyawan: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
+// UpdateUserByAdmin memperbarui data user oleh admin
+func (h *UserHandler) UpdateUserByAdmin(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID harus berupa angka"})
+		return
+	}
+
+	var req struct {
+		NamaLengkap string `json:"nama_lengkap"`
+		NoTelp      string `json:"no_telp"`
+		Email       string `json:"email"`
+		Role        string `json:"role"`
+		Status      string `json:"status"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format request tidak valid: " + err.Error()})
+		return
+	}
+
+	user := &model.User{
+		ID:          id,
+		NamaLengkap: req.NamaLengkap,
+		NoTelp:      req.NoTelp,
+		Email:       req.Email,
+		Role:        model.UserRole(req.Role),
+		Status:      model.UserStatus(req.Status),
+	}
+
+	if err := h.usecase.UpdateUserByAdmin(c.Request.Context(), user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Data karyawan berhasil diperbarui"})
+}
+
+// DeleteUser menghapus user berdasarkan ID
+func (h *UserHandler) DeleteUser(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID harus berupa angka"})
+		return
+	}
+
+	if err := h.usecase.DeleteUser(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Karyawan berhasil dihapus"})
 }

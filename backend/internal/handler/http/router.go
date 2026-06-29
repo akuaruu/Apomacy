@@ -128,6 +128,15 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		}
 		api.POST("/restock", restockHandler.CreateRestock)
 		api.GET("/migrate-images", migrationHandler.RunImageMigration)
+
+		// Endpoint khusus Admin untuk manajemen karyawan (staff)
+		adminUsers := api.Group("/users")
+		adminUsers.Use(middleware.RequireAuth(), middleware.RequireRole("Admin"))
+		{
+			adminUsers.GET("/staff", userHandler.GetAllStaff)
+			adminUsers.PUT("/staff/:id", userHandler.UpdateUserByAdmin)
+			adminUsers.DELETE("/staff/:id", userHandler.DeleteUser)
+		}
 	}
 
 	return r
