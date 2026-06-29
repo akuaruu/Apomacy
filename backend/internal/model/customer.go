@@ -13,18 +13,18 @@ const (
 )
 
 type Customer struct {
-	ID            int          `json:"id_customer"`
-	NoMember      string       `json:"no_member"`
-	NamaCustomer  string       `json:"nama_customer"`
-	NoTelp        string       `json:"no_telp"`
-	Alamat        string       `json:"alamat"`
-	TanggalLahir  time.Time    `json:"tanggal_lahir"`
-	JenisKelamin  JenisKelamin `json:"jenis_kelamin"`
-	Email         string       `json:"email"`
-	TanggalDaftar time.Time    `json:"tanggal_daftar"`
-	CreatedAt     time.Time    `json:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at"`
-	IDUser        int          `json:"id_user"`
+	ID            int           `json:"id_customer"`
+	NoMember      string        `json:"no_member"`
+	NamaCustomer  string        `json:"nama_customer"`
+	NoTelp        string        `json:"no_telp"`
+	Alamat        *string       `json:"alamat"`
+	TanggalLahir  *time.Time    `json:"tanggal_lahir"`
+	JenisKelamin  *JenisKelamin `json:"jenis_kelamin"`
+	Email         *string       `json:"email"`
+	TanggalDaftar time.Time     `json:"tanggal_daftar"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	IDUser        *int          `json:"id_user"`
 }
 
 type CustomerRepository interface {

@@ -581,7 +581,9 @@ func TestCreateWithDetails_GagalInsertDetail(t *testing.T) {
 		WillReturnRows(pgxmock.NewRows([]string{"id_transaksi"}).AddRow(1))
 
 	// Simulasi gagal saat insert detail
-	mock.ExpectExec("INSERT INTO detail_transaksi").WillReturnError(errors.New("db disconnect"))
+	mock.ExpectExec("INSERT INTO detail_transaksi").
+		WithArgs(1, 10, "", 0.0, 2, 0.0).
+		WillReturnError(errors.New("db disconnect"))
 	mock.ExpectRollback()
 
 	err = repo.CreateWithDetails(context.Background(), tx)

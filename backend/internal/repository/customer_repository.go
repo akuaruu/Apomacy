@@ -26,11 +26,14 @@ func (r *customerRepository) Create(ctx context.Context, customer *model.Custome
 			no_member,
 			nama_customer,
 			no_telp,
+			alamat,
+			tanggal_lahir,
+			jenis_kelamin,
 			email,
 			tanggal_daftar,
 			id_user
 		) VALUES (
-			$1, $2, $3, $4, $5, $6
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 		RETURNING id_customer, created_at, updated_at
 	`
@@ -41,6 +44,9 @@ func (r *customerRepository) Create(ctx context.Context, customer *model.Custome
 		customer.NoMember,
 		customer.NamaCustomer,
 		customer.NoTelp,
+		customer.Alamat,
+		customer.TanggalLahir,
+		customer.JenisKelamin,
 		customer.Email,
 		customer.TanggalDaftar,
 		customer.IDUser,
@@ -60,7 +66,7 @@ func (r *customerRepository) Create(ctx context.Context, customer *model.Custome
 func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Customer, error) {
 	query := `
 		SELECT id_customer, no_member, nama_customer, no_telp, alamat, 
-		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at 
+		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at, id_user
 		FROM customer 
 		WHERE id_customer = $1
 	`
@@ -69,7 +75,7 @@ func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Custom
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&c.ID, &c.NoMember, &c.NamaCustomer, &c.NoTelp, &c.Alamat,
 		&c.TanggalLahir, &c.JenisKelamin, &c.Email, &c.TanggalDaftar,
-		&c.CreatedAt, &c.UpdatedAt,
+		&c.CreatedAt, &c.UpdatedAt, &c.IDUser,
 	)
 
 	if err != nil {
@@ -81,7 +87,7 @@ func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Custom
 func (r *customerRepository) GetAll(ctx context.Context) ([]model.Customer, error) {
 	query := `
 		SELECT id_customer, no_member, nama_customer, no_telp, alamat, 
-		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at 
+		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at, id_user
 		FROM customer 
 		ORDER BY nama_customer ASC
 	`
@@ -98,12 +104,15 @@ func (r *customerRepository) GetAll(ctx context.Context) ([]model.Customer, erro
 		err := rows.Scan(
 			&c.ID, &c.NoMember, &c.NamaCustomer, &c.NoTelp, &c.Alamat,
 			&c.TanggalLahir, &c.JenisKelamin, &c.Email, &c.TanggalDaftar,
-			&c.CreatedAt, &c.UpdatedAt,
+			&c.CreatedAt, &c.UpdatedAt, &c.IDUser,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("gagal scan data customer: %v", err)
 		}
 		customers = append(customers, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("gagal membaca data customer: %v", err)
 	}
 
 	return customers, nil

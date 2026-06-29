@@ -353,8 +353,8 @@ func TestHandler_Checkout_Gagal_SesiInvalidType(t *testing.T) {
 	req, _ := http.NewRequest("POST", "/checkout", bytes.NewBuffer(body))
 	r.ServeHTTP(w, req)
 
-	// Akan panic di type assertion `idUser.(float64)` lalu di-recover oleh Gin,
-	// atau gagal memproses. Pastikan handler aman dari panic.
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	mockUC.AssertNotCalled(t, "Checkout", mock.Anything, mock.Anything)
 }
 
 func TestHandler_GetDetail_Gagal_IDBukanAngka(t *testing.T) {

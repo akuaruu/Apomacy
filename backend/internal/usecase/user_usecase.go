@@ -48,13 +48,15 @@ func (u *userUsecase) Register(ctx context.Context, user *model.User) error {
 		return err
 	}
 
+	email := user.Email
+	idUser := user.ID
 	customer := model.Customer{
 		NoMember:      fmt.Sprintf("MBR%06d", user.ID),
 		NamaCustomer:  user.NamaLengkap,
 		NoTelp:        user.NoTelp,
-		Email:         user.Email,
+		Email:         &email,
 		TanggalDaftar: time.Now(),
-		IDUser:        user.ID,
+		IDUser:        &idUser,
 	}
 
 	if err := u.customerRepo.Create(ctx, &customer); err != nil {
