@@ -19,11 +19,21 @@ export default function FooterWrapper() {
         return null;
     }
 
+    if (
+        pathname.startsWith("/dasbor") ||
+        pathname === "/faq" ||
+        pathname === "/profil" ||
+        pathname === "/riwayat-obat" ||
+        pathname.startsWith("/pembayaran")
+    ) {
+        return null;
+    }
+
     // Gunakan Footer singkat untuk keranjang, checkout, dan kasir member
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout" || pathname === "/kasir/member") {
         return <FooterSingkat />;
     }
-     if (pathname.startsWith("/kasir/member") || pathname === "/kasir/dashboard"|| pathname === "/kasir/karyawan"|| pathname === "/kasir/transaksi") {
+    if (pathname.startsWith("/kasir") || pathname === "/kasir/member" || pathname === "/kasir/dashboard" || pathname === "/kasir/karyawan" || pathname === "/kasir/transaksi") {
         return <FooterSingkat />;
     }
 

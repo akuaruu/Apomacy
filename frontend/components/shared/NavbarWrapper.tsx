@@ -5,6 +5,7 @@ import Navbar from "@/components/ui/Navbar";
 import NavbarSingkat from "@/components/ui/NavbarSingkat";
 import NavbarLanding from "@/components/ui/NavbarLanding";
 import { useCart } from "@/context/CartContext";
+import path from "path";
 
 export default function NavbarWrapper() {
     const pathname = usePathname();
@@ -19,18 +20,24 @@ export default function NavbarWrapper() {
         pathname === "/login" ||
         pathname === "/register" ||
         pathname.startsWith("/kasir/member") ||
-        pathname === "/kasir"
+        pathname.startsWith("/kasir") ||
+        pathname.startsWith("/pembayaran")
     ) {
         return null;
     }
 
-    if (pathname.startsWith("/kasir/member") || pathname === "/kasir/dashboard"|| pathname === "/kasir/karyawan"|| pathname === "/kasir/transaksi") {
-        return null;
-    }
 
     // cuman gunain navbar singkat uuntuk keranjang dan checkout
     if (pathname === "/keranjang" || pathname === "/keranjang/checkout") {
         return <NavbarSingkat />;
+    }
+
+    // Client side
+    if (
+        pathname.startsWith("/dasbor") ||
+        pathname.startsWith("/pembayaran")
+    ) {
+        return null
     }
 
     // Gunakan navbar landing untuk homepage, login, register, about

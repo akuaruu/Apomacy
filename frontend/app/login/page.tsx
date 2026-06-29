@@ -3,9 +3,85 @@
 import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
+import api from "@/lib/api";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const router = useRouter();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
+
+    try {
+      const response = await api.post("/users/login", {
+        username: email,
+        password,
+      });
+
+      const token = response.data?.token;
+
+      if (!token) {
+        throw new Error("Token tidak ditemukan pada respons login.");
+      }
+
+      const decoded = jwtDecode<{ role?: string }>(token);
+      const normalizedRole = decoded.role?.trim().toLowerCase();
+
+      const userRole =
+        normalizedRole === "admin" || normalizedRole === "kasir"
+          ? normalizedRole
+          : "member";
+
+      Cookies.remove("apomacy_token", { path: "/" });
+      Cookies.remove("apomacy_role", { path: "/" });
+
+      Cookies.set("apomacy_token", token, {
+        expires: 1,
+        path: "/",
+        sameSite: "lax",
+      });
+
+      Cookies.set("apomacy_role", userRole, {
+        expires: 1,
+        path: "/",
+        sameSite: "lax",
+      });
+
+      setSuccess("Login berhasil! Mengalihkan...");
+
+      if (userRole === "admin") {
+        router.replace("/admin");
+      } else if (userRole === "kasir") {
+        router.replace("/kasir");
+      } else {
+        router.replace("/katalog");
+      }
+
+      router.refresh();
+    } catch (err: any) {
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        "Gagal masuk. Silakan periksa kembali kredensial Anda.";
+
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex-grow bg-transparent flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -15,7 +91,7 @@ export default function LoginPage() {
         </Link>
       </div>
       <div className="max-w-4xl w-full bg-white rounded-[2rem] shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[600px] border border-gray-100">
-        
+
         {/* Left Side - Banner */}
         <div className="md:w-1/2 bg-primary-500 text-white p-12 flex flex-col justify-center relative overflow-hidden">
           <div className="relative z-10 space-y-6">
@@ -24,7 +100,6 @@ export default function LoginPage() {
               Akses resep obat dan kebutuhan kesehatan Anda dengan keamanan dan presisi yang layak Anda dapatkan.
             </p>
           </div>
-          {/* Background Illustration / Overlay */}
           <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1550831107-1553da8c8464?auto=format&fit=crop&q=80')] bg-cover bg-center mix-blend-overlay pointer-events-none"></div>
           <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary-400 rounded-full blur-3xl opacity-50"></div>
           <div className="absolute -top-24 -left-24 w-64 h-64 bg-primary-300 rounded-full blur-3xl opacity-30"></div>
@@ -37,16 +112,31 @@ export default function LoginPage() {
             <p className="text-gray-500 text-sm">Masuk untuk mengelola obat-obatan Anda secara aman.</p>
           </div>
 
-          <form className="space-y-6 flex-grow">
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium animate-fadeIn">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-600 rounded-xl text-sm font-medium animate-fadeIn">
+              {success}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-6 flex-grow">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Mail size={18} />
                 </div>
-                <input 
-                  type="email" 
-                  placeholder="nama@contoh.com" 
+                <input
+                  type="text"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@gmail.com"
                   className="w-full pl-11 pr-4 py-3.5 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                 />
               </div>
@@ -58,12 +148,15 @@ export default function LoginPage() {
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Lock size={18} />
                 </div>
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
                   className="w-full pl-11 pr-12 py-3.5 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 cursor-pointer hover:text-gray-600"
@@ -75,14 +168,31 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between pt-2">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500" />
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                />
                 <span className="text-sm text-gray-600">Ingat saya</span>
               </label>
               <Link href="#" className="text-sm font-medium text-primary-500 hover:text-primary-400">Lupa kata sandi?</Link>
             </div>
 
-            <button type="button" className="w-full bg-primary-500 hover:bg-primary-400 text-white font-semibold py-3.5 rounded-xl transition-colors shadow-md mt-4">
-              Masuk
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`w-full ${isLoading ? 'bg-primary-300 cursor-not-allowed' : 'bg-primary-500 hover:bg-primary-400'} text-white font-semibold py-3.5 rounded-xl transition-colors shadow-md mt-4 flex items-center justify-center`}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Masuk...
+                </span>
+              ) : "Masuk"}
             </button>
           </form>
 
@@ -95,7 +205,7 @@ export default function LoginPage() {
                 <span className="bg-white px-4 text-gray-400 font-semibold tracking-widest">atau</span>
               </div>
             </div>
-            
+
             <div className="mt-6 text-center text-sm text-gray-600">
               Baru di Apomacy? <Link href="/register" className="font-semibold text-primary-500 hover:text-primary-400">Daftar Sekarang</Link>
             </div>

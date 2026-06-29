@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
 import {
   Lock,
   ShoppingCart,
@@ -13,16 +12,21 @@ import {
   Save,
 } from "lucide-react";
 
-// Import komponen UI
 import SearchableSelect from "@/components/shared/SearchableSelect";
 import SearchableObatSelect from "@/components/shared/SearchableObatSelect";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import api from "@/lib/api";
 
 export default function RestockPage() {
   // Master Data State
+  const [supplierList, setSupplierList] = useState<any[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
+
+  // Membutuhkan 2 state untuk obat: satu master asli, satu untuk hasil filter dropdown
+  const [allObatList, setAllObatList] = useState<any[]>([]);
   const [obatOptions, setObatOptions] = useState<any[]>([]);
+
   const [isLoadingMaster, setIsLoadingMaster] = useState(true);
 
   // Header State
@@ -33,7 +37,7 @@ export default function RestockPage() {
     noFaktur: "",
   });
 
-  // Default State
+  // Default State Form Item
   const [formItem, setFormItem] = useState({
     obat: null as any,
     hargaBeli: 0,
@@ -58,7 +62,7 @@ export default function RestockPage() {
     type: "success" | "error";
   } | null>(null);
 
-  // API FETCH
+  // FETCH MASTER DATA
   useEffect(() => {
     generateNoTerima();
     fetchMasterData();
@@ -68,18 +72,30 @@ export default function RestockPage() {
     setIsLoadingMaster(true);
     try {
       const [resObat, resSupplier] = await Promise.all([
-        axios.get("https://api.npoint.io/b6965231a2d369815479"),
-        axios.get("https://api.npoint.io/f39f256e6c10202dbe42"),
+        api.get("/obat/").catch(() => ({ data: { data: [] } })),
+        api.get("/supplier/").catch(() => ({ data: { data: [] } })),
       ]);
-      setObatOptions(resObat.data);
-      const supplierNames = resSupplier.data.map((sup: any) => sup.nama);
-      setSupplierOptions(supplierNames);
+
+      const obatData = resObat.data?.data || resObat.data || [];
+      const supData = resSupplier.data?.data || resSupplier.data || [];
+
+      // Mapping data obat, pastikan id_supplier ikut terbawa untuk keperluan filter
+      const mappedObat = obatData.map((o: any) => ({
+        ...o,
+        id: o.id_obat,
+        kode: o.kode_obat,
+        nama: o.nama_obat,
+        id_supplier: o.id_supplier,
+      }));
+
+      setAllObatList(mappedObat);
+      setObatOptions(mappedObat); // Set awal tampilkan semua
+
+      setSupplierList(supData);
+      setSupplierOptions(supData.map((sup: any) => sup.nama_supplier));
+
     } catch (error) {
-      console.error("Gagal memuat data master:", error);
-      showToast(
-        "Gagal terhubung ke server untuk memuat data Obat dan Supplier.",
-        "error",
-      );
+      showToast("Gagal terhubung ke server untuk memuat data master.", "error");
     } finally {
       setIsLoadingMaster(false);
     }
@@ -90,23 +106,61 @@ export default function RestockPage() {
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, "0");
     const dd = String(date.getDate()).padStart(2, "0");
-    const randomNum = String(Math.floor(Math.random() * 999) + 1).padStart(
-      3,
-      "0",
-    );
+    const randomNum = String(Math.floor(Math.random() * 999) + 1).padStart(3, "0");
     setHeaderData((prev) => ({
       ...prev,
       noTerima: `REC-${yyyy}${mm}${dd}-${randomNum}`,
     }));
   };
 
-  const showToast = (
-    message: string,
-    type: "success" | "error" = "success",
-  ) => {
+  const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // --- LOGIKA FILTER TWO-WAY BINDING ---
+
+  // 1. Saat Supplier Dipilih Manual
+  const handleSupplierChange = (val: string) => {
+    setHeaderData({ ...headerData, supplier: val });
+
+    if (!val) {
+      setObatOptions(allObatList); // Jika supplier dikosongkan, tampilkan semua obat lagi
+      return;
+    }
+
+    const selectedSup = supplierList.find(s => s.nama_supplier === val);
+    if (selectedSup) {
+      // Filter list obat hanya yang id_supplier-nya cocok
+      const filteredObat = allObatList.filter(o => o.id_supplier === selectedSup.id_supplier);
+      setObatOptions(filteredObat);
+
+      // Jika user sudah memilih obat, tapi obat tersebut bukan milik supplier ini, kosongkan form obatnya
+      if (formItem.obat && formItem.obat.id_supplier !== selectedSup.id_supplier) {
+        setFormItem({ obat: null, hargaBeli: 0, qty: 0, expired: "" });
+      }
+    }
+  };
+
+  // 2. Saat Obat Dipilih Manual
+  const handleObatChange = (val: any) => {
+    setFormItem({ ...formItem, obat: val });
+
+    if (val) {
+      // Cari supplier dari obat ini
+      const linkedSup = supplierList.find(s => s.id_supplier === val.id_supplier);
+      if (linkedSup) {
+        // Otomatis ubah header supplier ke supplier milik obat ini
+        setHeaderData(prev => ({ ...prev, supplier: linkedSup.nama_supplier }));
+
+        // Langsung filter dropdown obat agar sesuai dengan supplier yang baru saja ter-set otomatis
+        const filteredObat = allObatList.filter(o => o.id_supplier === linkedSup.id_supplier);
+        setObatOptions(filteredObat);
+      }
+    }
+  };
+
+  // -------------------------------------
 
   const handleNumberChange = (field: string, val: string) => {
     const cleanDigits = val.replace(/\D/g, "");
@@ -136,15 +190,15 @@ export default function RestockPage() {
         cartItems.map((item) =>
           item.kode === editingItemKode
             ? {
-                ...item,
-                obat: formItem.obat,
-                kode: formItem.obat.kode,
-                nama: formItem.obat.nama,
-                hargaBeli: formItem.hargaBeli,
-                qty: formItem.qty,
-                expired: formItem.expired,
-                subtotal: formItem.hargaBeli * formItem.qty,
-              }
+              ...item,
+              obat: formItem.obat,
+              kode: formItem.obat.kode,
+              nama: formItem.obat.nama,
+              hargaBeli: formItem.hargaBeli,
+              qty: formItem.qty,
+              expired: formItem.expired,
+              subtotal: formItem.hargaBeli * formItem.qty,
+            }
             : item,
         ),
       );
@@ -163,6 +217,7 @@ export default function RestockPage() {
       const newItem = {
         kode: formItem.obat.kode,
         nama: formItem.obat.nama,
+        obat: formItem.obat,
         hargaBeli: formItem.hargaBeli,
         qty: formItem.qty,
         expired: formItem.expired,
@@ -175,7 +230,7 @@ export default function RestockPage() {
 
   const handleEditItem = (item: any) => {
     setFormItem({
-      obat: { kode: item.kode, nama: item.nama },
+      obat: item.obat,
       hargaBeli: item.hargaBeli,
       qty: item.qty,
       expired: item.expired,
@@ -194,15 +249,12 @@ export default function RestockPage() {
     setFormItem({ obat: null, hargaBeli: 0, qty: 0, expired: "" });
     setHeaderData((prev) => ({ ...prev, supplier: "", noFaktur: "" }));
     setEditingItemKode(null);
+    setObatOptions(allObatList); // Kembalikan filter dropdown obat ke daftar semula
   };
 
-  // Validasi
   const requestProcess = () => {
     if (cartItems.length === 0)
-      return showToast(
-        "Daftar obat masih kosong! Masukkan minimal 1 obat.",
-        "error",
-      );
+      return showToast("Daftar obat masih kosong! Masukkan minimal 1 obat.", "error");
     setModalConfig({
       isOpen: true,
       type: "tambah",
@@ -218,8 +270,7 @@ export default function RestockPage() {
       type: "batal",
       targetId: "",
       title: "Konfirmasi Reset Form",
-      message:
-        "Apakah Anda yakin ingin mengosongkan seluruh formulir? Semua data yang belum diproses akan hilang tanpa tersimpan.",
+      message: "Apakah Anda yakin ingin mengosongkan seluruh formulir? Semua data yang belum diproses akan hilang tanpa tersimpan.",
     });
   };
 
@@ -233,30 +284,61 @@ export default function RestockPage() {
     });
   };
 
-  // Eksekusi aksi setelah konfirmasi di modal
-  const executeModalAction = () => {
-    if (modalConfig.type === "tambah") {
-      console.log("RESTOCK PROCESSED:", {
-        header: headerData,
-        items: cartItems,
-      });
-      handleClearAll();
-      generateNoTerima();
-      showToast(
-        "Berhasil! Data restock telah diproses dan disimpan ke sistem.",
-        "success",
-      );
-    } else if (modalConfig.type === "batal") {
+  const executeModalAction = async () => {
+    const actionType = modalConfig.type;
+    setModalConfig({ ...modalConfig, isOpen: false });
+
+    if (actionType === "tambah") {
+      try {
+        const selectedSupplier = supplierList.find(s => s.nama_supplier === headerData.supplier);
+        const supplierId = selectedSupplier ? selectedSupplier.id_supplier : 0;
+
+        if (supplierId === 0) {
+          return showToast("Gagal memvalidasi supplier, pastikan supplier telah dipilih.", "error");
+        }
+
+        const payload = {
+          id_supplier: supplierId,
+          id_user: 1,
+          no_faktur_supplier: headerData.noFaktur,
+          no_penerimaan_internal: headerData.noTerima,
+          tanggal_restock: new Date(headerData.tanggal).toISOString(),
+          total_bayar: grandTotal,
+          keterangan: "Restock Barang Gudang",
+          details: cartItems.map(item => ({
+            id_obat: item.obat.id,
+            harga_beli: item.hargaBeli,
+            jumlah: item.qty,
+            tanggal_kadaluarsa: new Date(item.expired).toISOString(),
+            subtotal: item.subtotal
+          }))
+        };
+
+        // Menghapus slash '/' di akhir URL agar sesuai dengan routing Golang
+        await api.post("/restock/", payload);
+
+        handleClearAll();
+        generateNoTerima();
+        showToast("Berhasil! Data restock telah diproses dan stok obat di-update.", "success");
+      } catch (error: any) {
+        const errMsg = error.response?.data?.error || "Gagal memproses transaksi restock ke server.";
+        showToast(errMsg, "error");
+      }
+    } else if (actionType === "batal") {
       handleClearAll();
       showToast("Formulir berhasil dikosongkan.", "success");
-    } else if (modalConfig.type === "hapus") {
-      setCartItems(
-        cartItems.filter((item) => item.kode !== modalConfig.targetId),
-      );
+    } else if (actionType === "hapus") {
+      const newCartItems = cartItems.filter((item) => item.kode !== modalConfig.targetId);
+      setCartItems(newCartItems);
+
+      // Jika keranjang kosong karena item terakhir dihapus, buka kunci dropdown supplier
+      if (newCartItems.length === 0) {
+        setObatOptions(allObatList);
+      }
+
       if (editingItemKode === modalConfig.targetId) cancelEditItem();
       showToast("Item obat berhasil dihapus dari daftar.", "success");
     }
-    setModalConfig({ ...modalConfig, isOpen: false });
   };
 
   const grandTotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -287,10 +369,7 @@ export default function RestockPage() {
               No. Terima
             </label>
             <div className="relative">
-              <Lock
-                size={14}
-                className="absolute left-4 top-3.5 text-gray-400"
-              />
+              <Lock size={14} className="absolute left-4 top-3.5 text-gray-400" />
               <input
                 type="text"
                 readOnly
@@ -307,9 +386,7 @@ export default function RestockPage() {
             <input
               type="date"
               value={headerData.tanggal}
-              onChange={(e) =>
-                setHeaderData({ ...headerData, tanggal: e.target.value })
-              }
+              onChange={(e) => setHeaderData({ ...headerData, tanggal: e.target.value })}
               className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none cursor-pointer focus:border-apomacy-primary"
             />
           </div>
@@ -321,10 +398,9 @@ export default function RestockPage() {
               options={supplierOptions}
               placeholder={isLoadingMaster ? "Memuat..." : "Pilih Supplier..."}
               value={headerData.supplier}
-              disabled={isLoadingMaster}
-              onChange={(val) =>
-                setHeaderData({ ...headerData, supplier: val })
-              }
+              // LOCK otomatis aktif jika sedang memuat atau keranjang sudah ada isinya
+              disabled={isLoadingMaster || cartItems.length > 0}
+              onChange={handleSupplierChange}
             />
           </div>
           <div>
@@ -335,18 +411,14 @@ export default function RestockPage() {
               type="text"
               placeholder="Contoh: INV-9982"
               value={headerData.noFaktur}
-              onChange={(e) =>
-                setHeaderData({ ...headerData, noFaktur: e.target.value })
-              }
+              onChange={(e) => setHeaderData({ ...headerData, noFaktur: e.target.value })}
               className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary"
             />
           </div>
         </div>
 
         {/* Section Input Data */}
-        <div
-          className={`border rounded-2xl p-5 mb-8 transition-colors ${editingItemKode ? "bg-apomacy-primary/5 border-apomacy-primary/40" : "bg-surface-container-low/30 border-outline-variant"}`}
-        >
+        <div className={`border rounded-2xl p-5 mb-8 transition-colors ${editingItemKode ? "bg-apomacy-primary/5 border-apomacy-primary/40" : "bg-surface-container-low/30 border-outline-variant"}`}>
           <div className="flex items-center gap-2 mb-4 text-apomacy-primary">
             {editingItemKode ? (
               <Pencil size={16} strokeWidth={2.5} />
@@ -365,11 +437,9 @@ export default function RestockPage() {
               <SearchableObatSelect
                 options={obatOptions}
                 value={formItem.obat}
-                onChange={(val: any) => setFormItem({ ...formItem, obat: val })}
+                onChange={handleObatChange}
                 disabled={editingItemKode !== null || isLoadingMaster}
-                placeholder={
-                  isLoadingMaster ? "Memuat..." : "Pilih / Cari Obat..."
-                }
+                placeholder={isLoadingMaster ? "Memuat..." : "Pilih / Cari Obat..."}
               />
             </div>
             <div>
@@ -380,9 +450,7 @@ export default function RestockPage() {
                 type="text"
                 inputMode="numeric"
                 value={formItem.hargaBeli === 0 ? "" : formItem.hargaBeli}
-                onChange={(e) =>
-                  handleNumberChange("hargaBeli", e.target.value)
-                }
+                onChange={(e) => handleNumberChange("hargaBeli", e.target.value)}
                 className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-white outline-none focus:border-apomacy-primary"
                 placeholder="0"
               />
@@ -407,9 +475,7 @@ export default function RestockPage() {
               <input
                 type="date"
                 value={formItem.expired}
-                onChange={(e) =>
-                  setFormItem({ ...formItem, expired: e.target.value })
-                }
+                onChange={(e) => setFormItem({ ...formItem, expired: e.target.value })}
                 className="w-full px-3 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-white outline-none cursor-pointer focus:border-apomacy-primary"
               />
             </div>
@@ -471,9 +537,7 @@ export default function RestockPage() {
                             <Pencil size={16} strokeWidth={2.5} />
                           </button>
                           <button
-                            onClick={() =>
-                              requestDeleteRow(item.kode, item.nama)
-                            }
+                            onClick={() => requestDeleteRow(item.kode, item.nama)}
                             className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50"
                             title="Hapus baris"
                           >
@@ -563,7 +627,6 @@ export default function RestockPage() {
         </div>
       </div>
 
-      {/* Panggil komponen Modal dan Toast */}
       <ModalConfirm
         isOpen={modalConfig.isOpen}
         title={modalConfig.title}

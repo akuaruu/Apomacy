@@ -1,0 +1,85 @@
+package model
+
+import (
+	"context"
+	"time"
+)
+
+type MetodePembayaran string
+
+const (
+	MetodeTunai    MetodePembayaran = "Tunai"
+	MetodeDebit    MetodePembayaran = "Debit"
+	MetodeQRIS     MetodePembayaran = "QRIS"
+	MetodeTransfer MetodePembayaran = "Transfer"
+)
+
+type StatusTransaksi string
+
+const (
+	TxSelesai            StatusTransaksi = "Selesai"
+	TxPending            StatusTransaksi = "Pending"
+	TxBatal              StatusTransaksi = "Batal"
+	TxMenungguPembayaran StatusTransaksi = "Pending"
+)
+
+type Transaksi struct {
+	ID               int              `json:"id_transaksi"`
+	IDCustomer       *int             `json:"id_customer"`
+	IDUser           int              `json:"id_user"`
+	NoTransaksi      string           `json:"no_transaksi"`
+	TanggalTransaksi time.Time        `json:"tanggal_transaksi"`
+	NamaCustomer     *string          `json:"nama_customer"`
+	TotalItem        int              `json:"total_item"`
+	Subtotal         float64          `json:"subtotal"`
+	TotalBayar       float64          `json:"total_bayar"`
+	MetodePembayaran MetodePembayaran `json:"metode_pembayaran"`
+	ResepRequired    bool             `json:"resep_required"`
+	NoResep          *string          `json:"no_resep"`
+	Status           StatusTransaksi  `json:"status"`
+	StatusPesanan    string           `json:"status_pesanan"`
+
+	Details    []DetailTransaksi `json:"details,omitempty"`
+	Pengiriman *Pengiriman       `json:"pengiriman,omitempty"`
+}
+
+type DetailTransaksi struct {
+	IDDetailTrx int     `json:"id_detail_trx"`
+	IDTransaksi int     `json:"id_transaksi"`
+	IDObat      int     `json:"id_obat"`
+	NamaObat    string  `json:"nama_obat"`
+	HargaSatuan float64 `json:"harga_satuan"`
+	Qty         int     `json:"qty"`
+	Subtotal    float64 `json:"subtotal"`
+}
+
+// Field nullable di database menggunakan pointer agar aman saat di-scan dari NULL
+type Pengiriman struct {
+	IDPengiriman     int        `json:"id_pengiriman,omitempty"`
+	IDTransaksi      int        `json:"id_transaksi,omitempty"`
+	MetodePenerimaan string     `json:"metode_penerimaan"`
+	NamaPenerima     *string    `json:"nama_penerima,omitempty"`
+	NoHpPenerima     *string    `json:"no_hp_penerima,omitempty"`
+	AlamatPengiriman *string    `json:"alamat_pengiriman,omitempty"`
+	WaktuSampai      *time.Time `json:"waktu_pesanan_sampai,omitempty"`
+}
+
+type TransaksiRepository interface {
+	CreateWithDetails(ctx context.Context, tx *Transaksi) error
+	GetByID(ctx context.Context, id int) (*Transaksi, error)
+	UpdateStatus(ctx context.Context, id int, status StatusTransaksi) error
+	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
+	GetByUserID(ctx context.Context, idUser int) ([]*Transaksi, error)
+	GetAll(ctx context.Context) ([]Transaksi, error)
+	UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error
+}
+
+type TransaksiUsecase interface {
+	Checkout(ctx context.Context, tx *Transaksi) error
+	GetDetailTransaksi(ctx context.Context, idUser int, isStaff bool, id int) (*Transaksi, error)
+	BatalkanTransaksi(ctx context.Context, id int) error
+	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
+	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)
+	GetAll(ctx context.Context) ([]Transaksi, error)
+	UpdateStatusPesanan(ctx context.Context, noTransaksi string, statusPesanan string) error
+}
