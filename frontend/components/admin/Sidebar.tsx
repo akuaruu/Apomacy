@@ -25,7 +25,6 @@ const NAV_ITEMS = [
   { label: "Customer", icon: <Users size={18} />, href: "/admin/member" },
   { label: "Karyawan", icon: <UserCheck size={18} />, href: "/admin/karyawan" },
   { label: "Transaksi", icon: <Receipt size={18} />, href: "/admin/transaksi" },
-  { label: "Laporan", icon: <BarChart2 size={18} />, href: "/admin/laporan" },
 ];
 
 interface SidebarProps {
