@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, Briefcase, KeyRound, UserCircle
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import {
+    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, Briefcase, KeyRound,
+    UserCircle, RefreshCw, ShieldCheck, ShieldAlert, AlertTriangle
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
@@ -11,7 +13,6 @@ import { jwtDecode } from "jwt-decode";
 
 interface Karyawan {
     id: number;
-    userIdStr: string;
     username: string;
     name: string;
     role: string;
@@ -21,103 +22,96 @@ interface Karyawan {
 }
 
 export default function KaryawanPage() {
+    const router = useRouter();
     const [employees, setEmployees] = useState<Karyawan[]>([]);
-    const [filteredEmployees, setFilteredEmployees] = useState<Karyawan[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedEmp, setSelectedEmp] = useState<Karyawan | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
+    const [isAdmin, setIsAdmin] = useState<boolean>(false);
+    const [roleChecked, setRoleChecked] = useState<boolean>(false);
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean; type: "tambah" | "edit" | "hapus"; title: string; message: string; action: () => void;
     }>({ isOpen: false, type: "tambah", title: "", message: "", action: () => {} });
 
     const [formData, setFormData] = useState({
-        userIdStr: "", username: "", password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif"
+        username: "", password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif"
     });
 
-    // --- BAGIAN YANG DIUBAH: Fungsi fetchEmployees ---
-    // Mengambil Admin dari Token JWT & Profile API + Menggabungkannya dengan LocalStorage
-    const fetchEmployees = async () => {
+    // Cek role user dari JWT token
+    useEffect(() => {
+        const token = Cookies.get("apomacy_token");
+        if (!token) {
+            router.replace("/login");
+            return;
+        }
+
         try {
-            setLoading(true);
-            
-            // 1. Ambil data karyawan tambahan dari Local Storage
-            const savedDataStr = localStorage.getItem("apomacy_karyawan_data");
-            let localEmployees: Karyawan[] = savedDataStr ? JSON.parse(savedDataStr) : [];
-
-            // 2. Ambil data Admin yang sedang login saat ini
-            const token = Cookies.get("apomacy_token"); 
-            if (token) {
-                const decoded: any = jwtDecode(token);
-                // Di user_usecase.go, payload JWT berisi id_user, role, dan nama
-                const adminId = decoded.id_user || decoded.id; 
-                const adminRole = decoded.role || decoded.Role || "Admin";
-                const adminUsername = decoded.username || `admin_${adminId}`;
-
-                try {
-                    // Tembak endpoint yang benar-benar ada di backend untuk ambil data profilnya
-                    const profileRes = await api.get("/users/profile");
-                    const profileData = profileRes.data?.data || {};
-
-                    const adminData: Karyawan = {
-                        id: adminId,
-                        userIdStr: `KRY-${String(adminId).padStart(3, '0')}`,
-                        username: adminUsername,
-                        name: profileData.nama || decoded.nama || "Admin",
-                        role: adminRole,
-                        phone: profileData.telepon || "-",
-                        email: profileData.email || "-",
-                        status: "Aktif"
-                    };
-
-                    // Mencegah duplikasi data admin di tabel
-                    const isAdminExist = localEmployees.find(e => e.id === adminId);
-                    if (!isAdminExist) {
-                        localEmployees = [adminData, ...localEmployees];
-                    } else {
-                        // Update data admin di local storage jika ada perubahan profil
-                        localEmployees = localEmployees.map(e => e.id === adminId ? adminData : e);
-                    }
-                } catch (profileErr) {
-                    console.log("Admin profile fetch terlewati (Mungkin belum diset)", profileErr);
-                }
+            const decoded: any = jwtDecode(token);
+            const role = (decoded.role || decoded.Role || "").toLowerCase();
+            if (role.includes("admin")) {
+                setIsAdmin(true);
             }
-
-            setEmployees(localEmployees);
-            setFilteredEmployees(localEmployees);
         } catch (error) {
-            console.error("Gagal memuat data:", error);
+            console.error("Gagal membaca token:", error);
+        }
+        setRoleChecked(true);
+    }, [router]);
+
+    // Fetch data karyawan dari backend
+    const fetchEmployees = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await api.get('/users/staff');
+            const rawData = response.data?.data || [];
+
+            const mappedData: Karyawan[] = rawData.map((item: any) => ({
+                id: item.id_user,
+                username: item.username,
+                name: item.nama_lengkap,
+                role: item.role,
+                phone: item.no_telp || "-",
+                email: item.email || "-",
+                status: item.status || "Aktif"
+            }));
+
+            setEmployees(mappedData);
+        } catch (err: any) {
+            if (err.response?.status === 403 || err.response?.status === 401) {
+                setError("Anda tidak memiliki akses ke halaman ini.");
+            } else {
+                setError("Gagal memuat data karyawan. Pastikan backend sudah berjalan.");
+            }
+            console.error("Gagal mengambil data karyawan:", err);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchEmployees();
-    }, []);
+        if (roleChecked && isAdmin) {
+            fetchEmployees();
+        }
+    }, [roleChecked, isAdmin]);
 
-    // Menyimpan data tambahan ke Local Storage
-    const saveToLocalStorage = (data: Karyawan[]) => {
-        setEmployees(data);
-        localStorage.setItem("apomacy_karyawan_data", JSON.stringify(data));
-    };
-
-    useEffect(() => {
-        const query = searchQuery.toLowerCase();
-        const filtered = employees.filter(emp =>
-            emp.name.toLowerCase().includes(query) ||
-            emp.role.toLowerCase().includes(query) ||
-            emp.userIdStr.toLowerCase().includes(query)
+    const filteredEmployees = useMemo(() => {
+        const q = searchQuery.toLowerCase();
+        return employees.filter(emp =>
+            emp.name.toLowerCase().includes(q) ||
+            emp.role.toLowerCase().includes(q) ||
+            emp.username.toLowerCase().includes(q) ||
+            emp.email.toLowerCase().includes(q)
         );
-        setFilteredEmployees(filtered);
-    }, [searchQuery, employees]);
+    }, [employees, searchQuery]);
 
     const initSelectEmployee = (emp: Karyawan) => {
         setSelectedEmp(emp);
         setMode("view");
         setFormData({
-            userIdStr: emp.userIdStr, username: emp.username, password: "", 
+            username: emp.username, password: "",
             name: emp.name, role: emp.role, phone: emp.phone, email: emp.email, status: emp.status
         });
     };
@@ -125,9 +119,9 @@ export default function KaryawanPage() {
     const handleAddClick = () => {
         setMode("add");
         setSelectedEmp(null);
-        setFormData({ 
-            userIdStr: "Otomatis dari Sistem", username: "", password: "", 
-            name: "", role: "Kasir", phone: "", email: "", status: "Aktif" 
+        setFormData({
+            username: "", password: "",
+            name: "", role: "Kasir", phone: "", email: "", status: "Aktif"
         });
     };
 
@@ -138,7 +132,7 @@ export default function KaryawanPage() {
         if (selectedEmp) initSelectEmployee(selectedEmp);
         else {
             setSelectedEmp(null);
-            setFormData({ userIdStr: "", username: "", password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif" });
+            setFormData({ username: "", password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif" });
         }
     };
 
@@ -146,19 +140,25 @@ export default function KaryawanPage() {
         if (!selectedEmp) return;
         setConfirmModal({
             isOpen: true, type: "hapus", title: "Hapus Data Karyawan",
-            message: `Data akun karyawan "${selectedEmp.name}" akan dihapus dari layar.`,
-            action: () => {
-                const updated = employees.filter(e => e.id !== selectedEmp.id);
-                saveToLocalStorage(updated);
-                setSelectedEmp(null);
-                setMode("view");
+            message: `Data akun karyawan "${selectedEmp.name}" akan dihapus secara permanen dari database.`,
+            action: async () => {
+                try {
+                    await api.delete(`/users/staff/${selectedEmp.id}`);
+                    await fetchEmployees();
+                    setSelectedEmp(null);
+                    setMode("view");
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                } catch (error: any) {
+                    console.error("Gagal menghapus:", error);
+                    alert("Gagal menghapus karyawan: " + (error.response?.data?.error || error.message));
+                }
             },
         });
     };
 
     const handleSaveSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.username.trim()) { alert("Username wajib diisi!"); return; }
+        if (!formData.name.trim()) { alert("Nama wajib diisi!"); return; }
 
         const actionText = mode === "add" ? "didaftarkan" : "diperbarui";
 
@@ -169,74 +169,88 @@ export default function KaryawanPage() {
             action: async () => {
                 try {
                     if (mode === "add") {
-                        if (!formData.password) { alert("Password wajib diisi!"); return; }
-                        
-                        // KONEKSI ASLI KE BACKEND: Mengirim data registrasi karyawan ke Supabase
+                        if (!formData.username.trim()) { alert("Username wajib diisi!"); return; }
+                        if (!formData.password || formData.password.length < 6) { alert("Password wajib diisi (minimal 6 karakter)!"); return; }
+
                         const addPayload = {
                             nama_lengkap: formData.name,
-                            email: formData.email || "karyawan@apotek.com", 
+                            email: formData.email || "karyawan@apotek.com",
                             username: formData.username,
-                            no_telp: formData.phone || "-", 
+                            no_telp: formData.phone || "-",
                             password: formData.password
                         };
                         await api.post("/users/register", addPayload);
-
-                        // --- BAGIAN YANG DIUBAH: Pembuatan ID Karyawan Baru ---
-                        // Karena API tidak mereturn ID baru, kita membuat simulasi ID untuk tabel
-                        const token = Cookies.get("apomacy_token"); 
-                        const adminId = token ? (jwtDecode<any>(token).id_user || 1) : 1;
-                        
-                        // Pastikan ID baru tidak bentrok dengan ID Admin atau ID lain
-                        const maxId = employees.length > 0 ? Math.max(...employees.map(e => e.id)) : adminId;
-                        const newId = maxId + 1;
-                        
-                        const newEmp: Karyawan = {
-                            id: newId,
-                            userIdStr: `KRY-${String(newId).padStart(3, '0')}`,
-                            username: formData.username,
-                            name: formData.name,
-                            role: formData.role, // Tampilan layar tetap sesuai yang diinput
-                            phone: formData.phone,
-                            email: formData.email,
-                            status: formData.status
-                        };
-                        
-                        const updatedList = [newEmp, ...employees];
-                        saveToLocalStorage(updatedList);
-                        initSelectEmployee(newEmp);
+                        await fetchEmployees();
+                        setMode("view");
+                        setSelectedEmp(null);
 
                     } else if (mode === "edit" && selectedEmp) {
-                        const updatedList = employees.map(emp => 
-                            emp.id === selectedEmp.id ? { ...emp, ...formData, userIdStr: emp.userIdStr } : emp
-                        );
-                        saveToLocalStorage(updatedList);
-                        
-                        // Tembak Profile API (jika yang diedit adalah akun Admin sendiri)
-                        const token = Cookies.get("apomacy_token"); 
-                        if (token) {
-                            const decoded: any = jwtDecode(token);
-                            if (decoded.id_user === selectedEmp.id) {
-                                await api.put(`/users/profile`, {
-                                    nama_lengkap: formData.name,
-                                    no_telp: formData.phone || "-",
-                                    email: formData.email || "karyawan@apotek.com",
-                                }).catch(() => console.log("Skip update DB, API bermasalah"));
-                            }
-                        }
-                        
+                        const editPayload = {
+                            nama_lengkap: formData.name,
+                            no_telp: formData.phone || "-",
+                            email: formData.email || "-",
+                            role: formData.role,
+                            status: formData.status
+                        };
+                        await api.put(`/users/staff/${selectedEmp.id}`, editPayload);
+                        await fetchEmployees();
                         setMode("view");
                     }
-                    
+
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                } catch (error) {
+                } catch (error: any) {
                     console.error("Error Backend:", error);
-                    alert("Gagal memproses data! Pastikan Username belum terpakai.");
+                    alert("Gagal memproses data! " + (error.response?.data?.error || "Pastikan Username belum terpakai."));
                 }
             },
         });
     };
 
     const closeModal = () => setConfirmModal({ ...confirmModal, isOpen: false });
+
+    // Tampilkan loading saat cek role
+    if (!roleChecked) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center">
+                <div className="flex flex-col items-center gap-2 text-apomacy-primary">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <p className="text-sm font-bold animate-pulse">Memeriksa akses...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Tampilkan pesan ditolak jika bukan Admin
+    if (!isAdmin) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center p-8">
+                <div className="bg-discount-red/10 border border-discount-red text-discount-red p-8 rounded-2xl max-w-md text-center space-y-4">
+                    <ShieldAlert size={48} className="mx-auto opacity-80" />
+                    <h2 className="font-black text-lg">Akses Ditolak</h2>
+                    <p className="text-sm font-medium">
+                        Halaman Manajemen Karyawan hanya dapat diakses oleh <span className="font-bold">Admin</span>.
+                        Silakan hubungi administrator jika Anda memerlukan akses.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // Tampilkan error
+    if (error) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center p-8">
+                <div className="bg-discount-red/10 border border-discount-red text-discount-red p-6 rounded-2xl max-w-md text-center space-y-3">
+                    <AlertTriangle size={32} className="mx-auto" />
+                    <h2 className="font-black text-lg">Gagal Memuat Data</h2>
+                    <p className="text-sm font-medium">{error}</p>
+                    <button onClick={fetchEmployees} className="mt-2 px-4 py-2 bg-apomacy-primary text-white rounded-xl text-sm font-bold hover:bg-apomacy-dark transition-colors">
+                        Coba Lagi
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch w-full">
@@ -245,49 +259,75 @@ export default function KaryawanPage() {
                 <div className="flex flex-col flex-1 min-h-0 w-full">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0 w-full">
                         <div>
-                            <h2 className="text-lg md:text-xl font-bold text-apomacy-dark">Manajemen Karyawan</h2>
-                            <p className="text-[11px] md:text-xs text-on-surface-variant mt-0.5">Mode Hybrid (Database + Profil Admin)</p>
+                            <h2 className="text-lg md:text-xl font-bold text-apomacy-dark flex items-center gap-2">
+                                <Briefcase size={22} className="text-apomacy-primary" />
+                                Manajemen Karyawan
+                            </h2>
+                            <p className="text-[11px] md:text-xs text-on-surface-variant mt-0.5">Data karyawan dari database sistem</p>
                         </div>
-                        <form onSubmit={(e) => e.preventDefault()} className="relative w-full sm:w-72 shrink-0">
+                        <div className="flex items-center gap-2">
+                            {/* Badge Admin */}
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border bg-blue-50 text-blue-700 border-blue-200 shrink-0">
+                                <ShieldCheck size={14} />
+                                Admin · Akses Penuh
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 mb-4 shrink-0">
+                        <div className="relative flex-1">
                             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
-                            <input type="text" placeholder="Cari ID, Nama, Jabatan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full rounded-xl bg-surface-container-low py-2 pl-10 pr-4 text-sm text-on-surface border border-outline-variant outline-none focus:border-apomacy-primary transition-all" />
-                        </form>
+                            <input type="text" placeholder="Cari nama, username, jabatan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full rounded-xl bg-surface-container-low py-2 pl-10 pr-4 text-sm text-on-surface border border-outline-variant outline-none focus:border-apomacy-primary transition-all" />
+                        </div>
+                        <button onClick={fetchEmployees} title="Muat ulang data"
+                            className="p-2 border border-outline-variant rounded-xl hover:bg-gray-50 text-gray-600 transition-colors shrink-0">
+                            <RefreshCw size={18} className={loading ? "animate-spin text-apomacy-primary" : ""} />
+                        </button>
                     </div>
 
                     <div className="flex-1 overflow-auto rounded-xl border border-outline-variant shadow-sm bg-white scrollbar-thin scrollbar-thumb-gray-300 relative min-h-0">
                         {loading ? (
                             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-apomacy-primary bg-white/80 z-10">
                                 <Loader2 className="h-10 w-10 animate-spin" />
-                                <p className="text-sm font-medium animate-pulse">Menyiapkan data profil...</p>
+                                <p className="text-sm font-medium animate-pulse">Memuat data karyawan...</p>
                             </div>
                         ) : filteredEmployees.length === 0 ? (
                              <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2 min-h-[300px]">
                                  <Search size={40} className="opacity-20" />
-                                 <span className="text-sm font-medium">Tabel kosong. Silakan tambah karyawan baru.</span>
+                                 <span className="text-sm font-medium">
+                                     {searchQuery ? "Tidak ditemukan karyawan yang cocok." : "Belum ada data karyawan."}
+                                 </span>
                              </div>
                         ) : (
-                            <table className="w-full text-left border-collapse min-w-[800px]">
+                            <table className="w-full text-left border-collapse min-w-[700px]">
                                 <thead className="sticky top-0 z-10 bg-surface-container-lowest shadow-sm">
                                     <tr className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant border-b border-outline-variant">
-                                        <th className="px-4 py-3 whitespace-nowrap w-24">ID Staf</th>
-                                        <th className="px-4 py-3 whitespace-nowrap w-48">Nama Karyawan</th>
+                                        <th className="px-4 py-3 whitespace-nowrap w-12">No</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Nama Karyawan</th>
                                         <th className="px-4 py-3 whitespace-nowrap w-32">Username</th>
-                                        <th className="px-4 py-3 whitespace-nowrap w-32">Jabatan</th>
+                                        <th className="px-4 py-3 whitespace-nowrap w-24">Jabatan</th>
                                         <th className="px-4 py-3 whitespace-nowrap w-32">Telepon</th>
-                                        <th className="px-4 py-3 whitespace-nowrap text-center">Status</th>
+                                        <th className="px-4 py-3 whitespace-nowrap text-center w-20">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm text-on-surface bg-white">
-                                    {filteredEmployees.map((emp) => (
+                                    {filteredEmployees.map((emp, idx) => (
                                         <tr key={emp.id} onClick={() => { setMode("view"); initSelectEmployee(emp); }}
                                             className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${selectedEmp?.id === emp.id ? 'bg-blue-50 border-l-4 border-l-apomacy-primary' : 'border-l-4 border-l-transparent'}`}>
-                                            <td className="px-4 py-3.5"><span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">{emp.userIdStr}</span></td>
+                                            <td className="px-4 py-3.5 text-gray-400">{idx + 1}</td>
                                             <td className="px-4 py-3.5 font-semibold text-apomacy-dark text-[13px] whitespace-nowrap truncate max-w-[200px]">{emp.name}</td>
                                             <td className="px-4 py-3.5 font-mono text-[12px] text-gray-500 whitespace-nowrap">@{emp.username}</td>
-                                            <td className="px-4 py-3.5 text-on-surface-variant text-[12px] whitespace-nowrap font-medium">{emp.role}</td>
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
+                                                    emp.role === 'Admin' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                }`}>
+                                                    {emp.role}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3.5 font-mono text-[12px] whitespace-nowrap">{emp.phone}</td>
                                             <td className="px-4 py-3.5 whitespace-nowrap text-center">
-                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide border ${emp.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : emp.status === 'Cuti' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide border ${emp.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : emp.status === 'cuti' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                                                     {emp.status}
                                                 </span>
                                             </td>
@@ -313,7 +353,7 @@ export default function KaryawanPage() {
                         <div className="p-2 bg-apomacy-ice rounded-xl text-apomacy-primary"><Briefcase size={20} /></div>
                         <div>
                             <h2 className="text-lg font-bold text-apomacy-dark">{mode === "add" ? "Registrasi Akun Karyawan" : mode === "edit" ? "Edit Profil Akun" : "Detail Akun"}</h2>
-                            <p className="text-xs text-on-surface-variant">Data masuk ke Supabase Database</p>
+                            <p className="text-xs text-on-surface-variant">Data tersimpan di database</p>
                         </div>
                     </div>
 
@@ -326,12 +366,8 @@ export default function KaryawanPage() {
                         ) : (
                             <>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">ID Karyawan</label>
-                                    <input type="text" value={formData.userIdStr} disabled className="w-full rounded-xl bg-gray-100 py-2.5 px-4 text-sm font-mono font-medium text-gray-500 border border-gray-200 outline-none cursor-not-allowed" />
-                                </div>
-                                <div className="space-y-1">
                                     <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Nama Lengkap</label>
-                                    <input type="text" required value={formData.name} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                                    <input type="text" required value={formData.name} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                         className="w-full rounded-xl bg-white py-2.5 px-4 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium" />
                                 </div>
 
@@ -354,7 +390,7 @@ export default function KaryawanPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Jabatan Sistem</label>
-                                        <select value={formData.role} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, role: e.target.value })} 
+                                        <select value={formData.role} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                             className="w-full rounded-xl bg-white py-2.5 px-3 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium">
                                             <option value="Admin">Admin</option>
                                             <option value="Kasir">Kasir</option>
@@ -362,15 +398,15 @@ export default function KaryawanPage() {
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Status Akun</label>
-                                        <select value={formData.status} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, status: e.target.value })} 
+                                        <select value={formData.status} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                             className="w-full rounded-xl bg-white py-2.5 px-3 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium">
                                             <option value="Aktif">Aktif</option>
-                                            <option value="Cuti">Cuti</option>
+                                            <option value="cuti">Cuti</option>
                                             <option value="Resign">Resign</option>
                                         </select>
                                     </div>
                                 </div>
-                                
+
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">No. Telepon</label>
                                     <input type="text" required value={formData.phone} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="08xxxxxxxx"
@@ -391,7 +427,7 @@ export default function KaryawanPage() {
                     <button type="button" onClick={handleCancelClick} disabled={mode === "view"} className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${ mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low" }`}><XCircle size={16} /> Batal</button>
                 </div>
             </form>
-            
+
             <ModalConfirm isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message} onConfirm={() => { confirmModal.action(); closeModal(); }} onCancel={closeModal} />
         </div>
     );

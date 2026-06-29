@@ -79,8 +79,8 @@ export default function DashboardPage() {
 
         // Fetch API Transaksi dan Obat secara bersamaan
         const [resTrx, resObat] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/transaksi/all`, { headers }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/obat`, { headers }),
+          fetch(`/api/transaksi/all`, { headers }),
+          fetch(`/api/obat`, { headers }),
         ]);
 
         if (!resTrx.ok) {

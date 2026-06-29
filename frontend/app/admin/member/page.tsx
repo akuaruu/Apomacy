@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation"; // Ditambahkan untuk fungsi redirect
+import { useRouter } from "next/navigation";
 import {
     Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User, RefreshCw,
-    Users, ShieldCheck, ShieldAlert, Phone, Cake, BadgeCheck
+    Users, ShieldCheck, Phone, Cake, BadgeCheck, AlertTriangle
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
@@ -19,22 +19,19 @@ interface Member {
     phone: string;
     age: number | string;
     rawBirthDate: string;
-    address: string; 
+    address: string;
     email: string | null;
+    source: "customer" | "user";
 }
-
-type Role = "admin" | "kasir";
 
 export default function MemberPage() {
     const router = useRouter();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
-
-    // State untuk menyimpan Role (Admin / Kasir)
-    const [userRole, setUserRole] = useState<Role>("kasir");
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
@@ -54,42 +51,26 @@ export default function MemberPage() {
         age: ""
     });
 
-    const canDelete = userRole === "admin";
+    // Admin selalu bisa delete
+    const canDelete = true;
 
-    // 1. Fetching Role User & Data Member
     useEffect(() => {
-        // PERBAIKAN: Menggunakan nama cookie yang benar "apomacy_token"
-        const token = Cookies.get("apomacy_token"); 
-        
+        const token = Cookies.get("apomacy_token");
         if (!token) {
-            router.replace("/login"); // Lempar ke login jika tidak ada token
+            router.replace("/login");
             return;
         }
-
-        try {
-            const decoded: any = jwtDecode(token);
-            const role = (decoded.role || decoded.Role || decoded.role_name || "").toLowerCase();
-            
-            // Set role jadi admin jika di dalam token ada kata 'admin'
-            if (role.includes("admin")) {
-                setUserRole("admin");
-            } else {
-                setUserRole("kasir");
-            }
-        } catch (error) {
-            console.error("Gagal membaca token:", error);
-        }
-        
         fetchMembers();
     }, [router]);
 
     const fetchMembers = async () => {
         setLoading(true);
+        setError(null);
         try {
             const response = await api.get('/customer');
             const rawData = response.data?.data || response.data || [];
 
-            const mappedData = rawData.map((item: any) => {
+            const mappedData: Member[] = rawData.map((item: any) => {
                 let calculatedAge: number | string = "";
 
                 if (item.tanggal_lahir) {
@@ -106,40 +87,41 @@ export default function MemberPage() {
                     phone: item.no_telp || "-",
                     age: calculatedAge,
                     rawBirthDate: item.tanggal_lahir || "",
-                    address: item.alamat || "-", 
-                    email: item.email || null
+                    address: item.alamat || "-",
+                    email: item.email || null,
+                    source: "customer" as const
                 };
             });
 
             setMembers(mappedData);
-        } catch (error) {
-            console.error("Gagal mengambil data:", error);
+        } catch (err: any) {
+            console.error("Gagal mengambil data:", err);
+            if (err.response?.status === 401 || err.response?.status === 403) {
+                setError("Akses ditolak. Silakan login kembali.");
+            } else {
+                setError("Gagal memuat data customer. Pastikan server berjalan.");
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    // 2. Logic Handler (Dengan ID + 1)
     const handleAddClick = () => {
         setMode("add");
 
-        // PERBAIKAN: Mengambil ID terakhir dan ditambah 1
         let nextSequence = 1;
         if (members.length > 0) {
-            // Ekstrak angka dari string "MBR-001", "MBR-050", dll
             const numbers = members.map(m => {
                 const match = m.noMember.match(/\d+/);
                 return match ? parseInt(match[0], 10) : 0;
             });
-            // Cari angka terbesar, lalu tambah 1
             nextSequence = Math.max(...numbers) + 1;
         }
-        
-        // Format menjadi 3 digit (contoh: MBR-005)
+
         const generatedNo = `MBR-${String(nextSequence).padStart(3, '0')}`;
 
         setFormData({
-            noMember: generatedNo, 
+            noMember: generatedNo,
             name: "",
             gender: "L",
             phone: "",
@@ -151,6 +133,13 @@ export default function MemberPage() {
     const handleRowClick = (member: Member) => {
         setMode("view");
         setSelectedMember(member);
+        setFormData({
+            noMember: member.noMember,
+            name: member.name,
+            gender: member.gender,
+            phone: member.phone,
+            age: member.age.toString()
+        });
     };
 
     const handleEditClick = (member: Member) => {
@@ -182,6 +171,7 @@ export default function MemberPage() {
                     setSelectedMember(null);
                 } catch (error) {
                     console.error("Gagal menghapus:", error);
+                    alert("Gagal menghapus member!");
                 }
             }
         });
@@ -208,13 +198,13 @@ export default function MemberPage() {
                     const birthDatePayload = `${birthYear}-01-01T00:00:00Z`;
 
                     const payload = {
-                        no_member: formData.noMember, // Mengirim ID yang sudah di +1 tadi
+                        no_member: formData.noMember,
                         nama_customer: formData.name,
                         no_telp: formData.phone,
                         jenis_kelamin: formData.gender,
                         tanggal_lahir: birthDatePayload,
-                        alamat: selectedMember?.address || "-", 
-                        email: selectedMember?.email || null 
+                        alamat: selectedMember?.address || "-",
+                        email: selectedMember?.email || null
                     };
 
                     if (mode === "add") {
@@ -226,8 +216,10 @@ export default function MemberPage() {
                     fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
+                    setSelectedMember(null);
                 } catch (error) {
                     console.error("Gagal menyimpan:", error);
+                    alert("Gagal menyimpan data member!");
                 }
             }
         });
@@ -242,29 +234,39 @@ export default function MemberPage() {
         );
     }, [members, searchQuery]);
 
+    // Error state
+    if (error && !loading) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center p-8">
+                <div className="bg-discount-red/10 border border-discount-red text-discount-red p-6 rounded-2xl max-w-md text-center space-y-3">
+                    <AlertTriangle size={32} className="mx-auto" />
+                    <h2 className="font-black text-lg">Gagal Memuat Data</h2>
+                    <p className="text-sm font-medium">{error}</p>
+                    <button onClick={fetchMembers} className="mt-2 px-4 py-2 bg-apomacy-primary text-white rounded-xl text-sm font-bold hover:bg-apomacy-dark transition-colors">
+                        Coba Lagi
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col h-[calc(100vh-90px)] bg-background relative max-w-full overflow-hidden p-6 gap-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-apomacy-dark flex items-center gap-2">
                         <Users className="text-apomacy-primary" size={28} />
-                        Manajemen Member
+                        Manajemen Customer
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
                         Kelola data Customer apotek.
                     </p>
                 </div>
 
-                {/* Badge Role User */}
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 ${
-                    userRole === "admin"
-                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                        : "bg-amber-50 text-amber-700 border-amber-200"
-                }`}>
-                    {userRole === "admin" ? <ShieldCheck size={14} /> : <ShieldAlert size={14} />}
-                    {userRole === "admin"
-                        ? "Admin · Akses Penuh"
-                        : "Kasir · Tambah & Edit"}
+                {/* Badge Role Admin */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 bg-blue-50 text-blue-700 border-blue-200">
+                    <ShieldCheck size={14} />
+                    Admin · Akses Penuh
                 </div>
             </div>
 
@@ -333,7 +335,7 @@ export default function MemberPage() {
                                         <td colSpan={7} className="py-16 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-3">
                                                 <Loader2 className="animate-spin text-apomacy-primary" size={32} />
-                                                <span className="text-sm font-medium">Memuat data member...</span>
+                                                <span className="text-sm font-medium">Memuat data customer...</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -342,7 +344,7 @@ export default function MemberPage() {
                                         <td colSpan={7} className="py-16 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-2">
                                                 <Search size={40} className="opacity-20" />
-                                                <span className="text-sm font-medium">Tidak ada data member.</span>
+                                                <span className="text-sm font-medium">Tidak ada data customer.</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -390,17 +392,13 @@ export default function MemberPage() {
                                                         >
                                                             <Edit2 size={16} />
                                                         </button>
-
-                                                        {/* TOMBOL HAPUS HANYA UNTUK ADMIN */}
-                                                        {canDelete && (
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(member); }}
-                                                                className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                                                title="Hapus"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        )}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(member); }}
+                                                            className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                            title="Hapus"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -513,13 +511,6 @@ export default function MemberPage() {
                                         <XCircle size={16} /> Batal
                                     </button>
                                 </div>
-
-                                {mode === "view" && selectedMember && !canDelete && (
-                                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
-                                        <ShieldAlert size={14} className="shrink-0" />
-                                        Akun Anda (Kasir) tidak memiliki izin untuk menghapus member.
-                                    </p>
-                                )}
                             </>
                         )}
                     </form>
