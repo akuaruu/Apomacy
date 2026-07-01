@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
+import Image from 'next/image';
+import Link from 'next/link';
 
 // ============================================================
 // DATA STATIS APOTEK
@@ -120,6 +122,26 @@ export default function DasborPage() {
     <div className="max-w-5xl mx-auto pb-10">
 
       {/* Header */}
+      <div className="mb-8">
+
+        <Link 
+          href="/katalog" 
+          className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 border border-apomacy-border text-apomacy-muted-blue rounded-lg hover:text-apomacy-blue hover:border-apomacy-teal hover:shadow-sm transition-all duration-200 mb-5 w-fit"
+          title="Kembali ke Halaman Utama"
+        >
+          {/* Ini dia file gambar Anda! */}
+       <Image 
+            src="/image/Home.png" 
+            alt="Ikon Home" 
+            width={30} 
+            height={30} 
+            className="object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+          />
+          <span className="text-sm font-medium">Katalog Obat</span>
+        </Link>
+      </div>
+
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-apomacy-blue">RINGKASAN DASBOR</h1>
         <p className="text-apomacy-muted-blue mt-1">Pantau aktivitas kesehatan dan pesanan obat Anda di sini.</p>

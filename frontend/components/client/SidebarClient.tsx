@@ -109,15 +109,6 @@ export default function SidebarClient() {
 
       {/* Menu Navigasi */}
       <nav className="flex-1 px-4 py-2 space-y-2 overflow-y-auto">
-        <Link
-          href="/katalog"
-          className={`block px-4 py-3 rounded-lg transition ${pathname === '/katalog'
-            ? 'bg-white/10 text-white font-medium'
-            : 'text-apomacy-light-blue hover:text-white hover:bg-apomacy-muted-blue/50'
-            }`}
-        >
-          Halaman Utama
-        </Link>
 
         <Link
           href="/dasbor"
