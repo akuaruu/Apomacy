@@ -65,6 +65,9 @@ export default function FaqPage() {
     <div className="max-w-4xl mx-auto pb-10">
       
       <div className="mb-8">
+        <br />
+        <br />
+        
         <h1 className="text-3xl font-bold text-apomacy-blue">Pusat Bantuan & FAQ</h1>
         <p className="text-apomacy-muted-blue mt-1">Temukan jawaban untuk pertanyaan yang paling sering diajukan terkait layanan Apomacy.</p>
       </div>

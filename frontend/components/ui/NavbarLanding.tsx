@@ -18,6 +18,8 @@ export default function NavbarLanding() {
         <Link href="/" className="hover:text-primary-500">Home</Link>
         <Link href="/katalog" className="hover:text-primary-500">Katalog Obat</Link>
         <Link href="/about" className="hover:text-primary-500">Tentang Kami</Link>
+        <Link href="/faq" className="hover:text-primary-500">Faq</Link>
+
       </div>
       <div className="flex items-center gap-4 text-sm font-medium">
         <Link href="/login" className="text-gray-600 hover:text-primary-500">Login</Link>

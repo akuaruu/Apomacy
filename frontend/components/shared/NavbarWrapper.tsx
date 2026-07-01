@@ -41,7 +41,7 @@ export default function NavbarWrapper() {
     }
 
     // Gunakan navbar landing untuk homepage, login, register, about
-    if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/about") {
+    if (pathname === "/" || pathname === "/login" || pathname === "/register" || pathname === "/about" || pathname === "/faq") {
         return <NavbarLanding />;
     }
 
