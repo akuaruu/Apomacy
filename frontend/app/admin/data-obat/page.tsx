@@ -19,6 +19,10 @@ import SearchableSelect from "@/components/shared/SearchableSelect";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
+import { getUserFriendlyError } from "@/lib/errors";
+import { getImageUploadError, IMAGE_UPLOAD_ACCEPT, isNonNegativeNumber, isPositiveNumber, isValidFutureDate } from "@/lib/validation";
+
+const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
 
 export default function DataObatPage() {
   const [obatList, setObatList] = useState<any[]>([]);
@@ -260,6 +264,12 @@ export default function DataObatPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const fileError = getImageUploadError(file, PRODUCT_IMAGE_MAX_SIZE);
+      if (fileError) {
+        showToast(fileError, "error");
+        e.target.value = "";
+        return;
+      }
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
     }
@@ -317,6 +327,19 @@ export default function DataObatPage() {
 
     if (formData.hargaJual <= 0) {
       showToast("Gagal! Harga Jual harus lebih dari 0.", "error");
+      return;
+    }
+
+    if (!isPositiveNumber(formData.hargaBeli)) {
+      showToast("Gagal! Harga beli harus lebih dari 0.", "error");
+      return;
+    }
+    if (!isNonNegativeNumber(formData.stok) || !isNonNegativeNumber(formData.minimal)) {
+      showToast("Gagal! Stok dan stok minimum tidak boleh bernilai negatif.", "error");
+      return;
+    }
+    if (!isValidFutureDate(formData.expired)) {
+      showToast("Gagal! Tanggal kedaluwarsa harus berada di masa depan.", "error");
       return;
     }
 
@@ -431,9 +454,8 @@ export default function DataObatPage() {
       await fetchObatData();
       handleClearForm();
 
-    } catch (error: any) {
-      const errMsg = error.response?.data?.error || "Terjadi kesalahan pada server saat memproses data.";
-      showToast(errMsg, "error");
+    } catch (error: unknown) {
+      showToast(getUserFriendlyError(error, "Gagal memproses data obat."), "error");
     }
   };
 
@@ -781,7 +803,7 @@ export default function DataObatPage() {
                       <input
                         type="file"
                         ref={fileInputRef}
-                        accept="image/*"
+                        accept={IMAGE_UPLOAD_ACCEPT}
                         onChange={handleImageChange}
                         disabled={mode === "edit"}
                         className="hidden"
@@ -795,7 +817,7 @@ export default function DataObatPage() {
                         FOTO
                       </button>
                       <p className="text-[10px] text-outline mt-1 truncate max-w-[120px]">
-                        {mode === "edit" ? "Update foto dari UI belum didukung" : (imageFile ? imageFile.name : "JPG, PNG")}
+                        {mode === "edit" ? "Update foto dari UI belum didukung" : (imageFile ? imageFile.name : "JPG, PNG, WebP · maks. 5 MB")}
                       </p>
                     </div>
                   </div>

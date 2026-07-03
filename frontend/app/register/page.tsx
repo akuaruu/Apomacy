@@ -6,6 +6,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, isValidIndonesianPhone, isValidPastDate, normalizeEmail, normalizePhone } from "@/lib/validation";
 
 interface Product {
   id: number;
@@ -60,16 +62,37 @@ export default function RegisterPage() {
       return;
     }
 
+    if (name.trim().length < 2) {
+      setError("Nama lengkap minimal terdiri dari 2 karakter.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Masukkan alamat email yang valid.");
+      return;
+    }
+    if (!isValidIndonesianPhone(phone)) {
+      setError("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890.");
+      return;
+    }
+    if (!isValidPastDate(birthDate)) {
+      setError("Tanggal lahir harus berupa tanggal yang valid dan tidak boleh di masa depan.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Kata sandi minimal terdiri dari 8 karakter.");
+      return;
+    }
+
     setIsRegistering(true);
 
     try {
-      // PENYESUAIAN PAYLOAD: Disesuaikan dengan tag JSON di backend model User
+      const normalizedEmail = normalizeEmail(email);
       await api.post("/users/register", {
-        nama_lengkap: name,
-        email: email,
-        username: email, // Kita gunakan email sebagai username
-        no_telp: phone,
-        password: password, // Akan ditangkap oleh custom struct di backend
+        nama_lengkap: name.trim(),
+        email: normalizedEmail,
+        username: normalizedEmail,
+        no_telp: normalizePhone(phone),
+        password,
       });
 
       setSuccess("Pendaftaran berhasil! Silakan masuk ke akun Anda.");
@@ -84,10 +107,8 @@ export default function RegisterPage() {
       setTimeout(() => {
         window.location.href = "/login";
       }, 2000);
-    } catch (err: any) {
-      console.error("Register Error:", err);
-      const msg = err.response?.data?.message || err.response?.data?.error || "Gagal melakukan pendaftaran. Silakan periksa kembali data Anda.";
-      setError(msg);
+    } catch (err: unknown) {
+      setError(getUserFriendlyError(err, "Gagal melakukan pendaftaran. Periksa kembali data Anda."));
     } finally {
       setIsRegistering(false);
     }

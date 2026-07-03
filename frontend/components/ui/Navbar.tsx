@@ -7,6 +7,8 @@ import { usePathname, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import api from "@/lib/api";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 interface NavCategory {
     label: string;
@@ -101,11 +103,17 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
         e.preventDefault();
 
         setLoginError("");
+
+        if (!isValidEmail(loginEmail)) {
+            setLoginError("Masukkan alamat email yang valid.");
+            return;
+        }
+
         setIsLoggingIn(true);
 
         try {
             const response = await api.post("/users/login", {
-                username: loginEmail,
+                username: normalizeEmail(loginEmail),
                 password: loginPassword,
             });
 
@@ -171,14 +179,8 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
             router.refresh();
 
-        } catch (err: any) {
-            const message =
-                err.response?.data?.error ||
-                err.response?.data?.message ||
-                err.message ||
-                "Gagal masuk. Periksa kembali email dan password Anda.";
-
-            setLoginError(message);
+        } catch (err: unknown) {
+            setLoginError(getUserFriendlyError(err, "Gagal masuk. Periksa kembali email dan kata sandi Anda."));
         } finally {
             setIsLoggingIn(false);
         }

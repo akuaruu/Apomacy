@@ -9,6 +9,8 @@ import {
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
+import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
+import { isValidIndonesianPhone, normalizePhone } from "@/lib/validation";
 
 interface Member {
     id: number;
@@ -32,17 +34,6 @@ interface CustomerApiItem {
     alamat?: string | null;
     email?: string | null;
 }
-
-const getApiErrorMessage = (error: unknown, fallback: string) => {
-    if (typeof error === "object" && error !== null && "response" in error) {
-        const response = (error as {
-            response?: { data?: { error?: string; detail?: string } };
-        }).response;
-        return response?.data?.detail || response?.data?.error || fallback;
-    }
-
-    return error instanceof Error ? error.message : fallback;
-};
 
 export default function MemberPage() {
     const router = useRouter();
@@ -213,8 +204,10 @@ export default function MemberPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.age || isNaN(Number(formData.age))) {
-            alert("Umur harus berupa angka valid!");
+        if (!formData.name.trim()) { alert("Nama member wajib diisi."); return; }
+        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid."); return; }
+        if (!formData.age || !Number.isInteger(Number(formData.age)) || Number(formData.age) < 0 || Number(formData.age) > 120) {
+            alert("Umur harus berupa angka antara 0 sampai 120 tahun.");
             return;
         }
 
@@ -232,8 +225,8 @@ export default function MemberPage() {
 
                     const payload = {
                         no_member: formData.noMember,
-                        nama_customer: formData.name,
-                        no_telp: formData.phone,
+                        nama_customer: formData.name.trim(),
+                        no_telp: normalizePhone(formData.phone),
                         jenis_kelamin: formData.gender,
                         tanggal_lahir: birthDatePayload,
                         alamat: selectedMember?.address || "-",

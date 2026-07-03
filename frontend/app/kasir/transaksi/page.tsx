@@ -8,6 +8,7 @@ import {
 import Cookies from "js-cookie";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
 
 interface Member {
     id: string;
@@ -60,17 +61,6 @@ interface CustomerApiItem {
     no_telp?: string;
     NoTelp?: string;
 }
-
-const getApiErrorMessage = (error: unknown, fallback: string) => {
-    if (typeof error === "object" && error !== null && "response" in error) {
-        const response = (error as {
-            response?: { data?: { error?: string; detail?: string } };
-        }).response;
-        return response?.data?.detail || response?.data?.error || fallback;
-    }
-
-    return error instanceof Error ? error.message : fallback;
-};
 
 export default function TransaksiOfflinePage() {
     const [isLoadingData, setIsLoadingData] = useState(true);

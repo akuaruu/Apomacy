@@ -19,6 +19,7 @@ import Cookies from "js-cookie";
 import StatCard from "@/components/admin/StatCard";
 // Pastikan komponen SalesAnalytics ini sudah kamu update dengan kode yang aku kasih sebelumnya
 import SalesAnalytics from "@/components/admin/SalesAnalytics";
+import { getUserFriendlyError } from "@/lib/errors";
 
 // --- Typescript Interfaces ---
 interface DetailTransaksi {
@@ -94,8 +95,8 @@ export default function DashboardPage() {
 
         setTransactions(dataTrx.data || []);
         setObatList(dataObat.data || []);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(getUserFriendlyError(err, "Gagal memuat data dasbor."));
       } finally {
         setIsLoading(false);
       }

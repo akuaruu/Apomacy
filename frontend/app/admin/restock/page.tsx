@@ -17,6 +17,8 @@ import SearchableObatSelect from "@/components/shared/SearchableObatSelect";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidFutureDate } from "@/lib/validation";
 
 export default function RestockPage() {
   // Master Data State
@@ -72,8 +74,8 @@ export default function RestockPage() {
     setIsLoadingMaster(true);
     try {
       const [resObat, resSupplier] = await Promise.all([
-        api.get("/obat/").catch(() => ({ data: { data: [] } })),
-        api.get("/supplier/").catch(() => ({ data: { data: [] } })),
+        api.get("/obat"),
+        api.get("/supplier"),
       ]);
 
       const obatData = resObat.data?.data || resObat.data || [];
@@ -183,6 +185,10 @@ export default function RestockPage() {
         "Gagal! Seluruh formulir penerimaan dan detail obat wajib diisi dengan lengkap.",
         "error",
       );
+    }
+
+    if (!isValidFutureDate(formItem.expired)) {
+      return showToast("Tanggal kedaluwarsa obat harus berada di masa depan.", "error");
     }
 
     if (editingItemKode) {
@@ -315,14 +321,13 @@ export default function RestockPage() {
         };
 
         // Menghapus slash '/' di akhir URL agar sesuai dengan routing Golang
-        await api.post("/restock/", payload);
+        await api.post("/restock", payload);
 
         handleClearAll();
         generateNoTerima();
         showToast("Berhasil! Data restock telah diproses dan stok obat di-update.", "success");
-      } catch (error: any) {
-        const errMsg = error.response?.data?.error || "Gagal memproses transaksi restock ke server.";
-        showToast(errMsg, "error");
+      } catch (error: unknown) {
+        showToast(getUserFriendlyError(error, "Gagal memproses transaksi restock."), "error");
       }
     } else if (actionType === "batal") {
       handleClearAll();

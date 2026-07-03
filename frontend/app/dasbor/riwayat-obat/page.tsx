@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Cookies from "js-cookie";
+import { getUserFriendlyError } from "@/lib/errors";
 
 // --- INTERFACE DATA DARI API ---
 interface DetailTransaksi {
@@ -59,8 +60,8 @@ export default function PesananPage() {
 
         const responseData = await res.json();
         setRiwayatPesanan(responseData.data || []);
-      } catch (error: any) {
-        setErrorMsg(error.message);
+      } catch (error: unknown) {
+        setErrorMsg(getUserFriendlyError(error, "Gagal mengambil riwayat pesanan."));
       } finally {
         setIsLoading(false);
       }

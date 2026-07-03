@@ -7,6 +7,8 @@ import api from "@/lib/api";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -22,11 +24,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!isValidEmail(email)) {
+      setError("Masukkan alamat email yang valid.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const response = await api.post("/users/login", {
-        username: email,
+        username: normalizeEmail(email),
         password,
       });
 
@@ -70,14 +78,8 @@ export default function LoginPage() {
       }
 
       router.refresh();
-    } catch (err: any) {
-      const message =
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        err.message ||
-        "Gagal masuk. Silakan periksa kembali kredensial Anda.";
-
-      setError(message);
+    } catch (err: unknown) {
+      setError(getUserFriendlyError(err, "Gagal masuk. Periksa kembali email dan kata sandi Anda."));
     } finally {
       setIsLoading(false);
     }
@@ -132,7 +134,8 @@ export default function LoginPage() {
                   <Mail size={18} />
                 </div>
                 <input
-                  type="text"
+                  type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -150,6 +153,7 @@ export default function LoginPage() {
                 </div>
                 <input
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
