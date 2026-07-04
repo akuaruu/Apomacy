@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/middleware"
@@ -15,7 +16,8 @@ import (
 func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery(), middleware.RequestLogger(slog.Default()))
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{

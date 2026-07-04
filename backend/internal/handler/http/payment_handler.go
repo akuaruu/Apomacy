@@ -4,11 +4,11 @@ import (
 	"context"
 	"crypto/sha512"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
-	"github.com/akuaruu/apomacy/backend/internal/usecase"
 	"github.com/gin-gonic/gin"
 	"github.com/midtrans/midtrans-go"
 )
@@ -37,11 +37,15 @@ type MidtransNotification struct {
 }
 
 type PaymentHandler struct {
-	paymentUsecase   *usecase.PaymentUsecase
+	paymentUsecase   paymentUsecase
 	transaksiUsecase model.TransaksiUsecase
 }
 
-func NewPaymentHandler(u *usecase.PaymentUsecase, tu model.TransaksiUsecase) *PaymentHandler {
+type paymentUsecase interface {
+	GenerateSnapToken(string, int64, string, []midtrans.ItemDetails) (string, error)
+}
+
+func NewPaymentHandler(u paymentUsecase, tu model.TransaksiUsecase) *PaymentHandler {
 	return &PaymentHandler{
 		paymentUsecase:   u,
 		transaksiUsecase: tu,
@@ -117,12 +121,12 @@ func (h *PaymentHandler) WebhookNotification(c *gin.Context) {
 
 	// Update status transaksi di database
 	if err := h.transaksiUsecase.UpdateStatusByNoTransaksi(context.Background(), notification.OrderID, newStatus); err != nil {
-		fmt.Printf("[WEBHOOK ERROR] Gagal update transaksi %s: %v\n", notification.OrderID, err)
+		slog.ErrorContext(c.Request.Context(), "midtrans webhook update failed", "error", err, "order_id", notification.OrderID, "request_id", requestID(c))
 		// Tetap return 200 agar Midtrans tidak retry terus-menerus
 		c.Status(http.StatusOK)
 		return
 	}
 
-	fmt.Printf("[WEBHOOK] Transaksi %s diupdate ke status: %s\n", notification.OrderID, newStatus)
+	slog.InfoContext(c.Request.Context(), "midtrans webhook processed", "order_id", notification.OrderID, "status", newStatus, "request_id", requestID(c))
 	c.Status(http.StatusOK)
 }

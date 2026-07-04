@@ -1,11 +1,12 @@
 package http
 
 import (
-	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/akuaruu/apomacy/backend/internal/middleware"
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/gin-gonic/gin"
 )
@@ -61,8 +62,7 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	req.IDUser = idUser
 
 	if err := h.usecase.Checkout(c.Request.Context(), &req); err != nil {
-		// tambah log ini sementara
-		fmt.Printf("[ERROR] Checkout gagal: %+v\n", err)
+		slog.ErrorContext(c.Request.Context(), "checkout failed", "error", err, "request_id", requestID(c))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses transaksi", "detail": err.Error()})
 		return
 	}
@@ -74,6 +74,12 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 			"no_transaksi": req.NoTransaksi,
 		},
 	})
+}
+
+func requestID(c *gin.Context) string {
+	value, _ := c.Get(middleware.RequestIDKey)
+	requestID, _ := value.(string)
+	return requestID
 }
 
 // GetDetail mengambil riwayat spesifik transaksi beserta rincian obat dan pengiriman
