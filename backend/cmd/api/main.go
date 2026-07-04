@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/akuaruu/apomacy/backend/internal/config"
 	router "github.com/akuaruu/apomacy/backend/internal/handler/http"
+	"github.com/akuaruu/apomacy/backend/internal/observability"
 	"github.com/akuaruu/apomacy/backend/pkg/database"
 	midtrans "github.com/akuaruu/apomacy/backend/pkg/transaction"
 
@@ -21,6 +23,7 @@ import (
 func main() {
 	// 1. Load Configurations & Infrastructures
 	godotenv.Load()
+	slog.SetDefault(observability.NewLogger(os.Stdout))
 	cfg := config.LoadConfig()
 
 	dbPool := database.NewPostgresConn(&cfg.DB)
