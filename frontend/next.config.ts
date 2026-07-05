@@ -1,13 +1,18 @@
 import type { NextConfig } from "next";
 
+const backendApiUrl = (
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8080/api"
+).replace(/\/+$/, "");
+
 const nextConfig: NextConfig = {
   // Menambahkan jalur proxy (rewrites) untuk mengatasi masalah CORS / Mixed Content
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        // Arahkan ke backend Golang di server VPS 
-        destination: 'http://159.223.82.138:8080/api/:path*', 
+        destination: `${backendApiUrl}/:path*`,
       },
     ];
   },
