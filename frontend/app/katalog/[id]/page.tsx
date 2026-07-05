@@ -7,6 +7,8 @@ import { useCart } from "@/context/CartContext";
 import { formatRupiah } from "@/lib/Data";
 import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
 import api from "@/lib/api";
+import { getApiDataArray, getApiDataObject } from "@/lib/api-data";
+import { getUserFriendlyError } from "@/lib/errors";
 import Cookies from "js-cookie";
 
 interface ProductDetail {
@@ -28,6 +30,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const [product, setProduct] = useState<ProductDetail | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<ExtendedProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
 
     const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
     const [quantity, setQuantity] = useState(1);
@@ -64,9 +67,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     useEffect(() => {
         const fetchProduct = async () => {
             setIsLoading(true);
+            setLoadError("");
             try {
                 const res = await api.get(`/obat/${id}`);
-                const data = res.data?.data || res.data;
+                const data = getApiDataObject<any>(res.data, "detail obat");
 
                 const currentCategory = data.kategori && data.kategori.length > 0 ? data.kategori[0] : data.jenis_obat;
 
@@ -90,9 +94,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 setProduct(detail);
 
                 const relatedRes = await api.get("/obat");
-                let relatedData = relatedRes.data?.data || relatedRes.data;
-                if (Array.isArray(relatedData)) {
-                    const mappedRelated: ExtendedProduct[] = relatedData
+                const relatedData = getApiDataArray<any>(relatedRes.data, "obat terkait");
+                const mappedRelated: ExtendedProduct[] = relatedData
                         .filter((item: any) => item.id_obat.toString() !== id)
                         .filter((item: any) => {
                             const itemCat = item.kategori && item.kategori.length > 0 ? item.kategori[0] : item.jenis_obat;
@@ -108,11 +111,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             unit: item.satuan,
                             inStock: item.stok > 0
                         }));
-                    setRelatedProducts(mappedRelated);
-                }
+                setRelatedProducts(mappedRelated);
 
             } catch (error) {
-                console.error("Gagal mengambil data produk");
+                setProduct(null);
+                setRelatedProducts([]);
+                setLoadError(getUserFriendlyError(error, "Gagal memuat detail produk."));
             } finally {
                 setIsLoading(false);
             }
@@ -132,7 +136,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     if (!product) {
         return (
             <div className="flex min-h-screen flex-col items-center justify-center bg-apomacy-bg text-center">
-                <h1 className="text-2xl font-bold text-apomacy-dark">Produk tidak ditemukan</h1>
+                <h1 className="text-2xl font-bold text-apomacy-dark">{loadError || "Produk tidak ditemukan"}</h1>
                 <Link href="/katalog" className="mt-4 text-apomacy-primary hover:underline">
                     Kembali ke Katalog
                 </Link>

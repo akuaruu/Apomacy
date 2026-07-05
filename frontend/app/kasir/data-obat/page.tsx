@@ -19,8 +19,9 @@ import SearchableSelect from "@/components/shared/SearchableSelect";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
+import { getApiDataArray } from "@/lib/api-data";
 import { getUserFriendlyError } from "@/lib/errors";
-import { getImageUploadError, IMAGE_UPLOAD_ACCEPT, isNonNegativeNumber, isPositiveNumber, isValidFutureDate } from "@/lib/validation";
+import { getImageUploadError, IMAGE_UPLOAD_ACCEPT, isNonNegativeNumber, isPositiveNumber, isValidCode, isValidFutureDate } from "@/lib/validation";
 
 const PRODUCT_IMAGE_MAX_SIZE = 5 * 1024 * 1024;
 
@@ -102,12 +103,12 @@ export default function DataObatPage() {
     try {
       // Hanya request ke supplier, kategori ditiadakan karena tidak ada route /kategori di backend
       const supRes = await api.get("/supplier");
-      const supData = supRes.data?.data || supRes.data || [];
+      const supData = getApiDataArray<any>(supRes.data, "supplier");
 
       setSupplierList(supData);
       setSupplierOptions(supData.map((s: any) => s.nama_supplier));
     } catch (error) {
-      console.error("Gagal mengambil data master supplier", error);
+      showToast(getUserFriendlyError(error, "Gagal memuat data supplier."), "error");
     }
   };
 
@@ -115,7 +116,7 @@ export default function DataObatPage() {
     setIsLoading(true);
     try {
       const response = await api.get("/obat");
-      const data = response.data?.data || response.data || [];
+      const data = getApiDataArray<any>(response.data, "obat");
 
       // Mengekstrak kategori unik dari data obat yang ditarik untuk tag suggestions
       const extractedCategories = new Set<string>();
@@ -153,23 +154,15 @@ export default function DataObatPage() {
       setCategories(Array.from(extractedCategories));
       setObatList(mappedData);
     } catch (error) {
-      showToast("Terjadi kesalahan saat memuat data obat dari server.", "error");
+      showToast(getUserFriendlyError(error, "Gagal memuat data obat."), "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMasterData();
+    void Promise.all([fetchMasterData(), fetchObatData()]);
   }, []);
-
-  // Fetch Obat dipisah agar menunggu fetchMasterData selesai
-  // Sehingga supplierList sudah ready saat mapping di fetchObatData
-  useEffect(() => {
-    if (supplierOptions.length >= 0) {
-      fetchObatData();
-    }
-  }, [supplierOptions.length]);
 
   const handleClearForm = () => {
     setFormData({
@@ -264,6 +257,11 @@ export default function DataObatPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (mode === "edit") {
+        showToast("Gambar produk belum dapat diubah. Simpan perubahan tanpa memilih gambar baru.", "error");
+        e.target.value = "";
+        return;
+      }
       const fileError = getImageUploadError(file, PRODUCT_IMAGE_MAX_SIZE);
       if (fileError) {
         showToast(fileError, "error");
@@ -304,9 +302,16 @@ export default function DataObatPage() {
   const handleSaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isValidCode(formData.kode)) {
+      showToast("Kode obat wajib diisi dan hanya boleh menggunakan huruf, angka, titik, garis miring, tanda hubung, atau garis bawah.", "error");
+      return;
+    }
+    if (formData.nama.trim().length < 2) {
+      showToast("Nama obat minimal terdiri dari 2 karakter.", "error");
+      return;
+    }
+
     if (
-      !formData.kode.trim() ||
-      !formData.nama.trim() ||
       !formData.jenis ||
       formData.kategori.length === 0 ||
       !formData.bentuk ||
@@ -325,13 +330,16 @@ export default function DataObatPage() {
       return;
     }
 
-    if (formData.hargaJual <= 0) {
-      showToast("Gagal! Harga Jual harus lebih dari 0.", "error");
+    if (!isPositiveNumber(formData.hargaBeli)) {
+      showToast("Harga beli harus lebih dari 0.", "error");
       return;
     }
-
-    if (!isPositiveNumber(formData.hargaBeli)) {
-      showToast("Gagal! Harga beli harus lebih dari 0.", "error");
+    if (!isPositiveNumber(formData.hargaJual)) {
+      showToast("Harga jual harus lebih dari 0.", "error");
+      return;
+    }
+    if (Number(formData.hargaJual) <= Number(formData.hargaBeli)) {
+      showToast("Harga jual harus lebih besar daripada harga beli.", "error");
       return;
     }
     if (!isNonNegativeNumber(formData.stok) || !isNonNegativeNumber(formData.minimal)) {
@@ -381,7 +389,11 @@ export default function DataObatPage() {
     try {
       if (modalConfig.type === "tambah" || modalConfig.type === "edit") {
         const selectedSupplier = supplierList.find(s => s.nama_supplier === formData.supplier);
-        const supplierId = selectedSupplier ? selectedSupplier.id_supplier.toString() : "0";
+        if (!selectedSupplier) {
+          showToast("Supplier yang dipilih tidak ditemukan. Muat ulang data lalu pilih kembali.", "error");
+          return;
+        }
+        const supplierId = selectedSupplier.id_supplier.toString();
 
         // Format ke RFC3339 agar mudah di-parse time.Time oleh Golang
         const formattedExpiredDate = `${formData.expired}T00:00:00Z`;
@@ -389,8 +401,8 @@ export default function DataObatPage() {
         if (modalConfig.type === "tambah") {
           // POST Menerima Multipart Form Data di obat_handler.go
           const payload = new FormData();
-          payload.append("kode_obat", formData.kode);
-          payload.append("nama_obat", formData.nama);
+          payload.append("kode_obat", formData.kode.trim());
+          payload.append("nama_obat", formData.nama.trim());
           payload.append("jenis_obat", formData.jenis);
           payload.append("bentuk_obat", formData.bentuk);
           payload.append("satuan", formData.satuan);
@@ -438,10 +450,6 @@ export default function DataObatPage() {
             kategori: formData.kategori,
             gambar_produk: formData.gambar,
           };
-
-          if (imageFile) {
-            showToast("Endpoint Update di server saat ini hanya mendukung JSON. Gambar baru akan diabaikan.", "error");
-          }
 
           await api.put(`/obat/${formData.id}`, jsonPayload);
           showToast("Perubahan data obat berhasil disimpan!", "success");

@@ -8,9 +8,10 @@ import {
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
+import { getApiDataArray } from "@/lib/api-data";
 import Cookies from "js-cookie";
 import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
-import { isValidIndonesianPhone, normalizePhone } from "@/lib/validation";
+import { isValidIndonesianPhone, isValidPersonName, normalizePhone } from "@/lib/validation";
 
 interface Member {
     id: number;
@@ -71,11 +72,7 @@ export default function MemberPage() {
 
         try {
             const response = await api.get('/customer');
-            const rawData: CustomerApiItem[] = Array.isArray(response.data?.data)
-                ? response.data.data
-                : Array.isArray(response.data)
-                    ? response.data
-                    : [];
+            const rawData = getApiDataArray<CustomerApiItem>(response.data, "member");
 
             const mappedData = rawData.map((item): Member => {
                 let calculatedAge: number | string = "";
@@ -204,10 +201,10 @@ export default function MemberPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.name.trim()) { alert("Nama member wajib diisi."); return; }
-        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid."); return; }
-        if (!formData.age || !Number.isInteger(Number(formData.age)) || Number(formData.age) < 0 || Number(formData.age) > 120) {
-            alert("Umur harus berupa angka antara 0 sampai 120 tahun.");
+        if (!isValidPersonName(formData.name)) { alert("Nama member harus terdiri dari 2–100 karakter dan tidak boleh berisi angka."); return; }
+        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890."); return; }
+        if (!formData.age || !Number.isInteger(Number(formData.age)) || Number(formData.age) < 1 || Number(formData.age) > 120) {
+            alert("Umur harus berupa angka bulat antara 1 sampai 120 tahun.");
             return;
         }
 

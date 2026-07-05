@@ -1,55 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { User, Mail, Phone, Calendar, Lock, Zap, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Phone, Lock, Zap, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
 import { getUserFriendlyError } from "@/lib/errors";
-import { isValidEmail, isValidIndonesianPhone, isValidPastDate, normalizeEmail, normalizePhone } from "@/lib/validation";
-
-interface Product {
-  id: number;
-  title: string;
-  price: number;
-  category: string;
-  image: string;
-}
+import { isValidEmail, isValidIndonesianPhone, isValidPersonName, normalizeEmail, normalizePhone } from "@/lib/validation";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [birthDate, setBirthDate] = useState("");
   const [password, setPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
-
   useEffect(() => {
     const token = Cookies.get("apomacy_token");
     if (token) {
       window.location.href = "/dasbor";
     }
-
-    const fetchProducts = async () => {
-      try {
-        const response = await axios.get("https://fakestoreapi.com/products?limit=10");
-        setProducts(response.data);
-      } catch (err) {
-        console.error("Gagal mengambil data produk:", err);
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-
-    fetchProducts();
   }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -62,8 +36,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (name.trim().length < 2) {
-      setError("Nama lengkap minimal terdiri dari 2 karakter.");
+    if (!isValidPersonName(name)) {
+      setError("Nama lengkap harus terdiri dari 2–100 karakter dan tidak boleh berisi angka.");
       return;
     }
     if (!isValidEmail(email)) {
@@ -72,10 +46,6 @@ export default function RegisterPage() {
     }
     if (!isValidIndonesianPhone(phone)) {
       setError("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890.");
-      return;
-    }
-    if (!isValidPastDate(birthDate)) {
-      setError("Tanggal lahir harus berupa tanggal yang valid dan tidak boleh di masa depan.");
       return;
     }
     if (password.length < 8) {
@@ -100,7 +70,6 @@ export default function RegisterPage() {
       setName("");
       setEmail("");
       setPhone("");
-      setBirthDate("");
       setPassword("");
       setAgreed(false);
 
@@ -211,22 +180,6 @@ export default function RegisterPage() {
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+62 123-4567-890"
                       className="w-full pl-11 pr-4 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 flex-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tanggal Lahir</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                      <Calendar size={18} />
-                    </div>
-                    <input
-                      type="date"
-                      required
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm text-gray-500"
                     />
                   </div>
                 </div>

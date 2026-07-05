@@ -1,25 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import Cookies from "js-cookie";
+import api from "@/lib/api";
+import { getApiDataObject } from "@/lib/api-data";
 import { getUserFriendlyError } from "@/lib/errors";
-import { getImageUploadError, IMAGE_UPLOAD_ACCEPT, isValidIndonesianPhone, isValidPastDate, normalizePhone } from "@/lib/validation";
+import { getImageUploadError, IMAGE_UPLOAD_ACCEPT, isValidIndonesianPhone, isValidPastDate, isValidPersonName, normalizePhone } from "@/lib/validation";
 
 const PROFILE_IMAGE_MAX_SIZE = 2 * 1024 * 1024;
-
-const getResponseError = async (response: Response, fallback: string) => {
-  let message = fallback;
-
-  try {
-    const data: unknown = await response.json();
-    if (data && typeof data === "object" && "error" in data) {
-      const error = (data as { error?: unknown }).error;
-      if (typeof error === "string") message = error;
-    }
-  } catch {}
-
-  return getUserFriendlyError(new Error(message), fallback);
-};
 
 export default function ProfilPage() {
   // State untuk menyimpan isian form
@@ -30,8 +17,10 @@ export default function ProfilPage() {
     tanggalLahir: '',
     alamat: '',
   });
+  const [initialFormData, setInitialFormData] = useState(formData);
 
   const [fotoProfil, setFotoProfil] = useState('');
+  const [initialFotoProfil, setInitialFotoProfil] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,26 +34,8 @@ export default function ProfilPage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // Ambil token dari Cookies sesuai dengan nama yang diset di halaman Login
-        const token = Cookies.get('apomacy_token');
-
-        // Memanggil endpoint GET /api/users/profile (Sesuai dengan router.go Anda!)
-        const res = await fetch(`/api/users/profile`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        // Penanganan error yang tahan banting (Mencegah SyntaxError JSON position 4)
-        if (!res.ok) {
-          throw new Error(await getResponseError(res, "Gagal mengambil data profil."));
-        }
-
-        // Parsing JSON jika responsnya sukses (200 OK)
-        const responseData = await res.json();
-        const data = responseData.data ?? {};
+        const response = await api.get("/users/profile");
+        const data = getApiDataObject<Record<string, unknown>>(response.data, "profil");
 
         const tanggalLahir =
           data.tanggalLahir ??
@@ -76,37 +47,29 @@ export default function ProfilPage() {
           data.foto_profil ??
           "";
 
-        setFormData({
+        const loadedFormData = {
           nama:
-            data.nama ??
-            data.nama_lengkap ??
-            "",
+            String(data.nama ?? data.nama_lengkap ?? ""),
 
           email:
-            data.email ??
-            "",
+            String(data.email ?? ""),
 
           telepon:
-            data.telepon ??
-            data.no_telp ??
-            "",
+            String(data.telepon ?? data.no_telp ?? ""),
 
           tanggalLahir: tanggalLahir
             ? String(tanggalLahir).slice(0, 10)
             : "",
 
           alamat:
-            data.alamat ??
-            "",
-        });
+            String(data.alamat ?? ""),
+        };
+        setFormData(loadedFormData);
+        setInitialFormData(loadedFormData);
 
-        setFotoProfil(
-          fotoProfil
-            ? encodeURI(fotoProfil)
-            : ""
-        );
-        console.log("PROFILE RESPONSE:", responseData);
-
+        const loadedFotoProfil = fotoProfil ? encodeURI(String(fotoProfil)) : "";
+        setFotoProfil(loadedFotoProfil);
+        setInitialFotoProfil(loadedFotoProfil);
       } catch (error: unknown) {
         console.error("Error fetching profile:", error);
         setPesanError(getUserFriendlyError(error, "Gagal mengambil data profil."));
@@ -146,8 +109,8 @@ export default function ProfilPage() {
     setPesanSukses(false);
     setPesanError("");
 
-    if (!formData.nama.trim()) {
-      setPesanError("Nama lengkap wajib diisi.");
+    if (!isValidPersonName(formData.nama)) {
+      setPesanError("Nama lengkap harus terdiri dari 2–100 karakter dan tidak boleh berisi angka.");
       return;
     }
     if (!isValidIndonesianPhone(formData.telepon)) {
@@ -162,8 +125,7 @@ export default function ProfilPage() {
     setIsLoading(true);
 
     try {
-      // Ambil token dari Cookies sesuai dengan nama yang diset di halaman Login
-      const token = Cookies.get('apomacy_token');
+      let savedFotoProfil = fotoProfil;
 
       // --- A. Upload Foto Profil ---
       // (Sesuai endpoint PUT /api/users/:id/foto di router.go)
@@ -172,46 +134,29 @@ export default function ProfilPage() {
         const extension = selectedFile.type.split("/")[1].replace("jpeg", "jpg");
         formDataFoto.append("foto", selectedFile, `profile-${Date.now()}.${extension}`);
 
-        const resFoto = await fetch("/api/users/foto", {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formDataFoto,
-        });
-
-        if (!resFoto.ok) {
-          throw new Error(await getResponseError(resFoto, "Gagal mengunggah foto profil."));
-        }
-
-        const fotoData = await resFoto.json();
+        const resFoto = await api.put("/users/foto", formDataFoto);
+        const fotoData = getApiDataObject<{ url?: string }>(resFoto.data, "foto profil");
+        if (!fotoData.url) throw new Error("URL foto profil tidak ditemukan pada respons server.");
         setFotoProfil(fotoData.url);
+        savedFotoProfil = fotoData.url;
         setSelectedFile(null);
 
       }
 
       // --- B. Update Data Teks (Menyimpan Nama, Alamat, Tanggal Lahir) ---
-      const resData = await fetch(`/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        // Pastikan key JSON di bawah ini (nama, telepon, dll) sesuai 
-        // dengan struct yang kamu buat di file handler Golang-mu!
-        body: JSON.stringify({
+      await api.put("/users/profile", {
           nama_lengkap: formData.nama.trim(),
           no_telp: normalizePhone(formData.telepon),
           tanggal_lahir: formData.tanggalLahir,
-          alamat: formData.alamat
-        })
+          alamat: formData.alamat.trim()
       });
-
-      if (!resData.ok) {
-        throw new Error(await getResponseError(resData, "Gagal menyimpan perubahan profil."));
-      }
-
-
+      setInitialFormData({
+        ...formData,
+        nama: formData.nama.trim(),
+        telepon: normalizePhone(formData.telepon),
+        alamat: formData.alamat.trim(),
+      });
+      setInitialFotoProfil(savedFotoProfil);
       setPesanSukses(true);
       setTimeout(() => setPesanSukses(false), 3000);
     } catch (error: unknown) {
@@ -323,7 +268,13 @@ export default function ProfilPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 mt-6 border-t border-apomacy-border">
-            <button type="button" className="px-6 py-2.5 border border-apomacy-border text-apomacy-muted-blue font-medium rounded-lg hover:bg-gray-50 transition">
+            <button type="button" onClick={() => {
+              setFormData(initialFormData);
+              setFotoProfil(initialFotoProfil);
+              setSelectedFile(null);
+              setPesanError("");
+              setPesanSukses(false);
+            }} className="px-6 py-2.5 border border-apomacy-border text-apomacy-muted-blue font-medium rounded-lg hover:bg-gray-50 transition">
               Batal
             </button>
             <button type="submit" disabled={isLoading}

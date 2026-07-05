@@ -7,7 +7,10 @@ import Cookies from "js-cookie";
 import { formatRupiah } from "@/lib/Data";
 import { useCart } from "@/context/CartContext";
 import CheckoutButton from "@/components/client/CheckoutButton";
-import { isValidIndonesianPhone } from "@/lib/validation";
+import api from "@/lib/api";
+import { getApiDataObject } from "@/lib/api-data";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidIndonesianPhone, isValidPersonName } from "@/lib/validation";
 
 const SHIPPING_COST = 15000;
 const FREE_SHIPPING_THRESHOLD = 150000;
@@ -27,6 +30,7 @@ export default function CheckoutPage() {
         pickupName: "",
         pickupPhone: "",
     });
+    const [profileLocked, setProfileLocked] = useState({ name: false, phone: false });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -38,33 +42,30 @@ export default function CheckoutPage() {
         const token = Cookies.get("apomacy_token");
         if (!token) {
             router.replace("/login?redirect=/checkout");
+            return;
         }
 
         // Fetch data profil user secara otomatis
         const fetchProfile = async () => {
             try {
                 // Gunakan relative path (Proxy Vercel)
-                const res = await fetch("/api/users/profile", {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const response = await api.get("/users/profile");
+                const profileData = getApiDataObject<Record<string, unknown>>(response.data, "profil");
+                const name = typeof profileData.nama === "string" ? profileData.nama : "";
+                const phone = typeof profileData.telepon === "string" ? profileData.telepon : "";
+                const address = typeof profileData.alamat === "string" ? profileData.alamat : "";
 
-                if (res.ok) {
-                    const json = await res.json();
-                    const profileData = json.data;
-
-                    // Otomatis isi state formData dengan data database
-                    setFormData(prev => ({
-                        ...prev,
-                        name: profileData.nama || "",
-                        phone: profileData.telepon || "",
-                        pickupName: profileData.nama || "",
-                        pickupPhone: profileData.telepon || "",
-                    }));
-                }
+                setFormData(prev => ({
+                    ...prev,
+                    name,
+                    phone,
+                    address,
+                    pickupName: name,
+                    pickupPhone: phone,
+                }));
+                setProfileLocked({ name: Boolean(name), phone: Boolean(phone) });
             } catch (error) {
-                console.error("Gagal memuat profil", error);
+                console.error(getUserFriendlyError(error, "Gagal memuat profil untuk checkout."));
             }
         };
 
@@ -118,14 +119,14 @@ export default function CheckoutPage() {
 
         if (method === 'delivery') {
             // Validasi khusus untuk pesan antar
-            if (!formData.name.trim()) newErrors.name = "Nama penerima wajib diisi";
-            if (!isValidIndonesianPhone(formData.phone)) newErrors.phone = "Nomor handphone tidak valid";
-            if (!formData.address.trim()) newErrors.address = "Alamat pengiriman wajib diisi";
+            if (!isValidPersonName(formData.name)) newErrors.name = "Masukkan nama penerima yang valid";
+            if (!isValidIndonesianPhone(formData.phone)) newErrors.phone = "Masukkan nomor handphone Indonesia yang valid";
+            if (formData.address.trim().length < 10) newErrors.address = "Alamat pengiriman minimal terdiri dari 10 karakter";
 
         } else if (method === 'pickup') {
             // Validasi khusus untuk ambil sendiri
-            if (!formData.pickupName.trim()) newErrors.pickupName = "Nama pengambil wajib diisi";
-            if (!isValidIndonesianPhone(formData.pickupPhone)) newErrors.pickupPhone = "Nomor telepon pengambil tidak valid";
+            if (!isValidPersonName(formData.pickupName)) newErrors.pickupName = "Masukkan nama pengambil yang valid";
+            if (!isValidIndonesianPhone(formData.pickupPhone)) newErrors.pickupPhone = "Masukkan nomor telepon Indonesia yang valid";
         }
 
         setErrors(newErrors);
@@ -191,10 +192,10 @@ export default function CheckoutPage() {
                                         type="text"
                                         name="name"
                                         value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        readOnly={formData.name.length > 0} // Hanya dikunci jika teks sudah terisi
+                                        onChange={handleInputChange}
+                                        readOnly={profileLocked.name}
                                         placeholder="Nama Penerima"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.name.length > 0
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${profileLocked.name
                                             ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
                                             : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
@@ -205,10 +206,10 @@ export default function CheckoutPage() {
                                         type="text"
                                         name="phone"
                                         value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        readOnly={formData.phone.length > 0}
+                                        onChange={handleInputChange}
+                                        readOnly={profileLocked.phone}
                                         placeholder="Nomor Handphone"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.phone.length > 0
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${profileLocked.phone
                                             ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
                                             : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
@@ -266,12 +267,12 @@ export default function CheckoutPage() {
                                 <div>
                                     <input
                                         type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        readOnly={formData.name.length > 0} // Hanya dikunci jika teks sudah terisi
+                                        name="pickupName"
+                                        value={formData.pickupName}
+                                        onChange={handleInputChange}
+                                        readOnly={profileLocked.name}
                                         placeholder="Nama Penerima"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.name.length > 0
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${profileLocked.name
                                             ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
                                             : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
@@ -280,12 +281,12 @@ export default function CheckoutPage() {
                                 <div>
                                     <input
                                         type="text"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        readOnly={formData.phone.length > 0}
+                                        name="pickupPhone"
+                                        value={formData.pickupPhone}
+                                        onChange={handleInputChange}
+                                        readOnly={profileLocked.phone}
                                         placeholder="Nomor Handphone"
-                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${formData.phone.length > 0
+                                        className={`w-full p-3 rounded-xl border text-sm focus:outline-none transition-colors ${profileLocked.phone
                                             ? "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
                                             : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-teal"
                                             }`}
