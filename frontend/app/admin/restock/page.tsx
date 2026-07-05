@@ -17,11 +17,8 @@ import SearchableObatSelect from "@/components/shared/SearchableObatSelect";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
 import { getUserFriendlyError } from "@/lib/errors";
-import { isValidFutureDate, isValidPastDate } from "@/lib/validation";
-import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
+import { isValidFutureDate } from "@/lib/validation";
 
 export default function RestockPage() {
   // Master Data State
@@ -81,8 +78,8 @@ export default function RestockPage() {
         api.get("/supplier"),
       ]);
 
-      const obatData = getApiDataArray<any>(resObat.data, "obat");
-      const supData = getApiDataArray<any>(resSupplier.data, "supplier");
+      const obatData = resObat.data?.data || resObat.data || [];
+      const supData = resSupplier.data?.data || resSupplier.data || [];
 
       // Mapping data obat, pastikan id_supplier ikut terbawa untuk keperluan filter
       const mappedObat = obatData.map((o: any) => ({
@@ -100,7 +97,7 @@ export default function RestockPage() {
       setSupplierOptions(supData.map((sup: any) => sup.nama_supplier));
 
     } catch (error) {
-      showToast(getUserFriendlyError(error, "Gagal memuat data obat dan supplier."), "error");
+      showToast("Gagal terhubung ke server untuk memuat data master.", "error");
     } finally {
       setIsLoadingMaster(false);
     }
@@ -263,11 +260,7 @@ export default function RestockPage() {
 
   const requestProcess = () => {
     if (cartItems.length === 0)
-      return showToast("Daftar obat masih kosong. Masukkan minimal satu obat.", "error");
-    if (!headerData.noFaktur.trim())
-      return showToast("Nomor faktur supplier wajib diisi.", "error");
-    if (!isValidPastDate(headerData.tanggal))
-      return showToast("Tanggal penerimaan tidak valid atau berada di masa depan.", "error");
+      return showToast("Daftar obat masih kosong! Masukkan minimal 1 obat.", "error");
     setModalConfig({
       isOpen: true,
       type: "tambah",
@@ -303,15 +296,6 @@ export default function RestockPage() {
 
     if (actionType === "tambah") {
       try {
-        const token = Cookies.get("apomacy_token");
-        if (!token) {
-          return showToast("Sesi Anda telah berakhir. Silakan masuk kembali.", "error");
-        }
-        const userId = jwtDecode<{ id_user?: number }>(token).id_user;
-        if (!Number.isInteger(userId) || Number(userId) <= 0) {
-          return showToast("Identitas pengguna tidak valid. Silakan masuk kembali.", "error");
-        }
-
         const selectedSupplier = supplierList.find(s => s.nama_supplier === headerData.supplier);
         const supplierId = selectedSupplier ? selectedSupplier.id_supplier : 0;
 
@@ -321,8 +305,8 @@ export default function RestockPage() {
 
         const payload = {
           id_supplier: supplierId,
-          id_user: userId,
-          no_faktur_supplier: headerData.noFaktur.trim(),
+          id_user: 1,
+          no_faktur_supplier: headerData.noFaktur,
           no_penerimaan_internal: headerData.noTerima,
           tanggal_restock: new Date(headerData.tanggal).toISOString(),
           total_bayar: grandTotal,

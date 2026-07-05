@@ -1,10 +1,17 @@
 import type { NextConfig } from "next";
 
-const backendApiUrl = (
-  process.env.API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8080/api"
-).replace(/\/+$/, "");
+const DEFAULT_BACKEND_API_URL = "http://159.223.82.138:8080/api";
+
+function getBackendApiUrl() {
+  const value = (process.env.API_URL || DEFAULT_BACKEND_API_URL).replace(/\/+$/, "");
+  const url = new URL(value);
+
+  if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/api')) {
+    throw new Error("API_URL harus berupa URL absolut dan berakhiran /api");
+  }
+
+  return value;
+}
 
 const nextConfig: NextConfig = {
   // Menambahkan jalur proxy (rewrites) untuk mengatasi masalah CORS / Mixed Content
@@ -12,7 +19,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${backendApiUrl}/:path*`,
+        destination: `${getBackendApiUrl()}/:path*`,
       },
     ];
   },

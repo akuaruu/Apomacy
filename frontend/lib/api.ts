@@ -6,6 +6,7 @@ const api = axios.create({
   baseURL: '/api', // Menyesuaikan base URL backend
   timeout: 10000,
   headers: {
+    'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
 });

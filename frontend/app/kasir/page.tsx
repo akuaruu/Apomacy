@@ -5,11 +5,9 @@ import { createPortal } from "react-dom";
 import {
     Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
+import Cookies from "js-cookie";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
-import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
-import { getUserFriendlyError } from "@/lib/errors";
 
 interface TransaksiItem {
     name: string;
@@ -132,12 +130,24 @@ export default function KasirDashboardPage() {
                 // Hanya set loading (muter-muter) jika ini load pertama kali
                 if (isInitial) setIsLoading(true);
 
-                const response = await api.get("/transaksi/all");
-                const rawData = getApiDataArray<any>(response.data, "transaksi");
+                const API_URL = "/api/transaksi/all";
+                const token = Cookies.get('apomacy_token');
+
+                const response = await fetch(API_URL, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error("Gagal memuat data dari server");
+
+                const result = await response.json();
+                const rawData = result.data || [];
 
                 // --- PROSES MAPPING DATA ---
                 const newData: TransaksiDashboard[] = rawData.map((t: any) => {
-                    const formattedDate = t.tanggal_transaksi;
+                    let formattedDate = t.tanggal_transaksi;
                     // ... (logika format tanggal tetap sama)
 
                     const isOffline = !t.id_user || t.id_user === 0;
@@ -231,9 +241,7 @@ export default function KasirDashboardPage() {
                 });
 
             } catch (error) {
-                const message = getUserFriendlyError(error, "Gagal memuat daftar transaksi.");
-                console.error(message);
-                if (isInitial) showFeedback(message, "error");
+                console.error("Koneksi API Error:", error);
             } finally {
                 // Matikan loading HANYA JIKA ini adalah proses load pertama
                 if (isInitial) setIsLoading(false);
@@ -265,15 +273,25 @@ export default function KasirDashboardPage() {
         return map[status] ?? { background: "#f3f4f6", color: "#6b7280" };
     };
 
-    async function autoCompleteOrder(trxId: string) {
+    const autoCompleteOrder = async (trxId: string) => {
         try {
-            await api.patch(`/transaksi/${trxId}/status-pesanan`, { status_pesanan: "Selesai" });
+            const token = Cookies.get('apomacy_token');
+            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status_pesanan: "Selesai" })
+            });
+
+            if (!response.ok) throw new Error("Gagal auto-update status di server");
 
             showFeedback(`Pesanan ${trxId} otomatis diselesaikan (lebih dari 1 jam diproses)`, "success");
         } catch (error) {
-            console.error(getUserFriendlyError(error, "Gagal memperbarui status pesanan otomatis."));
+            console.error("Auto-complete error:", error);
         }
-    }
+    };
 
     const requestConfirm = (trxId: string, action: "kirim" | "ambil" | "selesai") => {
         const map: Record<typeof action, { newStatus: StatusType; title: string; message: string }> = {
@@ -302,13 +320,25 @@ export default function KasirDashboardPage() {
 
         setIsSubmitting(true);
         try {
-            await api.patch(`/transaksi/${trxId}/status-pesanan`, { status_pesanan: newStatus });
+            const token = Cookies.get('apomacy_token');
+            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                // Payload dikirim sesuai dengan validStatus di backend
+                body: JSON.stringify({ status_pesanan: newStatus })
+            });
+
+            if (!response.ok) throw new Error("Gagal update status di server");
 
             // Update UI jika API sukses
             setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: newStatus } : t));
             showFeedback(`Status pesanan ${trxId} berhasil diubah menjadi "${newStatus}"`, "success");
         } catch (error) {
-            showFeedback(getUserFriendlyError(error, "Gagal mengubah status pesanan."), "error");
+            console.error("Error:", error);
+            showFeedback("Gagal mengubah status pesanan. Periksa koneksi.", "error");
         } finally {
             setIsSubmitting(false);
             setConfirmModal(null);

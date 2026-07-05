@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
 import {
     Search, Plus, Trash2, ShoppingCart, User, Pill, CreditCard, Banknote, QrCode, Receipt, XCircle, Loader2, AlertTriangle
 } from "lucide-react";
@@ -133,23 +132,15 @@ export default function TransaksiOfflinePage() {
                 }
 
                 const obatRes = obatResult.value;
-                const obatRaw = getApiDataArray<MedicineApiItem>(obatRes.data, "obat");
-                const mappedObat: Medicine[] = obatRaw.flatMap((o) => {
-                    const id = o.id_obat ?? o.IDObat ?? o.id;
-                    const code = o.kode_obat ?? o.KodeObat;
-                    const name = o.nama_obat ?? o.NamaObat;
-
-                    if (!Number.isInteger(id) || !code || !name) return [];
-
-                    return [{
-                        id: Number(id),
-                        code,
-                        name,
-                        category: o.jenis_obat || o.JenisObat || "Umum",
-                        price: Number(o.harga_jual ?? o.HargaJual ?? 0),
-                        stock: Number(o.stok ?? o.Stok ?? 0),
-                    }];
-                });
+                const obatRaw = obatRes.data?.data || obatRes.data || [];
+                const mappedObat = obatRaw.map((o: MedicineApiItem) => ({
+                    id: o.id_obat || o.IDObat || o.id,
+                    code: o.kode_obat || o.KodeObat,
+                    name: o.nama_obat || o.NamaObat,
+                    category: o.jenis_obat || o.JenisObat || "Umum",
+                    price: Number(o.harga_jual ?? o.HargaJual ?? 0),
+                    stock: Number(o.stok ?? o.Stok ?? 0),
+                }));
                 setMedicinesData(mappedObat);
 
                 if (customerResult.status === "rejected") {
@@ -157,7 +148,7 @@ export default function TransaksiOfflinePage() {
                 }
 
                 const custRes = customerResult.value;
-                const custRaw = getApiDataArray<CustomerApiItem>(custRes.data, "member");
+                const custRaw = custRes.data?.data || custRes.data || [];
                 const mappedCust = custRaw
                     .map((c: CustomerApiItem) => ({
                         id: String(c.id_customer ?? c.IDCustomer ?? c.id ?? ""),
@@ -185,14 +176,7 @@ export default function TransaksiOfflinePage() {
     const formatRupiah = (num: number) => "Rp " + num.toLocaleString("id-ID");
 
     const handleAddToCart = () => {
-        if (!selectedMed) {
-            showToast("Pilih obat terlebih dahulu.", "error");
-            return;
-        }
-        if (!Number.isInteger(qty) || qty < 1) {
-            showToast("Jumlah obat harus berupa angka bulat minimal 1.", "error");
-            return;
-        }
+        if (!selectedMed || qty < 1) return;
 
         if (qty > selectedMed.stock) {
             showToast(`Stok tidak mencukupi! Stok ${selectedMed.name} tersisa: ${selectedMed.stock}`, "error");

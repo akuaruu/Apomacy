@@ -22,9 +22,8 @@ import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
 // Menggunakan interceptor custom milikmu (bukan axios bawaan)
 import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
 import { getUserFriendlyError } from "@/lib/errors";
-import { isValidCode, isValidEmail, isValidIndonesianPhone, normalizeEmail, normalizePhone } from "@/lib/validation";
+import { isValidEmail, isValidIndonesianPhone, normalizeEmail, normalizePhone } from "@/lib/validation";
 
 export default function SupplierPage() {
   const [supplierList, setSupplierList] = useState<any[]>([]);
@@ -77,7 +76,7 @@ export default function SupplierPage() {
     setIsLoading(true);
     try {
       const response = await api.get("/supplier");
-      const data = getApiDataArray<any>(response.data, "supplier");
+      const data = response.data?.data || response.data || [];
 
       // Mapping response Golang (snake_case) ke format state frontend
       const mappedData = data.map((item: any) => ({
@@ -94,7 +93,11 @@ export default function SupplierPage() {
 
       setSupplierList(mappedData);
     } catch (error) {
-      showToast(getUserFriendlyError(error, "Gagal memuat data supplier."), "error");
+      console.error("Gagal mengambil data dari API:", error);
+      showToast(
+        "Terjadi kesalahan saat memuat data supplier dari server.",
+        "error",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -187,29 +190,13 @@ export default function SupplierPage() {
       return;
     }
 
-    if (!isValidCode(formData.kode, 20)) {
-      showToast("Kode supplier hanya boleh menggunakan huruf, angka, titik, garis miring, tanda hubung, atau garis bawah.", "error");
-      return;
-    }
-    if (formData.nama.trim().length < 2) {
-      showToast("Nama supplier minimal terdiri dari 2 karakter.", "error");
-      return;
-    }
-    if (formData.cp.trim().length < 2) {
-      showToast("Nama contact person minimal terdiri dari 2 karakter.", "error");
-      return;
-    }
-    if (formData.kota.trim().length < 2 || formData.alamat.trim().length < 5) {
-      showToast("Isi kota dan alamat supplier dengan lengkap.", "error");
-      return;
-    }
-
+    // 2. Validasi Format Email Sederhana
     if (!isValidEmail(formData.email)) {
-      showToast("Masukkan alamat email supplier yang valid.", "error");
+      showToast("Gagal! Format email tidak valid.", "error");
       return;
     }
     if (!isValidIndonesianPhone(formData.telepon)) {
-      showToast("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890.", "error");
+      showToast("Gagal! Nomor telepon Indonesia tidak valid.", "error");
       return;
     }
 
@@ -255,13 +242,13 @@ export default function SupplierPage() {
 
         // Payload disesuaikan dengan struct JSON di Golang
         const payload = {
-          kode_supplier: formData.kode.trim(),
-          nama_supplier: formData.nama.trim(),
-          contact_person: formData.cp.trim(),
+          kode_supplier: formData.kode,
+          nama_supplier: formData.nama,
+          contact_person: formData.cp,
           no_telp: normalizePhone(formData.telepon),
           email: normalizeEmail(formData.email),
-          kota: formData.kota.trim(),
-          alamat: formData.alamat.trim(),
+          kota: formData.kota,
+          alamat: formData.alamat,
           status_kemitraan: formData.status
         };
 

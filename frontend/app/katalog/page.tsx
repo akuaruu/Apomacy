@@ -7,8 +7,6 @@ import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
 import SectionHeader from "@/components/ui/Header";
 import { useCart } from "@/context/CartContext";
 import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
-import { getUserFriendlyError } from "@/lib/errors";
 
 const SORT_OPTIONS = [
     { value: "popular", label: "Terpopuler" },
@@ -167,7 +165,9 @@ function KatalogContent() {
         setApiError(null);
         try {
             const response = await api.get("/obat");
-            let data = getApiDataArray<any>(response.data, "katalog obat");
+            let data = response.data?.data || response.data;
+
+            if (!Array.isArray(data)) data = [];
 
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
@@ -209,7 +209,7 @@ function KatalogContent() {
             setApiProducts(mappedData);
             setCurrentPage(1);
         } catch (error) {
-            setApiError(getUserFriendlyError(error, "Gagal memuat produk dari server."));
+            setApiError("Gagal memuat produk dari server.");
         } finally {
             setIsLoadingAPI(false);
         }

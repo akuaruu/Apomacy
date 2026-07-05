@@ -5,8 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
-import api from "@/lib/api";
-import { getApiDataObject } from "@/lib/api-data";
 
 // Interface untuk membaca isi Token
 interface MyTokenPayload {
@@ -44,14 +42,27 @@ export default function SidebarClient() {
         setUserName(decoded.nama || decoded.name || decoded.username || "Pengguna");
 
         // 2. Lakukan Fetch ke Backend
-        const response = await api.get("/users/profile");
-        const data = getApiDataObject<Record<string, unknown>>(response.data, "profil");
+        const res = await fetch(`/api/users/profile`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-        const validName = String(data.nama || data.username || decoded.nama || decoded.username || "Pengguna");
-        setUserName(validName);
+        if (res.ok) {
+          const responseData = await res.json();
+          const data = responseData.data;
 
-        if (typeof data.fotoProfil === "string" && data.fotoProfil) {
-          setFotoProfil(`${data.fotoProfil}?t=${new Date().getTime()}`);
+          // Sesuai dengan API Profil: Ambil data nama atau username
+          const validName = data.nama || data.username || decoded.nama || decoded.username || "Pengguna";
+          setUserName(validName);
+
+          if (data.fotoProfil && data.fotoProfil !== "") {
+            setFotoProfil(`${data.fotoProfil}?t=${new Date().getTime()}`);
+          }
+        } else {
+          setUserName(decoded.nama || decoded.username || "Pengguna");
         }
       } catch (error) {
         console.error("Gagal memuat data profil sidebar:", error);

@@ -7,11 +7,10 @@ import {
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import { getErrorStatus, getUserFriendlyError } from "@/lib/errors";
-import { isValidEmail, isValidIndonesianPhone, isValidPersonName, normalizeEmail, normalizePhone } from "@/lib/validation";
+import { isValidEmail, isValidIndonesianPhone, normalizeEmail, normalizePhone } from "@/lib/validation";
 
 interface Karyawan {
     id: number;
@@ -61,7 +60,9 @@ export default function KaryawanPage() {
         setError(null);
         try {
             const response = await api.get('/users/staff');
-            const rawData = getApiDataArray<StaffApiItem>(response.data, "karyawan");
+            const rawData: StaffApiItem[] = Array.isArray(response.data?.data)
+                ? response.data.data
+                : [];
 
             const mappedData: Karyawan[] = rawData.map((item) => ({
                 id: item.id_user,
@@ -173,7 +174,7 @@ export default function KaryawanPage() {
 
     const handleSaveSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isValidPersonName(formData.name)) { alert("Nama karyawan harus terdiri dari 2–100 karakter dan tidak boleh berisi angka."); return; }
+        if (!formData.name.trim()) { alert("Nama wajib diisi!"); return; }
         if (!isValidEmail(formData.email)) { alert("Masukkan alamat email login yang valid."); return; }
         if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890."); return; }
         if (mode === "add" && formData.password.length < 8) {

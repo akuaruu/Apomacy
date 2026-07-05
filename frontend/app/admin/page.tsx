@@ -14,11 +14,11 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
+import Cookies from "js-cookie";
+
 import StatCard from "@/components/admin/StatCard";
 // Pastikan komponen SalesAnalytics ini sudah kamu update dengan kode yang aku kasih sebelumnya
 import SalesAnalytics from "@/components/admin/SalesAnalytics";
-import api from "@/lib/api";
-import { getApiDataArray } from "@/lib/api-data";
 import { getUserFriendlyError } from "@/lib/errors";
 
 // --- Typescript Interfaces ---
@@ -68,13 +68,33 @@ export default function DashboardPage() {
       setError(null);
 
       try {
+        const token = Cookies.get("apomacy_token");
+
+        if (!token) {
+          throw new Error("Sesi tidak valid. Silakan login kembali.");
+        }
+
+        const headers = {
+          Authorization: `Bearer ${token}`,
+        };
+
+        // Fetch API Transaksi dan Obat secara bersamaan
         const [resTrx, resObat] = await Promise.all([
-          api.get("/transaksi/all"),
-          api.get("/obat"),
+          fetch(`/api/transaksi/all`, { headers }),
+          fetch(`/api/obat`, { headers }),
         ]);
 
-        setTransactions(getApiDataArray<Transaksi>(resTrx.data, "transaksi"));
-        setObatList(getApiDataArray<Obat>(resObat.data, "obat"));
+        if (!resTrx.ok) {
+          if (resTrx.status === 401 || resTrx.status === 403) throw new Error("Akses ditolak. Anda tidak memiliki izin.");
+          throw new Error("Gagal mengambil data transaksi");
+        }
+        if (!resObat.ok) throw new Error("Gagal mengambil data obat");
+
+        const dataTrx = await resTrx.json();
+        const dataObat = await resObat.json();
+
+        setTransactions(dataTrx.data || []);
+        setObatList(dataObat.data || []);
       } catch (err: unknown) {
         setError(getUserFriendlyError(err, "Gagal memuat data dasbor."));
       } finally {

@@ -29,10 +29,6 @@ export default function LoginPage() {
       setError("Masukkan alamat email yang valid.");
       return;
     }
-    if (!password) {
-      setError("Kata sandi wajib diisi.");
-      return;
-    }
 
     setIsLoading(true);
 

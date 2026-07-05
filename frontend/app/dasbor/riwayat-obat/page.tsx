@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import api from "@/lib/api";
-import { getApiDataArray, getApiDataObject } from "@/lib/api-data";
+import Cookies from "js-cookie";
 import { getUserFriendlyError } from "@/lib/errors";
 
 // --- INTERFACE DATA DARI API ---
@@ -46,8 +45,21 @@ export default function PesananPage() {
   useEffect(() => {
     const fetchRiwayat = async () => {
       try {
-        const response = await api.get('/transaksi');
-        setRiwayatPesanan(getApiDataArray<Transaksi>(response.data, "riwayat pesanan"));
+        const token = Cookies.get('apomacy_token');
+        if (!token) throw new Error("Anda belum login. Silakan login terlebih dahulu.");
+
+        const res = await fetch('/api/transaksi', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!res.ok) throw new Error("Gagal mengambil riwayat pesanan dari server.");
+
+        const responseData = await res.json();
+        setRiwayatPesanan(responseData.data || []);
       } catch (error: unknown) {
         setErrorMsg(getUserFriendlyError(error, "Gagal mengambil riwayat pesanan."));
       } finally {
@@ -68,10 +80,19 @@ export default function PesananPage() {
     setSelectedTransaksi(null);
 
     try {
-      const response = await api.get(`/transaksi/${idTransaksi}`);
-      setSelectedTransaksi(getApiDataObject<Transaksi>(response.data, "detail transaksi"));
-    } catch (error: unknown) {
-      alert(getUserFriendlyError(error, "Gagal memuat detail pesanan."));
+      const token = Cookies.get('apomacy_token');
+      // Memanggil endpoint GetDetail yang sudah ada di Golang
+      const res = await fetch(`/api/transaksi/${idTransaksi}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error("Gagal mengambil detail transaksi");
+
+      const resData = await res.json();
+      setSelectedTransaksi(resData.data);
+    } catch (error) {
+      console.error(error);
+      alert("Gagal memuat detail pesanan.");
       setIsModalOpen(false);
     } finally {
       setIsDetailLoading(false);

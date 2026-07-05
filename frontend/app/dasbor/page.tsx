@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import api from '@/lib/api';
-import { getApiDataArray, getApiDataObject } from '@/lib/api-data';
-import { getUserFriendlyError } from '@/lib/errors';
+import Cookies from 'js-cookie';
 
 // ============================================================
 // DATA STATIS APOTEK
@@ -65,7 +63,6 @@ export default function DasborPage() {
   const [transaksi, setTransaksi] = useState<Transaksi[]>([]);
   const [loadingTransaksi, setLoadingTransaksi] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
 
   // DERIVED VALUES
   // Disesuaikan dengan status backend (Pending, Selesai, Batal)
@@ -83,19 +80,34 @@ export default function DasborPage() {
   // FETCH DATA SAAT HALAMAN DIMUAT
   useEffect(() => {
     const fetchDashboardData = async () => {
+      // 1. Ambil Token dengan nama kunci yang benar
+      const token = Cookies.get('apomacy_token');
+      if (!token) {
+        setLoadingTransaksi(false);
+        return;
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
       try {
-        const [resTx, resProfile] = await Promise.all([
-          api.get('/transaksi'),
-          api.get('/users/profile'),
-        ]);
-        setTransaksi(getApiDataArray<Transaksi>(resTx.data, "transaksi"));
-        setProfile(getApiDataObject<UserProfile>(resProfile.data, "profil"));
+        // 2. Fetch Riwayat Transaksi (Persis seperti di Riwayat Obat)
+        const resTx = await fetch('/api/transaksi', { method: 'GET', headers });
+        if (resTx.ok) {
+          const txData = await resTx.json();
+          setTransaksi(txData.data || []);
+        }
+
+        // 3. Fetch Profil (Persis seperti di Edit Profil)
+        const resProfile = await fetch('/api/users/profile', { method: 'GET', headers });
+        if (resProfile.ok) {
+          const profileData = await resProfile.json();
+          setProfile(profileData.data);
+        }
       } catch (error) {
-        const message = getUserFriendlyError(error, "Gagal memuat data dasbor.");
-        console.error(message);
-        setErrorMessage(message);
-        setTransaksi([]);
-        setProfile(null);
+        console.error('Gagal memuat data dasbor:', error);
       } finally {
         setLoadingTransaksi(false);
       }
@@ -112,12 +124,6 @@ export default function DasborPage() {
         <h1 className="text-3xl font-bold text-apomacy-blue">RINGKASAN DASBOR</h1>
         <p className="text-apomacy-muted-blue mt-1">Pantau aktivitas kesehatan dan pesanan obat Anda di sini.</p>
       </div>
-
-      {errorMessage && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-500 text-red-700 rounded-lg">
-          {errorMessage}
-        </div>
-      )}
 
       {/* Grid 2 Kolom untuk Kartu Ringkasan */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
