@@ -36,7 +36,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
 
   const handleLogout = () => {
-    Cookies.remove("apomacy_token");
+    Cookies.remove("apomacy_token", { path: "/" });
+    Cookies.remove("apomacy_role", { path: "/" });
     window.location.href = "/";
   };
 

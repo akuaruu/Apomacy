@@ -74,7 +74,8 @@ export default function SidebarClient() {
   }, []);
 
   const handleLogout = () => {
-    Cookies.remove("apomacy_token");
+    Cookies.remove("apomacy_token", { path: "/" });
+    Cookies.remove("apomacy_role", { path: "/" });
     window.location.href = "/";
   };
 

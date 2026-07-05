@@ -17,6 +17,13 @@ function getRedirectPath(role: UserRole) {
 export function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
+    if (isRoute(pathname, "/api")) {
+        const headers = new Headers(request.headers);
+        headers.delete("origin");
+
+        return NextResponse.next({ request: { headers } });
+    }
+
     const token = request.cookies.get("apomacy_token")?.value;
     const roleCookie = request.cookies.get("apomacy_role")?.value;
 
@@ -36,12 +43,13 @@ export function middleware(request: NextRequest) {
 
     const isKatalogRoute = isRoute(pathname, "/katalog");
     const isKeranjangRoute = isRoute(pathname, "/keranjang");
+    const isDasborRoute = isRoute(pathname, "/dasbor");
 
     const isStaffRoute = isAdminRoute || isKasirRoute;
-    const isMemberRoute = isKatalogRoute || isKeranjangRoute;
+    const isMemberRoute = isKatalogRoute || isKeranjangRoute || isDasborRoute;
 
     if (!token) {
-        if (isStaffRoute || isKeranjangRoute) {
+        if (isStaffRoute || isKeranjangRoute || isDasborRoute) {
             return NextResponse.redirect(new URL("/login", request.url));
         }
 
@@ -101,6 +109,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
+        "/api/:path*",
+
         "/login",
         "/login/:path*",
 
@@ -115,5 +125,8 @@ export const config = {
 
         "/keranjang",
         "/keranjang/:path*",
+
+        "/dasbor",
+        "/dasbor/:path*",
     ],
 };

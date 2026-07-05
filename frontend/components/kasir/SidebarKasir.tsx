@@ -23,7 +23,8 @@ interface SidebarKasirProps {
 export default function SidebarKasir({ isOpen, setIsOpen }: SidebarKasirProps) {
     const pathname = usePathname();
     const handleLogout = () => {
-        Cookies.remove("apomacy_token");
+        Cookies.remove("apomacy_token", { path: "/" });
+        Cookies.remove("apomacy_role", { path: "/" });
         window.location.href = "/";
     };
 
