@@ -108,6 +108,10 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
             setLoginError("Masukkan alamat email yang valid.");
             return;
         }
+        if (!loginPassword) {
+            setLoginError("Kata sandi wajib diisi.");
+            return;
+        }
 
         setIsLoggingIn(true);
 

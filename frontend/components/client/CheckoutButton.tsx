@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useCart } from "@/context/CartContext";
 import api from "@/lib/api";
+import { getUserFriendlyError } from "@/lib/errors";
 import Image from 'next/image';
 
 interface ItemDetail {
@@ -35,10 +36,12 @@ type NotifStatus = "success" | "pending" | "error" | "closed" | null;
 function PaymentNotification({
     status,
     orderId,
+    errorMessage,
     onRedirect,
 }: {
     status: NotifStatus;
     orderId: string;
+    errorMessage: string;
     onRedirect: () => void;
 }) {
     const [countdown, setCountdown] = useState(5);
@@ -78,7 +81,7 @@ function PaymentNotification({
             border: "border-red-400",
             icon: <Image src="/icons/payment/circle-x.svg" alt="Pembayaran gagal" width={24} height={24} />,
             title: "Pembayaran Gagal",
-            message: "Transaksi tidak berhasil. Silakan coba kembali.",
+            message: errorMessage || "Transaksi tidak berhasil. Silakan coba kembali.",
         },
         closed: {
             bg: "bg-gray-50",
@@ -172,6 +175,7 @@ export default function CheckoutButton({
 
     const [isLoading, setIsLoading] = useState(false);
     const [notifStatus, setNotifStatus] = useState<NotifStatus>(null);
+    const [errorMessage, setErrorMessage] = useState("");
     const [orderId, setOrderId] = useState("");
     const snapCallbackHandledRef = useRef(false);
 
@@ -187,6 +191,7 @@ export default function CheckoutButton({
         }
 
         setIsLoading(true);
+        setErrorMessage("");
 
         try {
             const Cookies = (await import("js-cookie")).default;
@@ -251,7 +256,10 @@ export default function CheckoutButton({
                 items,
             });
 
-            const snapToken = snapRes.data.token;
+            const snapToken = snapRes.data?.token;
+            if (!snapToken || typeof snapToken !== "string") {
+                throw new Error("Token pembayaran tidak ditemukan pada respons server.");
+            }
 
             if (!window.snap) {
                 throw new Error("Snap script belum termuat");
@@ -309,8 +317,10 @@ export default function CheckoutButton({
             });
 
         } catch (error: unknown) {
-            console.error("Checkout failed:", error);
+            const message = getUserFriendlyError(error, "Pembayaran gagal disiapkan. Silakan coba kembali.");
+            console.error("Checkout failed:", message);
             if ((error as { response?: { status: number } })?.response?.status !== 401) {
+                setErrorMessage(message);
                 setNotifStatus("error");
             }
         } finally {
@@ -329,6 +339,7 @@ export default function CheckoutButton({
             <PaymentNotification
                 status={notifStatus}
                 orderId={orderId}
+                errorMessage={errorMessage}
                 onRedirect={handleRedirect}
             />
 
