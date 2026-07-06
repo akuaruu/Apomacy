@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -98,7 +98,7 @@ const statusPriority: Record<StatusType, number> = {
 };
 
 // ─── MAIN PAGE ──────────────────────────────────────────────────────────────────
-export default function KasirDashboardPage() {
+function KasirDashboardContent() {
     const [transactions, setTransactions] = useState<TransaksiDashboard[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -130,7 +130,7 @@ export default function KasirDashboardPage() {
 
             router.replace("/kasir", { scroll: false });
         }
-    }, [searchParams]);
+    }, [router, searchParams]);
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -804,5 +804,13 @@ export default function KasirDashboardPage() {
             {mounted && <Toast toast={feedback} />}
 
         </div>
+    );
+}
+
+export default function KasirDashboardPage() {
+    return (
+        <Suspense fallback={null}>
+            <KasirDashboardContent />
+        </Suspense>
     );
 }
