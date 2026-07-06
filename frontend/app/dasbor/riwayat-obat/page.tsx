@@ -198,9 +198,7 @@ export default function PesananPage() {
         </div>
       )}
 
-      {/* ===================================================================== */}
       {/* 4. MODAL POPUP DETAIL TRANSAKSI */}
-      {/* ===================================================================== */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
