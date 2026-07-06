@@ -7,6 +7,7 @@ import {
     Users, ShieldAlert, Phone, Cake, BadgeCheck, AlertTriangle
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import Toast from "@/components/shared/Toast";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
 import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
@@ -62,6 +63,13 @@ export default function MemberPage() {
         age: ""
     });
 
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    const showToast = (message: string, type: "success" | "error") => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+    };
+
     const canDelete = false;
 
     const fetchMembers = useCallback(async () => {
@@ -77,13 +85,22 @@ export default function MemberPage() {
                     ? response.data
                     : [];
 
-            const mappedData = rawData.map((item): Member => {
+                const mappedData = rawData.map((item): Member => {
                 let calculatedAge: number | string = "";
 
                 if (item.tanggal_lahir) {
                     const birthDate = new Date(item.tanggal_lahir);
                     if (!Number.isNaN(birthDate.getTime())) {
-                        calculatedAge = new Date().getFullYear() - birthDate.getFullYear();
+                        const today = new Date();
+                        let age = today.getFullYear() - birthDate.getFullYear();
+                        const m = today.getMonth() - birthDate.getMonth();
+                        
+
+                        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                            age--;
+                        }
+                        
+                        calculatedAge = age;
                     }
                 }
 
@@ -128,7 +145,6 @@ export default function MemberPage() {
     const handleAddClick = () => {
         setMode("add");
 
-
         let nextSequence = 1;
         if (members.length > 0) {
 
@@ -136,11 +152,9 @@ export default function MemberPage() {
                 const match = m.noMember.match(/\d+/);
                 return match ? parseInt(match[0], 10) : 0;
             });
-            // Cari angka terbesar, lalu tambah 1
             nextSequence = Math.max(...numbers) + 1;
         }
 
-        // Format menjadi 3 digit (contoh: MBR-005)
         const generatedNo = `MBR-${String(nextSequence).padStart(3, '0')}`;
 
         setFormData({
@@ -195,7 +209,7 @@ export default function MemberPage() {
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menghapus member.");
                     console.error("Gagal menghapus:", message);
-                    alert(message);
+                    showToast(message, "error");
                 }
             }
         });
@@ -204,10 +218,10 @@ export default function MemberPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.name.trim()) { alert("Nama member wajib diisi."); return; }
-        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid."); return; }
+        if (!formData.name.trim()) { showToast("Nama member wajib diisi.", "error"); return; }
+        if (!isValidIndonesianPhone(formData.phone)) { showToast("Masukkan nomor telepon Indonesia yang valid.", "error"); return; }
         if (!formData.age || !Number.isInteger(Number(formData.age)) || Number(formData.age) < 0 || Number(formData.age) > 120) {
-            alert("Umur harus berupa angka antara 0 sampai 120 tahun.");
+            showToast("Umur harus berupa angka antara 0 sampai 120 tahun.", "error");
             return;
         }
 
@@ -245,7 +259,7 @@ export default function MemberPage() {
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menyimpan data member.");
                     console.error("Gagal menyimpan:", message);
-                    alert(message);
+                    showToast(message, "error");
                 }
             }
         });
@@ -541,6 +555,8 @@ export default function MemberPage() {
                         onConfirm={confirmModal.action} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} />
                 </div>
             </div>
+
+            <Toast toast={toast} />
         </div>
     );
 }
