@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
     Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, User, RefreshCw,
-    Users, ShieldCheck, Phone, Cake, BadgeCheck, AlertTriangle
+    Users, ShieldAlert, Phone, Cake, BadgeCheck, AlertTriangle
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import Toast from "@/components/shared/Toast";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
 import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
@@ -39,7 +40,7 @@ export default function MemberPage() {
     const router = useRouter();
     const [members, setMembers] = useState<Member[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
@@ -51,7 +52,7 @@ export default function MemberPage() {
         message: string;
         action: () => void;
     }>({
-        isOpen: false, type: "tambah", title: "", message: "", action: () => {},
+        isOpen: false, type: "tambah", title: "", message: "", action: () => { },
     });
 
     const [formData, setFormData] = useState({
@@ -62,13 +63,19 @@ export default function MemberPage() {
         age: ""
     });
 
-    // Admin selalu bisa delete
-    const canDelete = true;
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    const showToast = (message: string, type: "success" | "error") => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+    };
+
+    const canDelete = false;
 
     const fetchMembers = useCallback(async () => {
         await Promise.resolve();
         setLoading(true);
-        setError(null);
+        setLoadError(null);
 
         try {
             const response = await api.get('/customer');
@@ -78,13 +85,22 @@ export default function MemberPage() {
                     ? response.data
                     : [];
 
-            const mappedData = rawData.map((item): Member => {
+                const mappedData = rawData.map((item): Member => {
                 let calculatedAge: number | string = "";
 
                 if (item.tanggal_lahir) {
                     const birthDate = new Date(item.tanggal_lahir);
                     if (!Number.isNaN(birthDate.getTime())) {
-                        calculatedAge = new Date().getFullYear() - birthDate.getFullYear();
+                        const today = new Date();
+                        let age = today.getFullYear() - birthDate.getFullYear();
+                        const m = today.getMonth() - birthDate.getMonth();
+                        
+
+                        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                            age--;
+                        }
+                        
+                        calculatedAge = age;
                     }
                 }
 
@@ -106,7 +122,7 @@ export default function MemberPage() {
             const message = getApiErrorMessage(error, "Gagal mengambil data member.");
             console.error("Gagal mengambil data:", message);
             setMembers([]);
-            setError(message);
+            setLoadError(message);
         } finally {
             setLoading(false);
         }
@@ -125,11 +141,13 @@ export default function MemberPage() {
         return () => window.clearTimeout(timer);
     }, [fetchMembers, router]);
 
+
     const handleAddClick = () => {
         setMode("add");
 
         let nextSequence = 1;
         if (members.length > 0) {
+
             const numbers = members.map(m => {
                 const match = m.noMember.match(/\d+/);
                 return match ? parseInt(match[0], 10) : 0;
@@ -157,7 +175,7 @@ export default function MemberPage() {
             name: member.name,
             gender: member.gender,
             phone: member.phone,
-            age: member.age.toString()
+            age: member.age.toString(),
         });
     };
 
@@ -191,7 +209,7 @@ export default function MemberPage() {
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menghapus member.");
                     console.error("Gagal menghapus:", message);
-                    alert(message);
+                    showToast(message, "error");
                 }
             }
         });
@@ -200,10 +218,10 @@ export default function MemberPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!formData.name.trim()) { alert("Nama member wajib diisi."); return; }
-        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid."); return; }
+        if (!formData.name.trim()) { showToast("Nama member wajib diisi.", "error"); return; }
+        if (!isValidIndonesianPhone(formData.phone)) { showToast("Masukkan nomor telepon Indonesia yang valid.", "error"); return; }
         if (!formData.age || !Number.isInteger(Number(formData.age)) || Number(formData.age) < 0 || Number(formData.age) > 120) {
-            alert("Umur harus berupa angka antara 0 sampai 120 tahun.");
+            showToast("Umur harus berupa angka antara 0 sampai 120 tahun.", "error");
             return;
         }
 
@@ -238,11 +256,10 @@ export default function MemberPage() {
                     fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
-                    setSelectedMember(null);
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menyimpan data member.");
                     console.error("Gagal menyimpan:", message);
-                    alert(message);
+                    showToast(message, "error");
                 }
             }
         });
@@ -257,22 +274,6 @@ export default function MemberPage() {
         );
     }, [members, searchQuery]);
 
-    // Error state
-    if (error && !loading) {
-        return (
-            <div className="flex h-[80vh] items-center justify-center p-8">
-                <div className="bg-discount-red/10 border border-discount-red text-discount-red p-6 rounded-2xl max-w-md text-center space-y-3">
-                    <AlertTriangle size={32} className="mx-auto" />
-                    <h2 className="font-black text-lg">Gagal Memuat Data</h2>
-                    <p className="text-sm font-medium">{error}</p>
-                    <button onClick={fetchMembers} className="mt-2 px-4 py-2 bg-apomacy-primary text-white rounded-xl text-sm font-bold hover:bg-apomacy-dark transition-colors">
-                        Coba Lagi
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col h-[calc(100vh-90px)] bg-background relative max-w-full overflow-hidden p-6 gap-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
@@ -286,16 +287,21 @@ export default function MemberPage() {
                     </p>
                 </div>
 
-                {/* Badge Role Admin */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 bg-blue-50 text-blue-700 border-blue-200">
-                    <ShieldCheck size={14} />
-                    Admin · Akses Penuh
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 bg-amber-50 text-amber-700 border-amber-200">
+                    <ShieldAlert size={14} />
+                    Kasir · Tambah & Edit
                 </div>
             </div>
 
             <div className="flex flex-col lg:flex-row gap-6 h-full min-h-0 overflow-hidden">
                 {/* Bagian Kiri: Tabel */}
                 <div className="w-full lg:w-7/12 flex flex-col bg-white rounded-2xl shadow-sm border border-outline-variant overflow-hidden min-h-0">
+                    {loadError && (
+                        <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                            <span>{loadError}</span>
+                        </div>
+                    )}
                     <div className="p-4 border-b border-outline-variant flex flex-col sm:flex-row gap-3 shrink-0 bg-surface-container-lowest">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -358,7 +364,7 @@ export default function MemberPage() {
                                         <td colSpan={7} className="py-16 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-3">
                                                 <Loader2 className="animate-spin text-apomacy-primary" size={32} />
-                                                <span className="text-sm font-medium">Memuat data customer...</span>
+                                                <span className="text-sm font-medium">Memuat data member...</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -367,22 +373,21 @@ export default function MemberPage() {
                                         <td colSpan={7} className="py-16 text-center text-gray-400">
                                             <div className="flex flex-col items-center justify-center gap-2">
                                                 <Search size={40} className="opacity-20" />
-                                                <span className="text-sm font-medium">Tidak ada data customer.</span>
+                                                <span className="text-sm font-medium">Tidak ada data member.</span>
                                             </div>
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredMembers.map((member, idx) => {
-                                        const isSelected = selectedMember?.noMember === member.noMember;
+                                        const isSelected = selectedMember?.id === member.id;
                                         return (
                                             <tr
-                                                key={member.noMember}
+                                                key={member.id}
                                                 onClick={() => handleRowClick(member)}
-                                                className={`cursor-pointer transition-colors ${
-                                                    isSelected
+                                                className={`cursor-pointer transition-colors ${isSelected
                                                         ? "bg-blue-50/70 hover:bg-blue-50"
                                                         : "hover:bg-gray-50"
-                                                }`}
+                                                    }`}
                                             >
                                                 <td className="px-4 py-3 text-gray-400">{idx + 1}</td>
                                                 <td className="px-4 py-3">
@@ -394,11 +399,10 @@ export default function MemberPage() {
                                                     {member.name}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                        member.gender === "P"
+                                                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${member.gender === "P"
                                                             ? "bg-pink-50 text-pink-600 border border-pink-100"
                                                             : "bg-sky-50 text-sky-600 border border-sky-100"
-                                                    }`}>
+                                                        }`}>
                                                         {member.gender === "P" ? "Perempuan" : "Laki-laki"}
                                                     </span>
                                                 </td>
@@ -415,13 +419,17 @@ export default function MemberPage() {
                                                         >
                                                             <Edit2 size={16} />
                                                         </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(member); }}
-                                                            className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                                            title="Hapus"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+
+                                                        {/* TOMBOL HAPUS HANYA UNTUK ADMIN */}
+                                                        {canDelete && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(member); }}
+                                                                className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                                title="Hapus"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -522,18 +530,23 @@ export default function MemberPage() {
 
                                 <div className="flex gap-3 mt-8 border-t border-outline-variant pt-4 shrink-0">
                                     <button type="submit" disabled={mode === "view"}
-                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
-                                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary"
-                                        }`}>
+                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary"
+                                            }`}>
                                         <Save size={16} /> Simpan
                                     </button>
                                     <button type="button" onClick={() => { setMode("view"); setSelectedMember(null); }} disabled={mode === "view"}
-                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${
-                                            mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low"
-                                        }`}>
+                                        className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low"
+                                            }`}>
                                         <XCircle size={16} /> Batal
                                     </button>
                                 </div>
+
+                                {mode === "view" && selectedMember && !canDelete && (
+                                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                                        <ShieldAlert size={14} className="shrink-0" />
+                                        Akun Anda tidak memiliki izin untuk menghapus Data Customer.
+                                    </p>
+                                )}
                             </>
                         )}
                     </form>
@@ -542,6 +555,8 @@ export default function MemberPage() {
                         onConfirm={confirmModal.action} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} />
                 </div>
             </div>
+
+            <Toast toast={toast} />
         </div>
     );
 }
