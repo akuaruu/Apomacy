@@ -9,6 +9,7 @@ interface SearchableSelectProps {
   onChange: (val: string) => void;
   placeholder: string;
   disabled?: boolean;
+  hasError?: boolean;
 }
 
 export default function SearchableSelect({
@@ -17,6 +18,7 @@ export default function SearchableSelect({
   onChange,
   placeholder,
   disabled = false,
+  hasError = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -48,7 +50,7 @@ export default function SearchableSelect({
             if (!isOpen) setSearchTerm("");
           }
         }}
-        className={`w-full px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-75" : "bg-surface-container-low border-outline-variant text-apomacy-dark cursor-pointer focus-within:border-apomacy-primary focus-within:ring-4 focus-within:ring-apomacy-primary/10"}`}
+        className={`w-full px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-75" : hasError ? "bg-red-50 border-red-500 text-apomacy-dark cursor-pointer focus-within:border-red-500 focus-within:ring-4 focus-within:ring-red-100" : "bg-surface-container-low border-outline-variant text-apomacy-dark cursor-pointer focus-within:border-apomacy-primary focus-within:ring-4 focus-within:ring-apomacy-primary/10"}`}
       >
         <span
           className={

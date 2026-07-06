@@ -9,6 +9,7 @@ interface SearchableObatSelectProps {
   onChange: (val: any) => void;
   disabled?: boolean;
   placeholder?: string;
+  hasError?: boolean;
 }
 
 export default function SearchableObatSelect({
@@ -17,6 +18,7 @@ export default function SearchableObatSelect({
   onChange,
   disabled = false,
   placeholder = "Pilih / Cari Obat...",
+  hasError = false,
 }: SearchableObatSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,7 +51,7 @@ export default function SearchableObatSelect({
             if (!isOpen) setSearchTerm("");
           }
         }}
-        className={`w-full h-full min-h-[42px] px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "border-outline-variant bg-white text-apomacy-dark cursor-pointer focus-within:ring-4 focus-within:ring-apomacy-primary/10 focus-within:border-apomacy-primary"}`}
+        className={`w-full h-full min-h-[42px] px-4 py-2.5 text-sm font-bold rounded-xl border flex justify-between items-center select-none transition-all ${disabled ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : hasError ? "border-red-500 bg-red-50 text-apomacy-dark cursor-pointer focus-within:ring-4 focus-within:ring-red-100 focus-within:border-red-500" : "border-outline-variant bg-white text-apomacy-dark cursor-pointer focus-within:ring-4 focus-within:ring-apomacy-primary/10 focus-within:border-apomacy-primary"}`}
       >
         {value ? (
           <span

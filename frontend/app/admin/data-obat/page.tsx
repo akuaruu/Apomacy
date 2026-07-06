@@ -31,6 +31,7 @@ export default function DataObatPage() {
   const [search, setSearch] = useState("");
   const [selectedObat, setSelectedObat] = useState<any>(null);
   const [mode, setMode] = useState<"tambah" | "edit" | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState({
@@ -97,6 +98,13 @@ export default function DataObatPage() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  const requiredMark = <span className="text-red-500">*</span>;
+  const hasFieldError = (invalid: boolean) => submitAttempted && invalid;
+  const inputStateClass = (invalid: boolean, enabledBg = "bg-surface-container-low") =>
+    hasFieldError(invalid)
+      ? "border-red-500 bg-red-50 focus:border-red-500"
+      : `border-outline-variant ${enabledBg} focus:border-apomacy-primary`;
 
   const fetchMasterData = async () => {
     try {
@@ -195,6 +203,7 @@ export default function DataObatPage() {
     setImagePreview("");
     setIsAddingCategory(false);
     setNewCategoryText("");
+    setSubmitAttempted(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     setSelectedObat(null);
     setMode(null);
@@ -261,6 +270,11 @@ export default function DataObatPage() {
     });
   };
 
+  const appendPayloadField = (payload: FormData, backendKey: string, formKey: string, value: string) => {
+    payload.append(backendKey, value);
+    payload.append(formKey, value);
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -303,6 +317,7 @@ export default function DataObatPage() {
 
   const handleSaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
 
     if (
       !formData.kode.trim() ||
@@ -325,13 +340,18 @@ export default function DataObatPage() {
       return;
     }
 
-    if (formData.hargaJual <= 0) {
-      showToast("Gagal! Harga Jual harus lebih dari 0.", "error");
+    if (!isNonNegativeNumber(formData.hargaBeli) || !isNonNegativeNumber(formData.hargaJual)) {
+      showToast("Gagal! Harga beli dan harga jual tidak boleh bernilai negatif.", "error");
       return;
     }
 
-    if (!isPositiveNumber(formData.hargaBeli)) {
-      showToast("Gagal! Harga beli harus lebih dari 0.", "error");
+    if (mode === "edit" && !isPositiveNumber(formData.hargaBeli)) {
+      showToast("Gagal! Harga beli pada data edit harus lebih dari 0 dan hanya dapat diubah melalui fitur restock.", "error");
+      return;
+    }
+
+    if (mode === "edit" && !isPositiveNumber(formData.hargaJual)) {
+      showToast("Gagal! Harga jual pada data edit harus lebih dari 0.", "error");
       return;
     }
     if (!isNonNegativeNumber(formData.stok) || !isNonNegativeNumber(formData.minimal)) {
@@ -389,23 +409,24 @@ export default function DataObatPage() {
         if (modalConfig.type === "tambah") {
           // POST Menerima Multipart Form Data di obat_handler.go
           const payload = new FormData();
-          payload.append("kode_obat", formData.kode);
-          payload.append("nama_obat", formData.nama);
-          payload.append("jenis_obat", formData.jenis);
-          payload.append("bentuk_obat", formData.bentuk);
-          payload.append("satuan", formData.satuan);
-          payload.append("id_supplier", supplierId);
-          payload.append("harga_beli", formData.hargaBeli.toString());
-          payload.append("harga_jual", formData.hargaJual.toString());
-          payload.append("stok", formData.stok.toString());
-          payload.append("stok_minimum", formData.minimal.toString());
-          payload.append("expired_date", formattedExpiredDate);
-          payload.append("deskripsi", formData.deskripsi);
-          payload.append("komposisi", formData.komposisi);
-          payload.append("dosis_pemakaian", formData.dosis);
+          appendPayloadField(payload, "IDSupplier", "id_supplier", supplierId);
+          appendPayloadField(payload, "KodeObat", "kode_obat", formData.kode);
+          appendPayloadField(payload, "NamaObat", "nama_obat", formData.nama);
+          appendPayloadField(payload, "JenisObat", "jenis_obat", formData.jenis);
+          appendPayloadField(payload, "BentukObat", "bentuk_obat", formData.bentuk);
+          appendPayloadField(payload, "Satuan", "satuan", formData.satuan);
+          appendPayloadField(payload, "HargaBeli", "harga_beli", formData.hargaBeli.toString());
+          appendPayloadField(payload, "HargaJual", "harga_jual", formData.hargaJual.toString());
+          appendPayloadField(payload, "Stok", "stok", formData.stok.toString());
+          appendPayloadField(payload, "StokMinimum", "stok_minimum", formData.minimal.toString());
+          appendPayloadField(payload, "ExpiredDate", "expired_date", formattedExpiredDate);
+          appendPayloadField(payload, "Deskripsi", "deskripsi", formData.deskripsi);
+          appendPayloadField(payload, "Komposisi", "komposisi", formData.komposisi);
+          appendPayloadField(payload, "DosisPemakaian", "dosis_pemakaian", formData.dosis);
 
           formData.kategori.forEach(k => {
             payload.append("kategori", k);
+            payload.append("Kategori", k);
           });
 
           if (imageFile) {
@@ -568,7 +589,7 @@ export default function DataObatPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Kode Obat
+                    Kode Obat {requiredMark}
                   </label>
                   <input
                     type="text"
@@ -577,13 +598,13 @@ export default function DataObatPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, kode: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low disabled:opacity-60 outline-none focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border disabled:opacity-60 outline-none transition-all ${inputStateClass(!formData.kode.trim())}`}
                     placeholder="Contoh: OBT004"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Nama Obat
+                    Nama Obat {requiredMark}
                   </label>
                   <input
                     type="text"
@@ -591,12 +612,12 @@ export default function DataObatPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, nama: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.nama.trim())}`}
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Kategori (Multi-Tag)
+                    Kategori (Multi-Tag) {requiredMark}
                   </label>
                   {isAddingCategory ? (
                     <div className="flex gap-2">
@@ -606,7 +627,7 @@ export default function DataObatPage() {
                         value={newCategoryText}
                         onChange={(e) => setNewCategoryText(e.target.value)}
                         placeholder="Kategori Baru"
-                        className="flex-1 px-3 py-2 text-xs font-bold text-apomacy-dark rounded-xl border border-apomacy-primary outline-none"
+                        className={`flex-1 px-3 py-2 text-xs font-bold text-apomacy-dark rounded-xl border outline-none ${inputStateClass(!newCategoryText.trim(), "bg-white")}`}
                       />
                       <button
                         type="button"
@@ -631,6 +652,7 @@ export default function DataObatPage() {
                           placeholder="Pilih Kategori"
                           value=""
                           onChange={handleSelectCategoryTag}
+                          hasError={hasFieldError(formData.kategori.length === 0)}
                         />
                       </div>
                       <button
@@ -665,7 +687,7 @@ export default function DataObatPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Jenis Obat
+                    Jenis Obat {requiredMark}
                   </label>
                   <SearchableSelect
                     options={jenisOptions}
@@ -674,11 +696,12 @@ export default function DataObatPage() {
                     onChange={(val: string) =>
                       setFormData({ ...formData, jenis: val })
                     }
+                    hasError={hasFieldError(!formData.jenis)}
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Bentuk Obat
+                    Bentuk Obat {requiredMark}
                   </label>
                   <SearchableSelect
                     options={bentukOptions}
@@ -687,11 +710,12 @@ export default function DataObatPage() {
                     onChange={(val: string) =>
                       setFormData({ ...formData, bentuk: val, satuan: "" })
                     }
+                    hasError={hasFieldError(!formData.bentuk)}
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Satuan
+                    Satuan {requiredMark}
                   </label>
                   <SearchableSelect
                     options={satuanOptions}
@@ -703,11 +727,12 @@ export default function DataObatPage() {
                       setFormData({ ...formData, satuan: val })
                     }
                     disabled={!formData.bentuk}
+                    hasError={hasFieldError(!formData.satuan)}
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Supplier
+                    Supplier {requiredMark}
                   </label>
                   <SearchableSelect
                     options={supplierOptions}
@@ -716,26 +741,32 @@ export default function DataObatPage() {
                     onChange={(val: string) =>
                       setFormData({ ...formData, supplier: val })
                     }
+                    hasError={hasFieldError(!formData.supplier)}
                   />
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-red-500 uppercase tracking-wider mb-1.5">
-                    Harga Beli (Lock)
+                  <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
+                    Harga Beli (Rp) {requiredMark}
                   </label>
                   <input
                     type="text"
-                    readOnly
-                    disabled
-                    value={`Rp ${formData.hargaBeli.toLocaleString("id-ID")}`}
-                    className="w-full px-4 py-2.5 text-sm font-bold text-gray-400 rounded-xl border border-dashed border-outline-variant bg-gray-50/80 cursor-not-allowed outline-none"
+                    inputMode="numeric"
+                    readOnly={mode === "edit"}
+                    disabled={mode === "edit"}
+                    value={mode === "edit" ? `Rp ${formData.hargaBeli.toLocaleString("id-ID")}` : formData.hargaBeli === 0 ? "" : formData.hargaBeli}
+                    onChange={(e) =>
+                      handleNumberOnlyChange("hargaBeli", e.target.value)
+                    }
+                    className={`w-full px-4 py-2.5 text-sm font-bold rounded-xl border outline-none transition-all ${mode === "edit" ? "text-gray-400 border-dashed border-outline-variant bg-gray-50/80 cursor-not-allowed" : `text-apomacy-dark ${inputStateClass(formData.hargaBeli < 0)}`}`}
+                    placeholder="0"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Harga Jual (Rp)
+                    Harga Jual (Rp) {requiredMark}
                   </label>
                   <input
                     type="text"
@@ -744,14 +775,14 @@ export default function DataObatPage() {
                     onChange={(e) =>
                       handleNumberOnlyChange("hargaJual", e.target.value)
                     }
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(mode === "edit" ? formData.hargaJual <= 0 : formData.hargaJual < 0)}`}
                     placeholder="0"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[11px] font-bold text-red-500 uppercase tracking-wider mb-1.5">
-                      Stok (Lock)
+                      Stok (Lock) {requiredMark}
                     </label>
                     <input
                       type="text"
@@ -763,7 +794,7 @@ export default function DataObatPage() {
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                      Stok Min
+                      Stok Min {requiredMark}
                     </label>
                     <input
                       type="text"
@@ -772,7 +803,7 @@ export default function DataObatPage() {
                       onChange={(e) =>
                         handleNumberOnlyChange("minimal", e.target.value)
                       }
-                      className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low text-center outline-none focus:border-apomacy-primary transition-all"
+                      className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border text-center outline-none transition-all ${inputStateClass(!formData.minimal)}`}
                       placeholder="0"
                     />
                   </div>
@@ -782,12 +813,12 @@ export default function DataObatPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Gambar Produk
+                    Gambar Produk {requiredMark}
                   </label>
                   <div className="flex gap-3 items-center">
                     <div
                       onClick={() => mode !== "edit" && fileInputRef.current?.click()}
-                      className={`w-16 h-16 shrink-0 rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex items-center justify-center text-outline overflow-hidden transition-all ${mode === "edit" ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:border-apomacy-primary hover:text-apomacy-primary"}`}
+                      className={`w-16 h-16 shrink-0 rounded-xl border-2 border-dashed flex items-center justify-center text-outline overflow-hidden transition-all ${mode === "edit" ? "border-outline-variant bg-surface-container-low opacity-60 cursor-not-allowed" : hasFieldError(!imagePreview) ? "border-red-500 bg-red-50 cursor-pointer" : "border-outline-variant bg-surface-container-low cursor-pointer hover:border-apomacy-primary hover:text-apomacy-primary"}`}
                     >
                       {imagePreview ? (
                         <img
@@ -824,7 +855,7 @@ export default function DataObatPage() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Expired Date
+                    Expired Date {requiredMark}
                   </label>
                   <input
                     type="date"
@@ -832,12 +863,12 @@ export default function DataObatPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, expired: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none cursor-pointer focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none cursor-pointer transition-all ${inputStateClass(!formData.expired)}`}
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Dosis Pemakaian
+                    Dosis Pemakaian {requiredMark}
                   </label>
                   <input
                     type="text"
@@ -846,7 +877,7 @@ export default function DataObatPage() {
                       setFormData({ ...formData, dosis: e.target.value })
                     }
                     placeholder="Contoh: 3 x sehari 1 tablet"
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.dosis.trim())}`}
                   />
                 </div>
               </div>
@@ -855,7 +886,7 @@ export default function DataObatPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-outline-variant/30 pt-4">
               <div>
                 <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                  Deskripsi Obat
+                  Deskripsi Obat {requiredMark}
                 </label>
                 <textarea
                   rows={3}
@@ -864,12 +895,12 @@ export default function DataObatPage() {
                     setFormData({ ...formData, deskripsi: e.target.value })
                   }
                   placeholder="Masukkan informasi indikasi umum atau deskripsi obat..."
-                  className="w-full px-4 py-3 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary resize-none transition-all"
+                  className={`w-full px-4 py-3 text-sm font-bold text-apomacy-dark rounded-xl border outline-none resize-none transition-all ${inputStateClass(!formData.deskripsi.trim())}`}
                 />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                  Komposisi Obat
+                  Komposisi Obat {requiredMark}
                 </label>
                 <textarea
                   rows={3}
@@ -878,7 +909,7 @@ export default function DataObatPage() {
                     setFormData({ ...formData, komposisi: e.target.value })
                   }
                   placeholder="Kandungan bahan aktif obat..."
-                  className="w-full px-4 py-3 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary resize-none transition-all"
+                  className={`w-full px-4 py-3 text-sm font-bold text-apomacy-dark rounded-xl border outline-none resize-none transition-all ${inputStateClass(!formData.komposisi.trim())}`}
                 />
               </div>
             </div>

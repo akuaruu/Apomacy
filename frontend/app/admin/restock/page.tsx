@@ -49,6 +49,7 @@ export default function RestockPage() {
 
   const [editingItemKode, setEditingItemKode] = useState<string | null>(null);
   const [cartItems, setCartItems] = useState<any[]>([]);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Modal & Toast
   const [modalConfig, setModalConfig] = useState({
@@ -120,6 +121,13 @@ export default function RestockPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const requiredMark = <span className="text-red-500">*</span>;
+  const hasFieldError = (invalid: boolean) => submitAttempted && invalid;
+  const inputStateClass = (invalid: boolean, enabledBg = "bg-white") =>
+    hasFieldError(invalid)
+      ? "border-red-500 bg-red-50 focus:border-red-500"
+      : `border-outline-variant ${enabledBg} focus:border-apomacy-primary`;
+
   // --- LOGIKA FILTER TWO-WAY BINDING ---
 
   // 1. Saat Supplier Dipilih Manual
@@ -173,18 +181,26 @@ export default function RestockPage() {
   };
 
   const handleAddToCart = () => {
+    setSubmitAttempted(true);
+
     if (
       !headerData.supplier ||
       !headerData.noFaktur.trim() ||
       !formItem.obat ||
-      formItem.hargaBeli <= 0 ||
-      formItem.qty <= 0 ||
       !formItem.expired
     ) {
       return showToast(
         "Gagal! Seluruh formulir penerimaan dan detail obat wajib diisi dengan lengkap.",
         "error",
       );
+    }
+
+    if (formItem.hargaBeli <= 0) {
+      return showToast("Harga beli restock harus lebih dari 0.", "error");
+    }
+
+    if (formItem.qty <= 0) {
+      return showToast("Qty restock harus lebih dari 0.", "error");
     }
 
     if (!isValidFutureDate(formItem.expired)) {
@@ -209,6 +225,7 @@ export default function RestockPage() {
         ),
       );
       showToast("Perubahan data item berhasil disimpan.", "success");
+      setSubmitAttempted(false);
       cancelEditItem();
     } else {
       const existingIndex = cartItems.findIndex(
@@ -231,6 +248,7 @@ export default function RestockPage() {
       };
       setCartItems([...cartItems, newItem]);
       setFormItem({ obat: null, hargaBeli: 0, qty: 0, expired: "" });
+      setSubmitAttempted(false);
     }
   };
 
@@ -248,6 +266,7 @@ export default function RestockPage() {
   const cancelEditItem = () => {
     setFormItem({ obat: null, hargaBeli: 0, qty: 0, expired: "" });
     setEditingItemKode(null);
+    setSubmitAttempted(false);
   };
 
   const handleClearAll = () => {
@@ -255,6 +274,7 @@ export default function RestockPage() {
     setFormItem({ obat: null, hargaBeli: 0, qty: 0, expired: "" });
     setHeaderData((prev) => ({ ...prev, supplier: "", noFaktur: "" }));
     setEditingItemKode(null);
+    setSubmitAttempted(false);
     setObatOptions(allObatList); // Kembalikan filter dropdown obat ke daftar semula
   };
 
@@ -371,7 +391,7 @@ export default function RestockPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start mb-8">
           <div>
             <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-              No. Terima
+              No. Terima {requiredMark}
             </label>
             <div className="relative">
               <Lock size={14} className="absolute left-4 top-3.5 text-gray-400" />
@@ -386,18 +406,18 @@ export default function RestockPage() {
           </div>
           <div>
             <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-              Tanggal
+              Tanggal {requiredMark}
             </label>
             <input
               type="date"
               value={headerData.tanggal}
               onChange={(e) => setHeaderData({ ...headerData, tanggal: e.target.value })}
-              className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none cursor-pointer focus:border-apomacy-primary"
+              className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none cursor-pointer ${inputStateClass(!headerData.tanggal, "bg-surface-container-low")}`}
             />
           </div>
           <div>
             <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-              Supplier
+              Supplier {requiredMark}
             </label>
             <SearchableSelect
               options={supplierOptions}
@@ -406,18 +426,19 @@ export default function RestockPage() {
               // LOCK otomatis aktif jika sedang memuat atau keranjang sudah ada isinya
               disabled={isLoadingMaster || cartItems.length > 0}
               onChange={handleSupplierChange}
+              hasError={hasFieldError(!headerData.supplier)}
             />
           </div>
           <div>
             <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-              No Faktur Supplier
+              No Faktur Supplier {requiredMark}
             </label>
             <input
               type="text"
               placeholder="Contoh: INV-9982"
               value={headerData.noFaktur}
               onChange={(e) => setHeaderData({ ...headerData, noFaktur: e.target.value })}
-              className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary"
+              className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none ${inputStateClass(!headerData.noFaktur.trim(), "bg-surface-container-low")}`}
             />
           </div>
         </div>
@@ -437,7 +458,7 @@ export default function RestockPage() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
             <div className="md:col-span-2">
               <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                Cari Data Obat
+                Cari Data Obat {requiredMark}
               </label>
               <SearchableObatSelect
                 options={obatOptions}
@@ -445,43 +466,44 @@ export default function RestockPage() {
                 onChange={handleObatChange}
                 disabled={editingItemKode !== null || isLoadingMaster}
                 placeholder={isLoadingMaster ? "Memuat..." : "Pilih / Cari Obat..."}
+                hasError={hasFieldError(!formItem.obat)}
               />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                Harga Beli (Rp)
+                Harga Beli (Rp) {requiredMark}
               </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={formItem.hargaBeli === 0 ? "" : formItem.hargaBeli}
                 onChange={(e) => handleNumberChange("hargaBeli", e.target.value)}
-                className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-white outline-none focus:border-apomacy-primary"
+                className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none ${inputStateClass(formItem.hargaBeli <= 0)}`}
                 placeholder="0"
               />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                Qty / Jumlah
+                Qty / Jumlah {requiredMark}
               </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={formItem.qty === 0 ? "" : formItem.qty}
                 onChange={(e) => handleNumberChange("qty", e.target.value)}
-                className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-white outline-none focus:border-apomacy-primary text-center"
+                className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none text-center ${inputStateClass(formItem.qty <= 0)}`}
                 placeholder="0"
               />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                Tanggal Expired
+                Tanggal Expired {requiredMark}
               </label>
               <input
                 type="date"
                 value={formItem.expired}
                 onChange={(e) => setFormItem({ ...formItem, expired: e.target.value })}
-                className="w-full px-3 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-white outline-none cursor-pointer focus:border-apomacy-primary"
+                className={`w-full px-3 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none cursor-pointer ${inputStateClass(!formItem.expired)}`}
               />
             </div>
           </div>

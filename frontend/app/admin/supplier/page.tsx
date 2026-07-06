@@ -32,6 +32,7 @@ export default function SupplierPage() {
   const [search, setSearch] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
   const [mode, setMode] = useState<"tambah" | "edit" | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Modal & Toast
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,6 +71,13 @@ export default function SupplierPage() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  const requiredMark = <span className="text-red-500">*</span>;
+  const hasFieldError = (invalid: boolean) => submitAttempted && invalid;
+  const inputStateClass = (invalid: boolean) =>
+    hasFieldError(invalid)
+      ? "border-red-500 bg-red-50 focus:border-red-500"
+      : "border-outline-variant bg-surface-container-low focus:border-apomacy-primary";
 
   // API FETCH DARI BACKEND GOLANG
   const fetchSupplierData = async () => {
@@ -120,6 +128,7 @@ export default function SupplierPage() {
       alamat: "",
       status: "Aktif",
     });
+    setSubmitAttempted(false);
     setSelectedSupplier(null);
     setMode(null);
   };
@@ -172,6 +181,7 @@ export default function SupplierPage() {
   // Handler yang divalidasi
   const handleSaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitAttempted(true);
 
     // 1. Validasi Data
     if (
@@ -392,7 +402,7 @@ export default function SupplierPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Kode Supplier
+                    Kode Supplier {requiredMark}
                   </label>
                   <input
                     type="text"
@@ -401,13 +411,13 @@ export default function SupplierPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, kode: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low disabled:opacity-60 outline-none focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border disabled:opacity-60 outline-none transition-all ${inputStateClass(!formData.kode.trim())}`}
                     placeholder="Contoh: SUP-001"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Nama Perusahaan / Supplier
+                    Nama Perusahaan / Supplier {requiredMark}
                   </label>
                   <input
                     type="text"
@@ -415,7 +425,7 @@ export default function SupplierPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, nama: e.target.value })
                     }
-                    className="w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                    className={`w-full px-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.nama.trim())}`}
                     placeholder="PT. Nama Perusahaan"
                   />
                 </div>
@@ -425,7 +435,7 @@ export default function SupplierPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Contact Person (CP)
+                    Contact Person (CP) {requiredMark}
                   </label>
                   <div className="relative">
                     <UserCircle
@@ -438,14 +448,14 @@ export default function SupplierPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, cp: e.target.value })
                       }
-                      className="w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                      className={`w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.cp.trim())}`}
                       placeholder="Nama Penanggung Jawab"
                     />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Telepon / WhatsApp
+                    Telepon / WhatsApp {requiredMark}
                   </label>
                   <div className="relative">
                     <Phone
@@ -457,7 +467,7 @@ export default function SupplierPage() {
                       inputMode="numeric"
                       value={formData.telepon}
                       onChange={(e) => handleTeleponChange(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                      className={`w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.telepon.trim() || !isValidIndonesianPhone(formData.telepon))}`}
                       placeholder="0812xxxxxx"
                     />
                   </div>
@@ -468,7 +478,7 @@ export default function SupplierPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Email Resmi
+                    Email Resmi {requiredMark}
                   </label>
                   <div className="relative">
                     <Mail
@@ -481,14 +491,14 @@ export default function SupplierPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
-                      className="w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                      className={`w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.email.trim() || !isValidEmail(formData.email))}`}
                       placeholder="email@perusahaan.com"
                     />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Kota Operasional
+                    Kota Operasional {requiredMark}
                   </label>
                   <div className="relative">
                     <MapPin
@@ -501,7 +511,7 @@ export default function SupplierPage() {
                       onChange={(e) =>
                         setFormData({ ...formData, kota: e.target.value })
                       }
-                      className="w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary transition-all"
+                      className={`w-full pl-10 pr-4 py-2.5 text-sm font-bold text-apomacy-dark rounded-xl border outline-none transition-all ${inputStateClass(!formData.kota.trim())}`}
                       placeholder="Jakarta, Bandung..."
                     />
                   </div>
@@ -512,7 +522,7 @@ export default function SupplierPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                    Status Kemitraan
+                    Status Kemitraan {requiredMark}
                   </label>
                   <div className="flex bg-surface-container-low p-1 rounded-xl border border-outline-variant">
                     <button
@@ -547,7 +557,7 @@ export default function SupplierPage() {
             {/* Alamat Lengkap */}
             <div className="border-t border-outline-variant/30 pt-4">
               <label className="block text-[11px] font-bold text-outline uppercase tracking-wider mb-1.5">
-                Alamat Lengkap Perusahaan
+                Alamat Lengkap Perusahaan {requiredMark}
               </label>
               <textarea
                 rows={2}
@@ -556,7 +566,7 @@ export default function SupplierPage() {
                   setFormData({ ...formData, alamat: e.target.value })
                 }
                 placeholder="Masukkan alamat lengkap gedung, blok, atau jalan operasional supplier..."
-                className="w-full px-4 py-3 text-sm font-bold text-apomacy-dark rounded-xl border border-outline-variant bg-surface-container-low outline-none focus:border-apomacy-primary resize-none transition-all"
+                className={`w-full px-4 py-3 text-sm font-bold text-apomacy-dark rounded-xl border outline-none resize-none transition-all ${inputStateClass(!formData.alamat.trim())}`}
               />
             </div>
 
