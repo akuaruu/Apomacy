@@ -1,10 +1,12 @@
 package http
 
 import (
-	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
+	"github.com/akuaruu/apomacy/backend/internal/middleware"
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +23,27 @@ type UpdateStatusPesananRequest struct {
 	StatusPesanan string `json:"status_pesanan" binding:"required"`
 }
 
+func contextUserID(c *gin.Context) (int, bool) {
+	value, exists := c.Get("id_user")
+	if !exists {
+		return 0, false
+	}
+
+	switch id := value.(type) {
+	case float64:
+		if id <= 0 || id != float64(int(id)) {
+			return 0, false
+		}
+		return int(id), true
+	case int:
+		return id, id > 0
+	case int64:
+		return int(id), id > 0
+	default:
+		return 0, false
+	}
+}
+
 // Checkout memproses keranjang belanja dari kasir
 func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	var req model.Transaksi
@@ -31,16 +54,15 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	}
 
 	// Ambil id_user dari JWT context (di-set oleh RequireAuth)  ← ganti blok validasi lama
-	idUser, exists := c.Get("id_user")
-	if !exists {
+	idUser, ok := contextUserID(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
 		return
 	}
-	req.IDUser = int(idUser.(float64))
+	req.IDUser = idUser
 
 	if err := h.usecase.Checkout(c.Request.Context(), &req); err != nil {
-		// tambah log ini sementara
-		fmt.Printf("[ERROR] Checkout gagal: %+v\n", err)
+		slog.ErrorContext(c.Request.Context(), "checkout failed", "error", err, "request_id", requestID(c))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses transaksi", "detail": err.Error()})
 		return
 	}
@@ -54,7 +76,13 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 	})
 }
 
-// GetDetail mengambil riwayat spesifik transaksi beserta rincian obat yang dibeli
+func requestID(c *gin.Context) string {
+	value, _ := c.Get(middleware.RequestIDKey)
+	requestID, _ := value.(string)
+	return requestID
+}
+
+// GetDetail mengambil riwayat spesifik transaksi beserta rincian obat dan pengiriman
 func (h *TransaksiHandler) GetDetail(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
@@ -63,8 +91,23 @@ func (h *TransaksiHandler) GetDetail(c *gin.Context) {
 		return
 	}
 
-	trx, err := h.usecase.GetDetailTransaksi(c.Request.Context(), id)
+	idUser, ok := contextUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
+	}
+
+	// role diasumsikan di-set oleh middleware RequireAuth dari klaim JWT
+	role, _ := c.Get("role")
+	roleName, _ := role.(string)
+	isStaff := strings.EqualFold(roleName, "kasir") || strings.EqualFold(roleName, "admin")
+
+	trx, err := h.usecase.GetDetailTransaksi(c.Request.Context(), idUser, isStaff, id)
 	if err != nil {
+		if err.Error() == "akses ditolak: transaksi ini bukan milik anda" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -90,18 +133,13 @@ func (h *TransaksiHandler) Batalkan(c *gin.Context) {
 }
 
 func (h *TransaksiHandler) GetRiwayatUser(c *gin.Context) {
-	idUserRaw, exists := c.Get("id_user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
-		return
-	}
-	idUserFloat, ok := idUserRaw.(float64)
+	idUser, ok := contextUserID(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
 		return
 	}
 
-	data, err := h.usecase.GetRiwayatByUser(c.Request.Context(), int(idUserFloat))
+	data, err := h.usecase.GetRiwayatByUser(c.Request.Context(), idUser)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil riwayat transaksi", "detail": err.Error()})
 		return

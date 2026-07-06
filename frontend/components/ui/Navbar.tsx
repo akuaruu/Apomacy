@@ -3,10 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 import api from "@/lib/api";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 interface NavCategory {
     label: string;
@@ -39,6 +41,11 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
     const router = useRouter();
+    const pathname = usePathname();
+
+    const logoHref = /^\/katalog\/[^/]+$/.test(pathname)
+        ? "/katalog"
+        : "/";
 
     const [userName, setUserName] = useState<string | null>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -94,46 +101,112 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
     const handleLoginSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
         setLoginError("");
+
+        if (!isValidEmail(loginEmail)) {
+            setLoginError("Masukkan alamat email yang valid.");
+            return;
+        }
+
         setIsLoggingIn(true);
 
         try {
             const response = await api.post("/users/login", {
-                username: loginEmail,
+                username: normalizeEmail(loginEmail),
                 password: loginPassword,
             });
 
-            const { token } = response.data;
+            const token = response.data?.token;
 
-            if (token) {
-                Cookies.set("apomacy_token", token, { expires: 1 });
-                const decoded = jwtDecode<MyTokenPayload>(token);
-                const userRole = decoded.role;
-
-                if (userRole === "Admin") {
-                    window.location.href = "/admin";
-                } else if (userRole === "Kasir") {
-                    window.location.href = "/kasir";
-                } else {
-                    window.location.reload();
-                }
+            if (!token) {
+                throw new Error("Token tidak ditemukan pada respons login.");
             }
-        } catch (err: any) {
-            const msg = err.response?.data?.error || "Gagal masuk. Periksa kembali email dan password Anda.";
-            setLoginError(msg);
+
+            const decoded = jwtDecode<MyTokenPayload>(token);
+
+            const normalizedRole = decoded.role
+                ?.trim()
+                .toLowerCase();
+
+            const userRole =
+                normalizedRole === "admin" ||
+                    normalizedRole === "kasir"
+                    ? normalizedRole
+                    : "member";
+
+            Cookies.remove("apomacy_token", { path: "/" });
+            Cookies.remove("apomacy_role", { path: "/" });
+
+            Cookies.set("apomacy_token", token, {
+                expires: 1,
+                path: "/",
+                sameSite: "lax",
+            });
+
+            Cookies.set("apomacy_role", userRole, {
+                expires: 1,
+                path: "/",
+                sameSite: "lax",
+            });
+
+            setIsLoggedIn(true);
+            setUserName(
+                decoded.nama ||
+                decoded.name ||
+                decoded.username ||
+                "Akun Saya"
+            );
+
+            setShowLoginModal(false);
+            setLoginPassword("");
+
+            if (
+                userRole === "member" &&
+                /^\/katalog\/[^/]+$/.test(pathname)
+            ) {
+                window.location.reload();
+                return;
+            }
+
+            if (userRole === "admin") {
+                router.replace("/admin");
+            } else if (userRole === "kasir") {
+                router.replace("/kasir");
+            } else {
+                router.replace("/katalog");
+            }
+
+            router.refresh();
+
+        } catch (err: unknown) {
+            setLoginError(getUserFriendlyError(err, "Gagal masuk. Periksa kembali email dan kata sandi Anda."));
         } finally {
             setIsLoggingIn(false);
         }
     };
 
+
     return (
         <>
             <header className="sticky top-0 z-40 w-full">
                 <div className="bg-white shadow-sm">
-                    <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-8 px-4 lg:px-8">
-                        <Link href="" className="group flex items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container">
-                            <Image src="/image/logo_apomacy.png" alt="Logo Apomacy" width={40} height={40} className="object-contain" />
-                            <span className="text-xl font-black tracking-[-0.02em]">Apomacy</span>
+                    <div className="mx-auto flex h-16 max-w-screen-xl items-center gap-2 px-4 sm:gap-4 lg:gap-8 lg:px-8">
+                        <Link
+                            href={logoHref}
+                            className="group flex shrink-0 items-center gap-2 text-apomacy-dark transition-colors hover:text-primary-container"
+                        >
+                            <Image
+                                src="/image/logo_apomacy.png"
+                                alt="Logo Apomacy"
+                                width={40}
+                                height={40}
+                                className="object-contain"
+                            />
+
+                            <span className="hidden text-xl font-black tracking-[-0.02em] md:inline">
+                                Apomacy
+                            </span>
                         </Link>
 
                         <form onSubmit={handleSearch} className="flex flex-1 items-stretch overflow-hidden rounded-full border border-apomacy-ice focus-within:border-apomacy-primary focus-within:ring-2 focus-within:ring-apomacy-primary/20 transition-all">
@@ -143,20 +216,20 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Cari obat, vitamin, atau produk kesehatan..."
-                                className="min-w-0 flex-1 bg-white px-5 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none"
+                                className="min-w-0 flex-1 bg-white px-3 py-2.5 text-sm text-apomacy-dark placeholder:text-apomacy-muted focus:outline-none sm:px-5"
                             />
-                            <button type="submit" suppressHydrationWarning className="shrink-0 bg-apomacy-primary px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark">
+                            <button type="submit" suppressHydrationWarning className="shrink-0 bg-apomacy-primary px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-apomacy-dark sm:px-6">
                                 CARI
                             </button>
                         </form>
 
-                        <div className="flex shrink-0 items-center gap-5">
-                            <a href="/dasbor" onClick={(e) => handleProtectedNavigation(e, "/dasbor")} className="hidden items-center gap-1.5 text-apomacy-dark cursor-pointer transition-colors hover:text-apomacy-primary sm:flex">
+                        <div className="flex shrink-0 items-center gap-2 sm:gap-5">
+                            <a href="/dasbor" onClick={(e) => handleProtectedNavigation(e, "/dasbor")} className="flex items-center gap-1.5 text-apomacy-dark cursor-pointer transition-colors hover:text-apomacy-primary">
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                 </svg>
                                 {/* Nampilin nama user secara dinamis stelah login */}
-                                <span className="text-sm font-semibold">
+                                <span className="hidden text-sm font-semibold xl:inline">
                                     {isLoggedIn ? `Hi, ${userName}` : "Akun Saya"}
                                 </span>
                             </a>
@@ -199,11 +272,22 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                             {categoryMenuOpen && (
                                 <div className="absolute left-0 top-full z-50 min-w-64 rounded-b-xl bg-white py-2 shadow-xl ring-1 ring-black/5 border-t border-gray-100">
                                     {[
-                                        { label: "Pereda Nyeri & Demam", href: "/katalog?cat=pereda-nyeri" },
-                                        { label: "Batuk & Flu", href: "/katalog?cat=batuk-flu" },
-                                        { label: "Pencernaan & Lambung", href: "/katalog?cat=pencernaan" },
-                                        { label: "Vitamin & Suplemen", href: "/katalog?cat=vitamin" },
-                                        { label: "Ibu & Anak", href: "/katalog?cat=ibu-anak" },
+                                        {
+                                            label: "Flu & Batuk",
+                                            href: "/katalog?cat=flu-batuk",
+                                        },
+                                        {
+                                            label: "Demam",
+                                            href: "/katalog?cat=demam",
+                                        },
+                                        {
+                                            label: "Vitamin & Suplemen",
+                                            href: "/katalog?cat=vitamin-suplemen",
+                                        },
+                                        {
+                                            label: "Pencernaan",
+                                            href: "/katalog?cat=pencernaan",
+                                        },
                                     ].map((item) => (
                                         <Link
                                             key={item.href}
@@ -220,12 +304,12 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
                         <div className="mx-4 hidden h-5 w-px bg-white/20 lg:block" />
 
-                        <nav className="hidden items-center gap-2 lg:flex">
+                        <nav className="flex items-center gap-0 sm:gap-2">
                             {navCategories.map((cat) => (
                                 <Link
                                     key={cat.href}
                                     href={cat.href}
-                                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:bg-white/15 ${cat.isPromo ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]" : "text-white/90 hover:text-white"}`}
+                                    className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors hover:bg-white/15 sm:px-3 sm:text-xs ${cat.isPromo ? "text-[#FF4B72] drop-shadow-sm hover:text-[#FF2A55]" : "text-white/90 hover:text-white"}`}
                                 >
                                     {cat.isPromo && <Image src="/Deal.png" alt="Promo" width={16} height={16} className="object-contain" />}
                                     <span>{cat.label}</span>

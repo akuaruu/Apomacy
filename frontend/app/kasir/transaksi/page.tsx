@@ -3,16 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import api from "@/lib/api";
 import {
-    Search, Plus, Trash2, ShoppingCart, User, Pill, CreditCard, Banknote, QrCode, Receipt, XCircle, Loader2
+    Search, Plus, Trash2, ShoppingCart, User, Pill, CreditCard, Banknote, QrCode, Receipt, XCircle, Loader2, AlertTriangle
 } from "lucide-react";
 import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
+import Toast from "@/components/shared/Toast";
+import ModalConfirm from "@/components/shared/ModalConfirm";
+import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
 
-interface MyTokenPayload {
-    id_user: number;
-    role: string;
-    exp: number;
-}
 interface Member {
     id: string;
     name: string;
@@ -35,12 +32,39 @@ interface CartItem {
     price: number;
     qty: number;
     subtotal: number;
+    isKeras: boolean;
+}
+
+interface MedicineApiItem {
+    id_obat?: number;
+    IDObat?: number;
+    id?: number;
+    kode_obat?: string;
+    KodeObat?: string;
+    nama_obat?: string;
+    NamaObat?: string;
+    jenis_obat?: string;
+    JenisObat?: string;
+    harga_jual?: number;
+    HargaJual?: number;
+    stok?: number;
+    Stok?: number;
+}
+
+interface CustomerApiItem {
+    id_customer?: number;
+    IDCustomer?: number;
+    id?: number;
+    nama_customer?: string;
+    NamaCustomer?: string;
+    nama?: string;
+    no_telp?: string;
+    NoTelp?: string;
 }
 
 export default function TransaksiOfflinePage() {
-    const [isMounted, setIsMounted] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [masterDataError, setMasterDataError] = useState<string | null>(null);
 
     const [noTrx, setNoTrx] = useState("");
 
@@ -66,55 +90,78 @@ export default function TransaksiOfflinePage() {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<"Tunai" | "QRIS" | "Debit">("Tunai");
     const [amountPaid, setAmountPaid] = useState<number | "">("");
+    const [isSaving, setIsSaving] = useState(false);
+
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+    const toastTimerRef = useRef<number | null>(null);
+    const showToast = (message: string, type: "success" | "error" = "success") => {
+        setToast({ message, type });
+        if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = window.setTimeout(() => setToast(null), 3500);
+    };
+
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        type: "tambah" | "edit" | "hapus" | "batal";
+        onConfirm: () => void;
+    }>({ isOpen: false, title: "", message: "", type: "batal", onConfirm: () => { } });
+
+    const closeConfirmModal = () => setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+
+    const [noResep, setNoResep] = useState("");
+    const isObatKeras = (category: string) => category.toLowerCase().includes("keras") && !category.toLowerCase().includes("terbatas");
+    const cartHasObatKeras = cart.some((item) => item.isKeras);
 
     useEffect(() => {
-        setIsMounted(true);
-        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-        const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
-        setNoTrx(`TRX-${dateStr}-${randomNum}`);
-
-        const token = Cookies.get("apomacy_token");
-
-        if (token) {
-            try {
-                const decoded = jwtDecode<MyTokenPayload>(token);
-                if (decoded.id_user) {
-                    setCurrentUserId(decoded.id_user);
-                }
-            } catch (error) {
-                console.error("Gagal membedah token kasir", error);
-            }
-        }
-
         const fetchMasterData = async () => {
             setIsLoadingData(true);
-            try {
-                const [obatRes, custRes] = await Promise.all([
-                    api.get("/obat/").catch(() => ({ data: { data: [] } })),
-                    api.get("/customer/").catch(() => ({ data: { data: [] } }))
-                ]);
+            setMasterDataError(null);
 
+            const [obatResult, customerResult] = await Promise.allSettled([
+                api.get("/obat"),
+                api.get("/customer"),
+            ]);
+
+            setNoTrx(`TRX-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
+
+            try {
+                if (obatResult.status === "rejected") {
+                    throw new Error(getApiErrorMessage(obatResult.reason, "Gagal memuat data obat."));
+                }
+
+                const obatRes = obatResult.value;
                 const obatRaw = obatRes.data?.data || obatRes.data || [];
-                const mappedObat = obatRaw.map((o: any) => ({
+                const mappedObat = obatRaw.map((o: MedicineApiItem) => ({
                     id: o.id_obat || o.IDObat || o.id,
                     code: o.kode_obat || o.KodeObat,
                     name: o.nama_obat || o.NamaObat,
                     category: o.jenis_obat || o.JenisObat || "Umum",
-                    price: o.harga_jual || o.HargaJual || 0,
-                    stock: o.stok || o.Stok || 0,
+                    price: Number(o.harga_jual ?? o.HargaJual ?? 0),
+                    stock: Number(o.stok ?? o.Stok ?? 0),
                 }));
                 setMedicinesData(mappedObat);
 
-                const custRaw = custRes.data?.data || custRes.data || [];
-                const mappedCust = custRaw.map((c: any) => ({
-                    id: c.id_customer?.toString() || c.IDCustomer?.toString() || c.id?.toString(),
-                    name: c.nama_customer || c.NamaCustomer || c.nama || "Tanpa Nama",
-                    phone: c.no_telp || c.NoTelp || "-",
-                }));
-                setMembersData(mappedCust);
+                if (customerResult.status === "rejected") {
+                    throw new Error(getApiErrorMessage(customerResult.reason, "Gagal memuat data member."));
+                }
 
+                const custRes = customerResult.value;
+                const custRaw = custRes.data?.data || custRes.data || [];
+                const mappedCust = custRaw
+                    .map((c: CustomerApiItem) => ({
+                        id: String(c.id_customer ?? c.IDCustomer ?? c.id ?? ""),
+                        name: c.nama_customer || c.NamaCustomer || c.nama || "Tanpa Nama",
+                        phone: c.no_telp || c.NoTelp || "-",
+                    }))
+                    .filter((customer: Member) => /^\d+$/.test(customer.id));
+                setMembersData(mappedCust);
             } catch (error) {
                 console.error("Gagal mengambil data referensi:", error);
+                const message = getApiErrorMessage(error, "Gagal memuat data referensi transaksi.");
+                setMasterDataError(message);
+                showToast(message, "error");
             } finally {
                 setIsLoadingData(false);
                 if (medSearchInputRef.current) {
@@ -132,7 +179,7 @@ export default function TransaksiOfflinePage() {
         if (!selectedMed || qty < 1) return;
 
         if (qty > selectedMed.stock) {
-            alert(`Stok tidak mencukupi! Stok ${selectedMed.name} tersisa: ${selectedMed.stock}`);
+            showToast(`Stok tidak mencukupi! Stok ${selectedMed.name} tersisa: ${selectedMed.stock}`, "error");
             return;
         }
 
@@ -140,7 +187,7 @@ export default function TransaksiOfflinePage() {
         if (existingItem) {
             const newQty = existingItem.qty + qty;
             if (newQty > selectedMed.stock) {
-                alert(`Stok tidak mencukupi!`);
+                showToast(`Stok tidak mencukupi!`, "error");
                 return;
             }
             setCart(cart.map(item =>
@@ -155,7 +202,8 @@ export default function TransaksiOfflinePage() {
                 name: selectedMed.name,
                 price: selectedMed.price,
                 qty: qty,
-                subtotal: selectedMed.price * qty
+                subtotal: selectedMed.price * qty,
+                isKeras: isObatKeras(selectedMed.category)
             }]);
         }
 
@@ -182,32 +230,67 @@ export default function TransaksiOfflinePage() {
 
     const totalTagihan = cart.reduce((total, item) => total + item.subtotal, 0);
     const totalItem = cart.reduce((total, item) => total + item.qty, 0);
-    const kembalian = (typeof amountPaid === "number" ? amountPaid : 0) - totalTagihan;
+    const isCashless = paymentMethod === "QRIS" || paymentMethod === "Debit";
+    const effectiveAmountPaid = isCashless ? totalTagihan : amountPaid;
+    const kembalian = (typeof effectiveAmountPaid === "number" ? effectiveAmountPaid : 0) - totalTagihan;
 
-    // VALIDASI KETAT: Tombol bayar tidak bisa ditekan jika belum pilih member
-    const isPaymentValid = typeof amountPaid === "number" && amountPaid >= totalTagihan && cart.length > 0 && selectedMember !== null;
+    const handlePaymentMethodChange = (method: "Tunai" | "QRIS" | "Debit") => {
+        setPaymentMethod(method);
+        setAmountPaid("");
+    };
 
-    const handleCetakTransaksi = async () => {
+    // VALIDASI KETAT: Tombol bayar tidak bisa ditekan jika belum pilih member,
+    // atau jika ada obat keras tapi nomor resep belum diisi
+    const isPaymentValid = typeof effectiveAmountPaid === "number" && effectiveAmountPaid >= totalTagihan && cart.length > 0 && selectedMember !== null && totalTagihan > 0 && (!cartHasObatKeras || noResep.trim() !== "");
+
+    const handleCetakTransaksi = () => {
         if (!isPaymentValid) {
-            if (!selectedMember) alert("Silakan pilih Pelanggan (Member) terlebih dahulu!");
+            if (!selectedMember) showToast("Silakan pilih Pelanggan (Member) terlebih dahulu!", "error");
+            else if (cart.length === 0) showToast("Keranjang masih kosong!", "error");
+            else if (cartHasObatKeras && noResep.trim() === "") showToast("Keranjang berisi obat keras. No. Resep dokter wajib diisi!", "error");
+            else showToast("Nominal pembayaran belum mencukupi total tagihan!", "error");
             return;
         }
 
-        if (!currentUserId) {
-            alert("Sesi login tidak valid. Silakan login ulang untuk memproses transaksi.");
+        if (!Cookies.get("apomacy_token")) {
+            showToast("Sesi login tidak valid. Silakan login ulang untuk memproses transaksi.", "error");
+            return;
+        }
+
+        setConfirmModal({
+            isOpen: true,
+            title: "Konfirmasi Transaksi",
+            message: `Simpan transaksi ${noTrx} untuk ${selectedMember!.name} senilai ${formatRupiah(totalTagihan)} via ${paymentMethod}?`,
+            type: "tambah",
+            onConfirm: () => {
+                closeConfirmModal();
+                submitTransaksi();
+            },
+        });
+    };
+
+    const submitTransaksi = async () => {
+        if (isSaving || !selectedMember || cart.length === 0) return;
+
+        const customerId = Number(selectedMember.id);
+        if (!Number.isInteger(customerId) || customerId <= 0) {
+            showToast("ID member tidak valid. Muat ulang data member lalu pilih kembali.", "error");
             return;
         }
 
         // Struktur payload disesuaikan persis dengan Struct Golang model.Transaksi
         const payload = {
             no_transaksi: noTrx,
-            id_customer: parseInt(selectedMember!.id),
-            nama_customer: selectedMember!.name,
+            id_customer: customerId,
+            nama_customer: selectedMember.name,
             total_item: totalItem,
             subtotal: totalTagihan,
-            total_bayar: totalTagihan,
+            total_bayar: effectiveAmountPaid,
             metode_pembayaran: paymentMethod,
-            status: "Selesai", // Langsung selesai karena dibayar di kasir
+            status: "Selesai",         // Langsung selesai karena dibayar di kasir
+            status_pesanan: "Selesai", // Transaksi offline kasir langsung selesai di tempat
+            resep_required: cartHasObatKeras,
+            no_resep: cartHasObatKeras ? noResep.trim() : null,
             details: cart.map(c => ({
                 id_obat: c.id,
                 nama_obat: c.name,
@@ -218,21 +301,47 @@ export default function TransaksiOfflinePage() {
         };
 
         try {
+            setIsSaving(true);
             await api.post("/transaksi", payload);
 
-            alert(`Transaksi Berhasil Disimpan!\n\nNo Trx: ${noTrx}\nPelanggan: ${selectedMember!.name}\nTotal: ${formatRupiah(totalTagihan)}\nKembalian: ${formatRupiah(kembalian)}\n\n(Struk Sedang Dicetak...)`);
-            window.location.reload();
-        } catch (error: any) {
-            const errorMsg = error.response?.data?.error || error.message;
+            showToast(`Transaksi ${noTrx} berhasil disimpan. Struk sedang dicetak...`, "success");
+            setTimeout(() => window.location.reload(), 1200);
+        } catch (error: unknown) {
+            const errorMsg = getApiErrorMessage(error, "Gagal menyimpan transaksi.");
             console.error("Gagal menyimpan transaksi:", errorMsg);
-            alert(`Transaksi Gagal: ${errorMsg}`);
+            showToast(`Transaksi Gagal: ${errorMsg}`, "error");
+        } finally {
+            setIsSaving(false);
         }
     };
 
-    if (!isMounted) return null;
+    const handleBatalkanTransaksi = () => {
+        if (cart.length === 0 && !selectedMember) return;
+        setConfirmModal({
+            isOpen: true,
+            title: "Batalkan Transaksi",
+            message: "Keranjang dan data pelanggan yang sudah diisi akan dikosongkan. Lanjutkan?",
+            type: "batal",
+            onConfirm: () => {
+                setCart([]);
+                setAmountPaid("");
+                setSelectedMember(null);
+                setMemberSearch("");
+                setNoResep("");
+                closeConfirmModal();
+                showToast("Transaksi dibatalkan, keranjang dikosongkan.", "success");
+            },
+        });
+    };
 
     return (
         <div className="flex flex-col w-full h-[calc(100vh-40px)] relative">
+            {masterDataError && (
+                <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                    <span>{masterDataError}</span>
+                </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
 
                 {/* ================= PANEL KIRI: FORM INPUT ================= */}
@@ -342,6 +451,11 @@ export default function TransaksiOfflinePage() {
                                                     <p className="text-[10px] bg-gray-100 text-gray-600 inline-block px-2 rounded mt-1">
                                                         {med.code} | Stok: <span className={med.stock > 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{med.stock}</span>
                                                     </p>
+                                                    {isObatKeras(med.category) && (
+                                                        <p className="text-[9px] bg-red-100 text-red-600 font-bold inline-block px-2 py-0.5 rounded mt-1 ml-1 uppercase tracking-wide">
+                                                            Wajib Resep
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <p className="text-sm font-bold text-apomacy-teal font-mono">{formatRupiah(med.price)}</p>
                                             </li>
@@ -394,7 +508,7 @@ export default function TransaksiOfflinePage() {
                         <h3 className="font-bold text-apomacy-dark flex items-center gap-2">
                             <ShoppingCart size={18} className="text-apomacy-primary" /> Daftar Belanjaan
                         </h3>
-                        <span className="bg-apomacy-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full">{cart.length} Item</span>
+                        <span className="bg-apomacy-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">{cart.length} Item</span>
                     </div>
 
                     {/* Tabel Keranjang  */}
@@ -420,7 +534,12 @@ export default function TransaksiOfflinePage() {
                                     {cart.map((item) => (
                                         <tr key={item.id} className="hover:bg-white transition-colors">
                                             <td className="py-4">
-                                                <p className="font-bold text-sm text-gray-800">{item.name}</p>
+                                                <p className="font-bold text-sm text-gray-800 flex items-center gap-1.5">
+                                                    {item.name}
+                                                    {item.isKeras && (
+                                                        <span className="text-[8px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded uppercase tracking-wide">Resep</span>
+                                                    )}
+                                                </p>
                                                 <p className="text-[10px] font-mono text-gray-400 mt-0.5">{item.code}</p>
                                             </td>
                                             <td className="py-4 text-center text-xs font-mono text-gray-500">{formatRupiah(item.price)}</td>
@@ -438,12 +557,31 @@ export default function TransaksiOfflinePage() {
                         )}
                     </div>
 
+                    {/* Panel No. Resep Dokter — muncul jika ada Obat Keras di keranjang */}
+                    {cartHasObatKeras && (
+                        <div className="px-6 py-4 bg-red-50 border-t border-red-100 shrink-0">
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-red-600 mb-1.5 flex items-center gap-1.5">
+                                <AlertTriangle size={14} /> Wajib: No. Resep Dokter
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Masukkan nomor resep dari dokter..."
+                                value={noResep}
+                                onChange={(e) => setNoResep(e.target.value)}
+                                className={`w-full rounded-xl bg-white py-2.5 px-4 text-sm font-medium text-gray-800 border outline-none transition-all ${noResep.trim() === "" ? "border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500" : "border-gray-300 focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary"}`}
+                            />
+                            <p className="text-[10px] text-red-500 mt-1.5">
+                                Keranjang berisi obat golongan keras. Transaksi tidak dapat diproses tanpa nomor resep yang valid.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Area Checkout & Pembayaran */}
                     <div className="bg-white border-t border-gray-200 shrink-0">
-                        <div className="px-6 py-5 bg-apomacy-dark text-white flex justify-between items-center">
+                        <div className="px-6 py-5 bg-gradient-to-r from-apomacy-dark to-apomacy-dark/90 text-white flex justify-between items-center">
                             <div>
                                 <p className="text-xs text-gray-300 font-medium uppercase tracking-wider mb-1">Total Tagihan</p>
-                                <p className="text-[10px] opacity-70">Termasuk PPN jika ada</p>
+                                <p className="text-[10px] opacity-70">{totalItem} item dalam keranjang</p>
                             </div>
                             <h2 className="text-3xl font-bold font-mono text-apomacy-ice">{formatRupiah(totalTagihan)}</h2>
                         </div>
@@ -458,34 +596,46 @@ export default function TransaksiOfflinePage() {
                                             <button
                                                 key={method}
                                                 type="button"
-                                                onClick={() => setPaymentMethod(method)}
-                                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border transition-all ${paymentMethod === method ? "border-apomacy-primary bg-apomacy-primary/10 text-apomacy-primary" : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                                                onClick={() => handlePaymentMethodChange(method)}
+                                                className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold border transition-all ${paymentMethod === method ? "border-apomacy-primary bg-apomacy-primary/10 text-apomacy-primary shadow-sm" : "border-gray-200 text-gray-500 hover:bg-gray-50"
                                                     }`}
                                             >
-                                                {method === "Tunai" && <Banknote size={14} />}
-                                                {method === "QRIS" && <QrCode size={14} />}
-                                                {method === "Debit" && <CreditCard size={14} />}
-                                                {method}
+                                                <span className="flex items-center gap-1.5">
+                                                    {method === "Tunai" && <Banknote size={14} />}
+                                                    {method === "QRIS" && <QrCode size={14} />}
+                                                    {method === "Debit" && <CreditCard size={14} />}
+                                                    {method}
+                                                </span>
                                             </button>
                                         ))}
                                     </div>
+                                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">
+                                        {paymentMethod === "Tunai"
+                                            ? "Masukkan nominal uang yang diterima dari pelanggan."
+                                            : "Nominal otomatis pas dengan total tagihan — pastikan approval di mesin EDC/QRIS sudah berhasil sebelum mencetak."}
+                                    </p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5">Nominal Bayar (Rp)</label>
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2.5">
+                                        {isCashless ? "Nominal Dibayar (Otomatis)" : "Nominal Bayar (Rp)"}
+                                    </label>
                                     <input
                                         type="number"
                                         placeholder="Masukkan jumlah uang..."
-                                        value={amountPaid}
+                                        value={effectiveAmountPaid}
+                                        disabled={isCashless}
                                         onChange={(e) => setAmountPaid(e.target.value === "" ? "" : Number(e.target.value))}
-                                        className="w-full rounded-xl bg-white py-2.5 px-4 text-sm font-bold font-mono text-gray-800 border border-gray-300 outline-none focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary transition-all"
+                                        className={`w-full rounded-xl py-2.5 px-4 text-sm font-bold font-mono border outline-none transition-all ${isCashless ? "bg-gray-50 text-gray-500 border-gray-200 cursor-not-allowed" : "bg-white text-gray-800 border-gray-300 focus:border-apomacy-primary focus:ring-1 focus:ring-apomacy-primary"}`}
                                     />
 
-                                    <div className="flex gap-2 mt-2">
-                                        <button type="button" onClick={() => setAmountPaid(totalTagihan)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">Uang Pas</button>
-                                        <button type="button" onClick={() => setAmountPaid(50000)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">50.000</button>
-                                        <button type="button" onClick={() => setAmountPaid(100000)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">100.000</button>
-                                    </div>
+                                    {!isCashless && (
+                                        <div className="flex gap-2 mt-2">
+                                            <button type="button" onClick={() => setAmountPaid(totalTagihan)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">Uang Pas</button>
+                                            <button type="button" onClick={() => setAmountPaid(50000)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">50.000</button>
+                                            <button type="button" onClick={() => setAmountPaid(100000)} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded-lg border border-gray-200 transition-colors">100.000</button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -493,26 +643,32 @@ export default function TransaksiOfflinePage() {
                             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                                 <div>
                                     <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">Kembalian</p>
-                                    <h3 className={`text-xl font-bold font-mono ${kembalian < 0 ? "text-red-500" : "text-emerald-600"}`}>
-                                        {amountPaid === "" ? "Rp 0" : (kembalian < 0 ? "Kurang " + formatRupiah(Math.abs(kembalian)) : formatRupiah(kembalian))}
-                                    </h3>
+                                    {isCashless ? (
+                                        <h3 className="text-xl font-bold font-mono text-gray-400">Rp 0 <span className="text-[10px] font-sans font-normal">(Non-Tunai)</span></h3>
+                                    ) : (
+                                        <h3 className={`text-xl font-bold font-mono ${kembalian < 0 ? "text-red-500" : "text-emerald-600"}`}>
+                                            {amountPaid === "" ? "Rp 0" : (kembalian < 0 ? "Kurang " + formatRupiah(Math.abs(kembalian)) : formatRupiah(kembalian))}
+                                        </h3>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-3">
                                     <button
                                         type="button"
-                                        onClick={() => { setCart([]); setAmountPaid(""); setSelectedMember(null); setMemberSearch(""); }}
-                                        className="flex items-center gap-2 px-6 py-3 rounded-xl border border-gray-300 bg-white text-gray-600 text-sm font-bold hover:bg-gray-50 transition-colors"
+                                        onClick={handleBatalkanTransaksi}
+                                        disabled={isSaving}
+                                        className="flex items-center gap-2 px-6 py-3 rounded-xl border border-gray-300 bg-white text-gray-600 text-sm font-bold hover:bg-gray-50 transition-colors disabled:opacity-50"
                                     >
                                         <XCircle size={18} /> Batal
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handleCetakTransaksi}
-                                        disabled={!isPaymentValid}
-                                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-white text-sm font-bold shadow-md transition-all ${!isPaymentValid ? "bg-gray-400 cursor-not-allowed" : "bg-apomacy-primary hover:bg-apomacy-dark"}`}
+                                        disabled={!isPaymentValid || isSaving}
+                                        className={`flex items-center gap-2 px-8 py-3 rounded-xl text-white text-sm font-bold shadow-md transition-all ${(!isPaymentValid || isSaving) ? "bg-gray-400 cursor-not-allowed" : "bg-apomacy-primary hover:bg-apomacy-dark"}`}
                                     >
-                                        <Receipt size={18} /> Cetak & Simpan
+                                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Receipt size={18} />}
+                                        {isSaving ? "Menyimpan..." : "Cetak & Simpan"}
                                     </button>
                                 </div>
                             </div>
@@ -521,6 +677,16 @@ export default function TransaksiOfflinePage() {
 
                 </div>
             </div>
+
+            <Toast toast={toast} />
+            <ModalConfirm
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={closeConfirmModal}
+            />
         </div>
     );
 }

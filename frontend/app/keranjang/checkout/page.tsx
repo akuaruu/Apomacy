@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { formatRupiah } from "@/lib/Data";
 import { useCart } from "@/context/CartContext";
 import CheckoutButton from "@/components/client/CheckoutButton";
+import { isValidIndonesianPhone } from "@/lib/validation";
 
 const SHIPPING_COST = 15000;
 const FREE_SHIPPING_THRESHOLD = 150000;
@@ -14,6 +15,7 @@ const FREE_SHIPPING_THRESHOLD = 150000;
 export default function CheckoutPage() {
     const router = useRouter();
     const { cartItems, selectedIds, cartTotal } = useCart();
+    const profileEffectHandledRef = useRef(false);
     const [method, setMethod] = useState<"delivery" | "pickup">("delivery");
     const [payment, setPayment] = useState("qris");
 
@@ -30,6 +32,9 @@ export default function CheckoutPage() {
 
     // ── Auth guard: redirect ke login jika belum punya token ─────────────────
     useEffect(() => {
+        if (profileEffectHandledRef.current) return;
+        profileEffectHandledRef.current = true;
+
         const token = Cookies.get("apomacy_token");
         if (!token) {
             router.replace("/login?redirect=/checkout");
@@ -114,13 +119,13 @@ export default function CheckoutPage() {
         if (method === 'delivery') {
             // Validasi khusus untuk pesan antar
             if (!formData.name.trim()) newErrors.name = "Nama penerima wajib diisi";
-            if (!formData.phone.trim()) newErrors.phone = "Nomor handphone wajib diisi";
+            if (!isValidIndonesianPhone(formData.phone)) newErrors.phone = "Nomor handphone tidak valid";
             if (!formData.address.trim()) newErrors.address = "Alamat pengiriman wajib diisi";
 
         } else if (method === 'pickup') {
             // Validasi khusus untuk ambil sendiri
             if (!formData.pickupName.trim()) newErrors.pickupName = "Nama pengambil wajib diisi";
-            if (!formData.pickupPhone.trim()) newErrors.pickupPhone = "Nomor telepon pengambil wajib diisi";
+            if (!isValidIndonesianPhone(formData.pickupPhone)) newErrors.pickupPhone = "Nomor telepon pengambil tidak valid";
         }
 
         setErrors(newErrors);

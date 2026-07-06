@@ -22,10 +22,9 @@ const NAV_ITEMS = [
   { label: "Data Obat", icon: <Pill size={18} />, href: "/admin/data-obat" },
   { label: "Restock", icon: <RefreshCcw size={18} />, href: "/admin/restock" },
   { label: "Supplier", icon: <Truck size={18} />, href: "/admin/supplier" },
-  { label: "Member", icon: <Users size={18} />, href: "/admin/member" },
+  { label: "Customer", icon: <Users size={18} />, href: "/admin/member" },
   { label: "Karyawan", icon: <UserCheck size={18} />, href: "/admin/karyawan" },
   { label: "Transaksi", icon: <Receipt size={18} />, href: "/admin/transaksi" },
-  { label: "Laporan", icon: <BarChart2 size={18} />, href: "/admin/laporan" },
 ];
 
 interface SidebarProps {
@@ -37,7 +36,8 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
 
   const handleLogout = () => {
-    Cookies.remove("apomacy_token");
+    Cookies.remove("apomacy_token", { path: "/" });
+    Cookies.remove("apomacy_role", { path: "/" });
     window.location.href = "/";
   };
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -68,13 +69,13 @@ func (h *MigrationHandler) RunImageMigration(c *gin.Context) {
 		resp, err := clientDL.Do(reqDL)
 
 		if err != nil {
-			fmt.Printf("❌ [%s] GAGAL DOWNLOAD (Timeout/Error): %v\n", kodeObat, err)
+			slog.ErrorContext(c.Request.Context(), "image migration download failed", "medicine_code", kodeObat, "error", err, "request_id", requestID(c))
 			failedList = append(failedList, fmt.Sprintf("%s (Gagal Request DL)", kodeObat))
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("❌ [%s] DITOLAK WEBSITE SUMBER! Status: %d | URL: %s\n", kodeObat, resp.StatusCode, oldURL)
+			slog.WarnContext(c.Request.Context(), "image migration source rejected request", "medicine_code", kodeObat, "status", resp.StatusCode, "request_id", requestID(c))
 			failedList = append(failedList, fmt.Sprintf("%s (Ditolak Web: %d)", kodeObat, resp.StatusCode))
 			resp.Body.Close()
 			continue
@@ -82,7 +83,7 @@ func (h *MigrationHandler) RunImageMigration(c *gin.Context) {
 
 		imageBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		fmt.Printf("✅ [%s] Berhasil download dari sumber asli.\n", kodeObat)
+		slog.DebugContext(c.Request.Context(), "image migration download completed", "medicine_code", kodeObat, "request_id", requestID(c))
 
 		// ---------------------------------------------------------
 		// TAHAP 2: UPLOAD KE SUPABASE
@@ -98,16 +99,17 @@ func (h *MigrationHandler) RunImageMigration(c *gin.Context) {
 		upResp, upErr := clientUP.Do(reqUP)
 
 		if upErr != nil || upResp.StatusCode >= 400 {
-			errorBody, _ := io.ReadAll(upResp.Body)
-			fmt.Printf("❌ [%s] GAGAL UPLOAD SUPABASE! Status: %d | Response: %s\n", kodeObat, upResp.StatusCode, string(errorBody))
-			failedList = append(failedList, fmt.Sprintf("%s (Gagal Upload Supabase: %d)", kodeObat, upResp.StatusCode))
+			status := 0
 			if upResp != nil {
+				status = upResp.StatusCode
 				upResp.Body.Close()
 			}
+			slog.ErrorContext(c.Request.Context(), "image migration upload failed", "medicine_code", kodeObat, "status", status, "error", upErr, "request_id", requestID(c))
+			failedList = append(failedList, fmt.Sprintf("%s (Gagal Upload Supabase: %d)", kodeObat, status))
 			continue
 		}
 		upResp.Body.Close()
-		fmt.Printf("✅ [%s] Berhasil upload ke Supabase.\n", kodeObat)
+		slog.DebugContext(c.Request.Context(), "image migration upload completed", "medicine_code", kodeObat, "request_id", requestID(c))
 
 		// ---------------------------------------------------------
 		// TAHAP 3: UPDATE DATABASE
@@ -116,12 +118,12 @@ func (h *MigrationHandler) RunImageMigration(c *gin.Context) {
 		_, dbErr := h.db.Exec(ctx, `UPDATE obat SET gambar_produk = $1 WHERE id_obat = $2`, newPublicURL, idObat)
 
 		if dbErr != nil {
-			fmt.Printf("❌ [%s] GAGAL UPDATE DB! Error: %v\n", kodeObat, dbErr)
+			slog.ErrorContext(c.Request.Context(), "image migration database update failed", "medicine_code", kodeObat, "error", dbErr, "request_id", requestID(c))
 			failedList = append(failedList, fmt.Sprintf("%s (Gagal Update DB)", kodeObat))
 			continue
 		}
 
-		fmt.Printf("🚀 [%s] MIGRASI SELESAI!\n-------------------------\n", kodeObat)
+		slog.InfoContext(c.Request.Context(), "image migration item completed", "medicine_code", kodeObat, "request_id", requestID(c))
 		migratedCount++
 	}
 

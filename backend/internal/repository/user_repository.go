@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type userRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
-func NewUserRepository(db *pgxpool.Pool) model.UserRepository {
+func NewUserRepository(db DBTx) model.UserRepository {
 	return &userRepository{db: db}
 }
 
@@ -121,12 +120,105 @@ func (r *userRepository) GetProfile(ctx context.Context, id int) (*model.UserPro
 	return &profile, nil
 }
 
-func (r *userRepository) UpdateProfileText(ctx context.Context, userID int, nama string, noTelp string, tglLahir string, alamat string) error {
-	query := `
-		UPDATE "user" 
-		SET nama_lengkap = $1, no_telp = $2, tanggal_lahir = $3, alamat = $4 
+func (r *userRepository) UpdateProfileText(
+	ctx context.Context,
+	userID int,
+	nama string,
+	noTelp string,
+	tglLahir string,
+	alamat string,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE public."user"
+		SET
+			nama_lengkap = $1,
+			no_telp = $2
+		WHERE id_user = $3
+	`, nama, noTelp, userID)
+
+	if err != nil {
+		return fmt.Errorf("gagal memperbarui data user: %v", err)
+	}
+
+	result, err := r.db.Exec(ctx, `
+		UPDATE public.customer
+		SET
+			nama_customer = $1,
+			no_telp = $2,
+			alamat = $3,
+			tanggal_lahir = CASE
+				WHEN $4 = '' THEN tanggal_lahir
+				ELSE $4::date
+			END
 		WHERE id_user = $5
+	`, nama, noTelp, alamat, tglLahir, userID)
+
+	if err != nil {
+		return fmt.Errorf("gagal memperbarui data customer: %v", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("data customer untuk user %d belum tersedia", userID)
+	}
+
+	return nil
+}
+
+func (r *userRepository) GetAllStaff(ctx context.Context) ([]model.User, error) {
+	query := `
+		SELECT id_user, username, nama_lengkap, role, no_telp, email, status, created_at, last_login
+		FROM "user"
+		WHERE role IN ('Admin', 'Kasir')
+		ORDER BY id_user ASC
 	`
-	_, err := r.db.Exec(ctx, query, nama, noTelp, tglLahir, alamat, userID)
-	return err
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("gagal mengambil data staff: %v", err)
+	}
+	defer rows.Close()
+
+	var users []model.User
+	for rows.Next() {
+		var u model.User
+		err := rows.Scan(
+			&u.ID, &u.Username, &u.NamaLengkap,
+			&u.Role, &u.NoTelp, &u.Email, &u.Status, &u.CreatedAt, &u.LastLogin,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("gagal membaca data staff: %v", err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+func (r *userRepository) Delete(ctx context.Context, id int) error {
+	query := `DELETE FROM "user" WHERE id_user = $1`
+	result, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("gagal menghapus user: %v", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user dengan ID %d tidak ditemukan", id)
+	}
+	return nil
+}
+
+func (r *userRepository) UpdateByAdmin(ctx context.Context, user *model.User) error {
+	query := `
+		UPDATE "user"
+		SET nama_lengkap = $1, no_telp = $2, email = $3, role = $4, status = $5
+		WHERE id_user = $6
+	`
+	result, err := r.db.Exec(ctx, query,
+		user.NamaLengkap, user.NoTelp, user.Email, user.Role, user.Status, user.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("gagal memperbarui data staff: %v", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user dengan ID %d tidak ditemukan", user.ID)
+	}
+	return nil
 }

@@ -5,7 +5,10 @@ import { Eye, EyeOff, Lock, Mail, ShieldCheck, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode"; // Tambahan baru untuk membedah token
+import { jwtDecode } from "jwt-decode";
+import { useRouter } from "next/navigation";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -15,57 +18,68 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!isValidEmail(email)) {
+      setError("Masukkan alamat email yang valid.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // 1. Kirim request ke backend (perhatikan endpoint-nya, sesuaikan dengan router.go milikmu)
       const response = await api.post("/users/login", {
-        username: email, // Backend meminta "username", kita kirim state "email"
-        password: password,
+        username: normalizeEmail(email),
+        password,
       });
 
-      // 2. Tangkap respons dari backend
-      const { token } = response.data;
+      const token = response.data?.token;
 
-      if (token) {
-        // 3. Simpan token di Cookies
-        Cookies.set("apomacy_token", token, { expires: 1 });
-
-        // 4. Bedah Token JWT untuk mengambil "role"
-        // Sesuaikan interface dengan MapClaims yang ada di backend Go
-        interface MyTokenPayload {
-          id_user: number;
-          role: string;
-          exp: number;
-        }
-
-        const decoded = jwtDecode<MyTokenPayload>(token);
-        const userRole = decoded.role;
-
-        setSuccess("Login berhasil! Mengalihkan...");
-
-        // 5. Redirect berdasarkan role yang ada di dalam Token
-        setTimeout(() => {
-          if (userRole === "Admin") {
-            window.location.href = "/admin";
-          } else if (userRole === "Kasir") {
-            window.location.href = "/kasir";
-          } else {
-            window.location.href = "/katalog"; // Halaman default untuk user biasa
-          }
-        }, 1500);
+      if (!token) {
+        throw new Error("Token tidak ditemukan pada respons login.");
       }
 
-    } catch (err: any) {
-      console.error("Login Error:", err);
-      // Tangkap pesan error spesifik dari backend (seperti "username atau password salah")
-      const msg = err.response?.data?.error || "Gagal masuk. Silakan periksa kembali kredensial Anda.";
-      setError(msg);
+      const decoded = jwtDecode<{ role?: string }>(token);
+      const normalizedRole = decoded.role?.trim().toLowerCase();
+
+      const userRole =
+        normalizedRole === "admin" || normalizedRole === "kasir"
+          ? normalizedRole
+          : "member";
+
+      Cookies.remove("apomacy_token", { path: "/" });
+      Cookies.remove("apomacy_role", { path: "/" });
+
+      Cookies.set("apomacy_token", token, {
+        expires: 1,
+        path: "/",
+        sameSite: "lax",
+      });
+
+      Cookies.set("apomacy_role", userRole, {
+        expires: 1,
+        path: "/",
+        sameSite: "lax",
+      });
+
+      setSuccess("Login berhasil! Mengalihkan...");
+
+      if (userRole === "admin") {
+        router.replace("/admin");
+      } else if (userRole === "kasir") {
+        router.replace("/kasir");
+      } else {
+        router.replace("/katalog");
+      }
+
+      router.refresh();
+    } catch (err: unknown) {
+      setError(getUserFriendlyError(err, "Gagal masuk. Periksa kembali email dan kata sandi Anda."));
     } finally {
       setIsLoading(false);
     }
@@ -114,17 +128,18 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-6 flex-grow">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email / Username</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Alamat Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                   <Mail size={18} />
                 </div>
                 <input
-                  type="text"
+                  type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin_apomacy"
+                  placeholder="example@gmail.com"
                   className="w-full pl-11 pr-4 py-3.5 bg-[#f8faff] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 transition-all text-sm"
                 />
               </div>
@@ -138,6 +153,7 @@ export default function LoginPage() {
                 </div>
                 <input
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

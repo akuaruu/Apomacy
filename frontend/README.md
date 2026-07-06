@@ -1,6 +1,6 @@
 # Apomacy — Frontend
 
-Layanan frontend untuk platform Apomacy. Dibangun dengan **Next.js 15** (App Router) dan **TypeScript**, menggunakan **Tailwind CSS v4** untuk styling yang modern dan responsif.
+Layanan frontend untuk platform Apomacy. Dibangun dengan **Next.js 16.2.6** (App Router), **React 19**, dan **TypeScript**, menggunakan **Tailwind CSS v4**.
 
 ---
 
@@ -20,7 +20,8 @@ Layanan frontend untuk platform Apomacy. Dibangun dengan **Next.js 15** (App Rou
 
 | Komponen | Teknologi |
 |----------|-----------|
-| **Framework** | Next.js 15+ (App Router) |
+| **Framework** | Next.js 16.2.6 (App Router) |
+| **UI Runtime** | React 19 |
 | **Language** | TypeScript |
 | **Styling** | Tailwind CSS v4 (configuration-less) |
 | **HTTP Client** | Axios |
@@ -30,7 +31,7 @@ Layanan frontend untuk platform Apomacy. Dibangun dengan **Next.js 15** (App Rou
 
 ## ✅ Prerequisites
 
-- **Node.js** versi 18.0 atau lebih baru → [Download Node.js](https://nodejs.org/)
+- **Node.js** versi yang kompatibel dengan Next.js 16 → [Download Node.js](https://nodejs.org/)
 - **npm** versi 9.0+ (sudah termasuk dalam instalasi Node.js)
 - Backend API Apomacy yang sudah berjalan → lihat [backend/README.md](../backend/README.md)
 
@@ -40,31 +41,22 @@ Layanan frontend untuk platform Apomacy. Dibangun dengan **Next.js 15** (App Rou
 
 ```
 frontend/
-├── src/
-│   ├── app/                      # Routing & halaman (Next.js App Router)
-│   │   ├── (auth)/               # Route group: halaman autentikasi
-│   │   │   ├── login/
-│   │   │   └── register/
-│   │   ├── dashboard/            # Halaman dasbor pasien
-│   │   ├── katalog/              # Halaman katalog & detail obat
-│   │   │   └── [id]/             # Dynamic route: detail obat
-│   │   ├── checkout/             # Halaman keranjang & proses checkout
-│   │   ├── globals.css           # Gaya global (Tailwind v4 theme config)
-│   │   ├── layout.tsx            # Root layout
-│   │   └── page.tsx              # Halaman landing (/)
-│   │
-│   ├── components/               # Komponen UI yang dapat digunakan ulang
-│   │   ├── ui/                   # Komponen dasar (Button, Input, Modal, Card)
-│   │   └── shared/               # Komponen global (Navbar, Footer, Sidebar)
-│   │
-│   ├── lib/                      # Logika & utilitas murni (non-UI)
-│   │   ├── api.ts                # Konfigurasi Axios instance & fungsi API call
-│   │   └── utils.ts              # Fungsi helper (format Rupiah, format tanggal, dll)
-│   │
-│   └── types/                    # Definisi interface & type TypeScript
-│       └── index.ts              # Export semua types
-│
-├── public/                       # Aset statis (gambar, icon, font)
+├── app/                          # Routing & halaman Next.js App Router
+│   ├── admin/                    # Dasbor dan operasional admin
+│   ├── kasir/                    # Dasbor dan operasional kasir
+│   ├── dasbor/                   # Dasbor member, profil, FAQ, riwayat
+│   ├── katalog/                  # Katalog dan detail produk `[id]`
+│   ├── keranjang/                # Keranjang dan checkout
+│   ├── pembayaran/               # Status pembayaran sukses/pending
+│   ├── login/ dan register/      # Autentikasi
+│   ├── globals.css               # Gaya global dan tema Tailwind
+│   ├── layout.tsx                # Root layout
+│   └── page.tsx                  # Landing page
+├── components/                   # Komponen admin, kasir, client, shared, dan UI
+├── context/                      # Context aplikasi, termasuk keranjang
+├── lib/                          # Axios instance dan helper data
+├── public/                       # Aset statis
+├── middleware.ts                # Proteksi dan redirect route berbasis role
 ├── next.config.ts                # Konfigurasi Next.js
 ├── package.json                  # Dependensi & npm scripts
 └── tsconfig.json                 # Konfigurasi TypeScript
@@ -74,17 +66,14 @@ frontend/
 
 ## ⚙️ Environment Configuration
 
-Buat file `.env.local` di root direktori `frontend/` berdasarkan `.env.example`:
+Buat file `.env.local` di root direktori `frontend/`:
 
 ```env
-# ── Backend API ───────────────────────────────────────────────
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
-
 # ── Midtrans (Client Key untuk Snap.js) ───────────────────────
 NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=
 ```
 
-> ⚠️ Variabel yang diawali `NEXT_PUBLIC_` akan ter-expose ke browser. Jangan pernah menyimpan secret key di variabel ini — hanya untuk nilai yang aman diakses publik.
+> Axios saat ini memanggil path relatif `/api`, yang diteruskan ke backend melalui `rewrites()` di `next.config.ts`. Sesuaikan destination rewrite untuk environment lokal atau deployment. Variabel yang diawali `NEXT_PUBLIC_` terekspos ke browser; jangan menyimpan secret key di sana.
 
 ---
 
@@ -99,8 +88,8 @@ cd frontend
 ### 2. Salin dan konfigurasi environment
 
 ```bash
-cp .env.example .env.local
-# Edit NEXT_PUBLIC_API_BASE_URL sesuai URL backend kamu
+touch .env.local
+# Isi NEXT_PUBLIC_MIDTRANS_CLIENT_KEY dan konfigurasi publik lain yang diperlukan
 ```
 
 ### 3. Install dependensi
@@ -125,7 +114,6 @@ Aplikasi akan berjalan di **`http://localhost:3000`**.
 | Build | `npm run build` | Build untuk production |
 | Start | `npm start` | Jalankan hasil build production |
 | Lint | `npm run lint` | Cek kode dengan ESLint |
-| Type Check | `npm run type-check` | Validasi TypeScript tanpa build |
 
 ---
 
@@ -138,8 +126,15 @@ Aplikasi akan berjalan di **`http://localhost:3000`**.
 | `/register` | Halaman registrasi | Publik (redirect jika sudah login) |
 | `/katalog` | Katalog obat | Publik |
 | `/katalog/[id]` | Detail produk obat | Publik |
-| `/checkout` | Keranjang & checkout | Login diperlukan |
-| `/dashboard` | Dasbor pasien (riwayat, profil) | Login diperlukan |
+| `/keranjang` | Keranjang belanja | Login diperlukan |
+| `/keranjang/checkout` | Informasi pengiriman dan pembayaran | Login diperlukan |
+| `/pembayaran/sukses` | Hasil pembayaran berhasil | Login diperlukan |
+| `/pembayaran/pending` | Status/instruksi pembayaran tertunda | Login diperlukan |
+| `/dasbor` | Dasbor member | Login diperlukan |
+| `/dasbor/profil` | Profil member | Login diperlukan |
+| `/dasbor/riwayat-obat` | Riwayat transaksi member | Login diperlukan |
+| `/admin/*` | Operasional admin | Role Admin |
+| `/kasir/*` | Operasional kasir | Role Kasir |
 
 ---
 
@@ -158,12 +153,12 @@ Aplikasi akan berjalan di **`http://localhost:3000`**.
 
 ### API Call
 
-Semua pemanggilan API dilakukan melalui fungsi-fungsi yang terdefinisi di `src/lib/api.ts`. Jangan memanggil URL API secara langsung di komponen — gunakan fungsi wrapper yang sudah ada.
+Pemanggilan API utama menggunakan Axios instance di `lib/api.ts`. Instance tersebut memakai base URL `/api` dan menambahkan JWT dari cookie `apomacy_token` melalui request interceptor.
 
 ```typescript
 // ✅ Benar
-import { getObatList } from '@/lib/api';
-const data = await getObatList();
+import api from '@/lib/api';
+const { data } = await api.get('/obat');
 
 // ❌ Hindari
 const data = await axios.get('http://localhost:8080/api/obat');

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/middleware"
@@ -15,9 +16,9 @@ import (
 func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery(), middleware.RequestLogger(slog.Default()))
 
-	// 1. CORS Middleware
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:3000",
@@ -30,18 +31,18 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// 2. Dependency Injection
 	userRepo := repository.NewUserRepository(dbPool)
-	userUsecase := usecase.NewUserUsecase(userRepo)
+	customerRepo := repository.NewCustomerRepository(dbPool)
+
+	userUsecase := usecase.NewUserUsecase(userRepo, customerRepo)
 	userHandler := NewUserHandler(userUsecase)
+
+	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
+	customerHandler := NewCustomerHandler(customerUsecase)
 
 	obatRepo := repository.NewObatRepository(dbPool)
 	obatUsecase := usecase.NewObatUsecase(obatRepo)
 	obatHandler := NewObatHandler(obatUsecase)
-
-	customerRepo := repository.NewCustomerRepository(dbPool)
-	customerUsecase := usecase.NewCustomerUsecase(customerRepo)
-	customerHandler := NewCustomerHandler(customerUsecase)
 
 	restockRepo := repository.NewRestockRepository(dbPool)
 	restockUsecase := usecase.NewRestockUsecase(restockRepo)
@@ -60,23 +61,19 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 	migrationHandler := NewMigrationHandler(dbPool)
 
-	// 3. Routing
 	api := r.Group("/api")
 	{
-		// --- AREA PUBLIK (Tanpa Middleware Auth) ---
-		// Bebas diakses siapa saja untuk mendaftar atau mengambil token
 		publicUsers := api.Group("/users")
 		{
 			publicUsers.POST("/register", userHandler.Register)
 			publicUsers.POST("/login", userHandler.Login)
 		}
 
-		// -AREA PRIVAT (Wajib Login/Bawa Token)
 		protectedUsers := api.Group("/users")
 		protectedUsers.Use(middleware.RequireAuth())
 		{
 			protectedUsers.PUT("/foto", userHandler.UploadFotoProfil)
-			protectedUsers.PUT("/profile", userHandler.Register)
+			protectedUsers.PUT("/profile", userHandler.UpdateProfile)
 			protectedUsers.GET("/profile", userHandler.GetProfile)
 		}
 
@@ -96,6 +93,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
 			customer.DELETE("/:id", customerHandler.DeleteCustomer)
+
 		}
 
 		supplier := api.Group("/supplier")
@@ -107,28 +105,42 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
 		}
 
+		// Endpoint yang boleh diakses semua role terautentikasi (customer, kasir, admin)
 		transaksi := api.Group("/transaksi")
 		transaksi.Use(middleware.RequireAuth())
 		{
 			transaksi.POST("", transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
-			transaksi.PUT("/:id/batal", transaksiHandler.Batalkan)
-
-			transaksi.PATCH("/:id/status-pesanan", transaksiHandler.UpdateStatusPesanan)
 			transaksi.GET("", transaksiHandler.GetRiwayatUser)
-			transaksi.GET("/all", transaksiHandler.GetAll)
+		}
+
+		// Endpoint khusus staff (kasir/admin) untuk operasional toko
+		transaksiStaff := api.Group("/transaksi")
+		transaksiStaff.Use(middleware.RequireAuth(), middleware.RequireRole("Kasir", "Admin"))
+		{
+			transaksiStaff.PUT("/:id/batal", transaksiHandler.Batalkan)
+			transaksiStaff.PATCH("/:id/status-pesanan", transaksiHandler.UpdateStatusPesanan)
+			transaksiStaff.GET("/all", transaksiHandler.GetAll)
 		}
 
 		payment := api.Group("/checkout")
 		{
 			payment.POST("", paymentHandler.Checkout)
-			// Endpoint untuk menerima notifikasi dari Midtrans
 			payment.POST("/notification", paymentHandler.WebhookNotification)
 		}
-
 		api.POST("/restock", restockHandler.CreateRestock)
 		api.GET("/migrate-images", migrationHandler.RunImageMigration)
+
+		// Endpoint khusus Admin untuk manajemen karyawan (staff)
+		adminUsers := api.Group("/users")
+		adminUsers.Use(middleware.RequireAuth(), middleware.RequireRole("Admin"))
+		{
+			adminUsers.GET("/staff", userHandler.GetAllStaff)
+			adminUsers.PUT("/staff/:id", userHandler.UpdateUserByAdmin)
+			adminUsers.DELETE("/staff/:id", userHandler.DeleteUser)
+		}
 	}
 
 	return r
+
 }

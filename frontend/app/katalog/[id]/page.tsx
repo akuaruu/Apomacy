@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { formatRupiah } from "@/lib/Data";
 import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
 import api from "@/lib/api";
+import Cookies from "js-cookie";
 
 interface ProductDetail {
     id: string;
@@ -40,23 +41,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     };
 
     const handleAddToCart_related = (relProduct: ExtendedProduct) => {
-        if (relProduct) {
-            setQuantity(1)
-
-            addToCart(relProduct as any);
+        if (!Cookies.get("apomacy_token")) {
+            window.dispatchEvent(new Event("openLoginModal"));
+            return;
         }
 
-    }
-
-    const handleAddToCart = (product: ExtendedProduct) => {
-
-        if (product) {
-            for (let i = 0; i < quantity; i++) {
-                addToCart(product as any);
-            }
-        }
+        setQuantity(1);
+        addToCart(relProduct as any);
     };
 
+    const handleAddToCart = (product: ExtendedProduct) => {
+        if (!Cookies.get("apomacy_token")) {
+            window.dispatchEvent(new Event("openLoginModal"));
+            return;
+        }
+
+        for (let i = 0; i < quantity; i++) {
+            addToCart(product as any);
+        }
+    };
 
     useEffect(() => {
         const fetchProduct = async () => {

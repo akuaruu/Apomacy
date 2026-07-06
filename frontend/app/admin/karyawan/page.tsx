@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import axios from "axios";
-import { 
-    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, Briefcase,
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+    Search, Plus, Edit2, Trash2, Save, XCircle, Loader2, Briefcase, KeyRound,
+    RefreshCw, ShieldCheck, AlertTriangle, Mail
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import api from "@/lib/api";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode";
+import { getErrorStatus, getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, isValidIndonesianPhone, normalizeEmail, normalizePhone } from "@/lib/validation";
 
 interface Karyawan {
     id: number;
@@ -13,90 +18,108 @@ interface Karyawan {
     role: string;
     phone: string;
     email: string;
-    address: string;
     status: string;
-    joinDate: string;
 }
 
-// ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
+interface StaffApiItem {
+    id_user: number;
+    nama_lengkap: string;
+    role: string;
+    no_telp?: string;
+    email: string;
+    status?: string;
+}
+
+interface TokenPayload {
+    id_user?: number;
+    role?: string;
+    Role?: string;
+}
+
 export default function KaryawanPage() {
     const [employees, setEmployees] = useState<Karyawan[]>([]);
-    const [filteredEmployees, setFilteredEmployees] = useState<Karyawan[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedEmp, setSelectedEmp] = useState<Karyawan | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
+    const [isSaving, setIsSaving] = useState(false);
 
     const [confirmModal, setConfirmModal] = useState<{
-        isOpen: boolean;
-        type: "tambah" | "edit" | "hapus";
-        title: string;
-        message: string;
-        action: () => void;
-    }>({
-        isOpen: false,
-        type: "tambah",
-        title: "",
-        message: "",
-        action: () => {},
-    });
+        isOpen: boolean; type: "tambah" | "edit" | "hapus"; title: string; message: string; action: () => void;
+    }>({ isOpen: false, type: "tambah", title: "", message: "", action: () => {} });
 
     const [formData, setFormData] = useState({
-        id: "", name: "", role: "Apoteker", phone: "", email: "", address: "", status: "Aktif"
+        password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif"
     });
 
-    useEffect(() => {
-        const fetchEmployees = async () => {
-            try {
-                setLoading(true);
-                const response = await axios.get("https://jsonplaceholder.typicode.com/users");
-                const rawData = [...response.data, ...response.data];
-                const mappedData = rawData.map((user: any, index: number) => ({
-                    id: index + 1,
-                    name: user.name,
-                    role: index % 3 === 0 ? "Apoteker" : index % 3 === 1 ? "Asisten Apoteker" : "Kasir",
-                    phone: user.phone.split(" ")[0],
-                    email: user.email.toLowerCase(),
-                    address: `${user.address.city}, ${user.address.street}`,
-                    status: index % 4 === 0 ? "Cuti" : "Aktif",
-                    joinDate: "2025-08-12"
-                }));
-                setEmployees(mappedData);
-                setFilteredEmployees(mappedData);
-                if (mappedData.length > 0) initSelectEmployee(mappedData[0]);
-            } catch (error) {
-                console.error("Gagal memuat data karyawan:", error);
-            } finally {
-                setLoading(false);
+    // Fetch data karyawan dari backend
+    const fetchEmployees = useCallback(async () => {
+        await Promise.resolve();
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await api.get('/users/staff');
+            const rawData: StaffApiItem[] = Array.isArray(response.data?.data)
+                ? response.data.data
+                : [];
+
+            const mappedData: Karyawan[] = rawData.map((item) => ({
+                id: item.id_user,
+                name: item.nama_lengkap,
+                role: item.role,
+                phone: item.no_telp || "-",
+                email: item.email || "-",
+                status: item.status || "Aktif"
+            }));
+
+            setEmployees(mappedData);
+        } catch (err: unknown) {
+            const status = getErrorStatus(err);
+            if (status === 403 || status === 401) {
+                setError("Anda tidak memiliki akses ke halaman ini.");
+            } else {
+                setError(getUserFriendlyError(err, "Gagal memuat data karyawan."));
             }
-        };
-        fetchEmployees();
+            console.error("Gagal mengambil data karyawan:", err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
-        const query = searchQuery.toLowerCase();
-        const filtered = employees.filter(emp =>
-            emp.name.toLowerCase().includes(query) ||
-            emp.role.toLowerCase().includes(query)
+        const timer = window.setTimeout(() => {
+            void fetchEmployees();
+        }, 0);
+
+        return () => window.clearTimeout(timer);
+    }, [fetchEmployees]);
+
+    const filteredEmployees = useMemo(() => {
+        const q = searchQuery.toLowerCase();
+        return employees.filter(emp =>
+            emp.name.toLowerCase().includes(q) ||
+            emp.role.toLowerCase().includes(q) ||
+            emp.email.toLowerCase().includes(q)
         );
-        setFilteredEmployees(filtered);
-    }, [searchQuery, employees]);
+    }, [employees, searchQuery]);
 
     const initSelectEmployee = (emp: Karyawan) => {
         setSelectedEmp(emp);
         setMode("view");
         setFormData({
-            id: `KRY-${String(emp.id).padStart(3, '0')}`,
-            name: emp.name, role: emp.role, phone: emp.phone,
-            email: emp.email, address: emp.address, status: emp.status
+            password: "",
+            name: emp.name, role: emp.role, phone: emp.phone, email: emp.email, status: emp.status
         });
     };
 
     const handleAddClick = () => {
         setMode("add");
         setSelectedEmp(null);
-        const nextId = employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1;
-        setFormData({ id: `KRY-${String(nextId).padStart(3, '0')}`, name: "", role: "Kasir", phone: "", email: "", address: "", status: "Aktif" });
+        setFormData({
+            password: "",
+            name: "", role: "Kasir", phone: "", email: "", status: "Aktif"
+        });
     };
 
     const handleEditClick = () => { if (selectedEmp) setMode("edit"); };
@@ -104,187 +127,337 @@ export default function KaryawanPage() {
     const handleCancelClick = () => {
         setMode("view");
         if (selectedEmp) initSelectEmployee(selectedEmp);
-        else if (employees.length > 0) initSelectEmployee(employees[0]);
+        else {
+            setSelectedEmp(null);
+            setFormData({ password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif" });
+        }
     };
 
     const handleDeleteClick = () => {
         if (!selectedEmp) return;
+
+        const token = Cookies.get("apomacy_token");
+        const currentUserId = token
+            ? jwtDecode<TokenPayload>(token).id_user
+            : undefined;
+        if (currentUserId === selectedEmp.id) {
+            alert("Akun admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.");
+            return;
+        }
+
         setConfirmModal({
-            isOpen: true,
-            type: "hapus",
-            title: "Hapus Data Karyawan",
-            message: `Data karyawan "${selectedEmp.name}" akan dihapus secara permanen dari sistem. Tindakan ini tidak dapat dibatalkan.`,
-            action: () => {
-                const updated = employees.filter(e => e.id !== selectedEmp.id);
-                setEmployees(updated);
-                setSelectedEmp(null);
-                setMode("view");
-                if (updated.length > 0) initSelectEmployee(updated[0]);
+            isOpen: true, type: "hapus", title: "Hapus Data Karyawan",
+            message: `Data akun karyawan "${selectedEmp.name}" akan dihapus secara permanen dari database.`,
+            action: async () => {
+                try {
+                    setIsSaving(true);
+                    await api.delete(`/users/staff/${selectedEmp.id}`);
+                    await fetchEmployees();
+                    setSelectedEmp(null);
+                    setMode("view");
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                } catch (error: unknown) {
+                    const status = getErrorStatus(error);
+                    const message = getUserFriendlyError(error, "Gagal menghapus karyawan.");
+                    console.error("Gagal menghapus:", message);
+                    if (status === 409) {
+                        alert("Karyawan memiliki riwayat transaksi/restock dan tidak dapat dihapus. Ubah status akun menjadi Resign agar akses login dinonaktifkan.");
+                    } else {
+                        alert(message);
+                    }
+                } finally {
+                    setIsSaving(false);
+                }
             },
         });
     };
 
     const handleSaveSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (mode === "add") {
-            setConfirmModal({
-                isOpen: true,
-                type: "tambah",
-                title: "Tambah Karyawan Baru",
-                message: `Data karyawan "${formData.name || "Karyawan Baru"}" akan disimpan ke dalam sistem.`,
-                action: () => {
-                    const generateId = employees.length > 0 ? Math.max(...employees.map(e => e.id)) + 1 : 1;
-                    const newEmp: Karyawan = {
-                        id: generateId, name: formData.name, role: formData.role,
-                        phone: formData.phone, email: formData.email, address: formData.address,
-                        status: formData.status, joinDate: "2026-05-19"
-                    };
-                    setEmployees([newEmp, ...employees]);
-                    initSelectEmployee(newEmp);
-                },
-            });
-        } else if (mode === "edit" && selectedEmp) {
-            setConfirmModal({
-                isOpen: true,
-                type: "edit",
-                title: "Simpan Perubahan Data",
-                message: `Perubahan data karyawan "${formData.name}" akan diperbarui di sistem.`,
-                action: () => {
-                    const updated = employees.map(e =>
-                        e.id === selectedEmp.id ? { ...e, ...formData, id: e.id, joinDate: e.joinDate } : e
-                    );
-                    setEmployees(updated);
-                    setMode("view");
-                },
-            });
+        if (!formData.name.trim()) { alert("Nama wajib diisi!"); return; }
+        if (!isValidEmail(formData.email)) { alert("Masukkan alamat email login yang valid."); return; }
+        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890."); return; }
+        if (mode === "add" && formData.password.length < 8) {
+            alert("Password wajib diisi (minimal 8 karakter)!");
+            return;
         }
+
+        const actionText = mode === "add" ? "didaftarkan" : "diperbarui";
+        const normalizedEmail = normalizeEmail(formData.email);
+        const normalizedPhone = normalizePhone(formData.phone);
+
+        setConfirmModal({
+            isOpen: true, type: mode === "add" ? "tambah" : "edit",
+            title: mode === "add" ? "Tambah Karyawan Baru" : "Simpan Perubahan",
+            message: `Data karyawan "${formData.name}" akan ${actionText} ke sistem.`,
+            action: async () => {
+                let createdUserId: number | null = null;
+                try {
+                    setIsSaving(true);
+                    if (mode === "add") {
+                        const addPayload = {
+                            nama_lengkap: formData.name.trim(),
+                            email: normalizedEmail,
+                            username: normalizedEmail,
+                            no_telp: normalizedPhone,
+                            password: formData.password
+                        };
+                        await api.post("/users/register", addPayload);
+
+                        const loginResponse = await api.post("/users/login", {
+                            username: normalizedEmail,
+                            password: formData.password,
+                        });
+                        const temporaryToken = loginResponse.data?.token;
+                        if (!temporaryToken) {
+                            throw new Error("ID akun baru tidak dapat diverifikasi.");
+                        }
+
+                        const decodedNewUser = jwtDecode<TokenPayload>(temporaryToken);
+                        if (!decodedNewUser.id_user) {
+                            throw new Error("ID akun baru tidak ditemukan pada token.");
+                        }
+                        createdUserId = decodedNewUser.id_user;
+
+                        await api.put(`/users/staff/${createdUserId}`, {
+                            nama_lengkap: formData.name.trim(),
+                            no_telp: normalizedPhone,
+                            email: normalizedEmail,
+                            role: formData.role,
+                            status: formData.status,
+                        });
+
+                        await fetchEmployees();
+                        setMode("view");
+                        setSelectedEmp(null);
+
+                    } else if (mode === "edit" && selectedEmp) {
+                        const editPayload = {
+                            nama_lengkap: formData.name.trim(),
+                            no_telp: normalizedPhone,
+                            email: selectedEmp.email,
+                            role: formData.role,
+                            status: formData.status
+                        };
+                        await api.put(`/users/staff/${selectedEmp.id}`, editPayload);
+                        await fetchEmployees();
+                        setMode("view");
+                        setSelectedEmp(null);
+                    }
+
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                } catch (error: unknown) {
+                    if (mode === "add" && createdUserId) {
+                        try {
+                            await api.delete(`/users/staff/${createdUserId}`);
+                        } catch (rollbackError) {
+                            console.error("Rollback akun karyawan gagal:", rollbackError);
+                        }
+                    }
+
+                    const message = getUserFriendlyError(error, "Gagal memproses data karyawan. Periksa kembali data yang diisi.");
+                    console.error("Error Backend:", message);
+                    alert(message);
+                } finally {
+                    setIsSaving(false);
+                }
+            },
+        });
     };
 
     const closeModal = () => setConfirmModal({ ...confirmModal, isOpen: false });
 
+    // Tampilkan error
+    if (error) {
+        return (
+            <div className="flex h-[80vh] items-center justify-center p-8">
+                <div className="bg-discount-red/10 border border-discount-red text-discount-red p-6 rounded-2xl max-w-md text-center space-y-3">
+                    <AlertTriangle size={32} className="mx-auto" />
+                    <h2 className="font-black text-lg">Gagal Memuat Data</h2>
+                    <p className="text-sm font-medium">{error}</p>
+                    <button onClick={fetchEmployees} className="mt-2 px-4 py-2 bg-apomacy-primary text-white rounded-xl text-sm font-bold hover:bg-apomacy-dark transition-colors">
+                        Coba Lagi
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch w-full">
-
-            {/* PANEL KIRI */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-outline-variant p-4 md:p-6 shadow-sm flex flex-col justify-between min-w-0 w-full">
+            {/* PANEL KIRI: DATA KARYAWAN */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-outline-variant p-4 md:p-6 shadow-sm flex flex-col justify-between min-w-0 w-full h-[calc(100vh-90px)]">
                 <div className="flex flex-col flex-1 min-h-0 w-full">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 shrink-0 w-full">
                         <div>
-                            <h2 className="text-lg md:text-xl font-bold text-apomacy-dark">Manajemen Karyawan</h2>
-                            <p className="text-[11px] md:text-xs text-on-surface-variant mt-0.5">Status Panel: <span className="font-bold uppercase text-apomacy-primary">{mode}</span></p>
+                            <h2 className="text-lg md:text-xl font-bold text-apomacy-dark flex items-center gap-2">
+                                <Briefcase size={22} className="text-apomacy-primary" />
+                                Manajemen Karyawan
+                            </h2>
+                            <p className="text-[11px] md:text-xs text-on-surface-variant mt-0.5">Data karyawan dari database sistem</p>
                         </div>
-                        <form onSubmit={(e) => e.preventDefault()} className="relative w-full sm:w-72 shrink-0">
-                            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
-                            <input type="text" placeholder="Cari nama atau jabatan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full rounded-xl bg-surface-container-low py-2 pl-10 pr-4 text-sm text-on-surface border border-outline-variant outline-none focus:border-apomacy-primary transition-all" />
-                        </form>
+                        <div className="flex items-center gap-2">
+                            {/* Badge Admin */}
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border bg-blue-50 text-blue-700 border-blue-200 shrink-0">
+                                <ShieldCheck size={14} />
+                                Admin · Akses Penuh
+                            </div>
+                        </div>
                     </div>
 
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-3 text-apomacy-primary flex-1 bg-white rounded-xl border border-outline-variant h-[400px] lg:h-[545px] w-full">
-                            <Loader2 className="h-10 w-10 animate-spin" />
-                            <p className="text-sm font-medium animate-pulse">Memuat data staf...</p>
+                    <div className="flex flex-col sm:flex-row gap-3 mb-4 shrink-0">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+                            <input type="text" placeholder="Cari nama, email, jabatan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full rounded-xl bg-surface-container-low py-2 pl-10 pr-4 text-sm text-on-surface border border-outline-variant outline-none focus:border-apomacy-primary transition-all" />
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto overflow-y-auto h-[400px] lg:h-[545px] w-full rounded-xl border border-outline-variant shadow-sm bg-white scrollbar-thin scrollbar-thumb-gray-300 relative">
-                            
-                            <table className="w-full text-left border-collapse min-w-[800px]">
-                                <thead className="sticky top-0 z-10 bg-surface-container shadow-sm">
+                        <button onClick={fetchEmployees} title="Muat ulang data"
+                            className="p-2 border border-outline-variant rounded-xl hover:bg-gray-50 text-gray-600 transition-colors shrink-0">
+                            <RefreshCw size={18} className={loading ? "animate-spin text-apomacy-primary" : ""} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-auto rounded-xl border border-outline-variant shadow-sm bg-white scrollbar-thin scrollbar-thumb-gray-300 relative min-h-0">
+                        {loading ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-apomacy-primary bg-white/80 z-10">
+                                <Loader2 className="h-10 w-10 animate-spin" />
+                                <p className="text-sm font-medium animate-pulse">Memuat data karyawan...</p>
+                            </div>
+                        ) : filteredEmployees.length === 0 ? (
+                             <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2 min-h-[300px]">
+                                 <Search size={40} className="opacity-20" />
+                                 <span className="text-sm font-medium">
+                                     {searchQuery ? "Tidak ditemukan karyawan yang cocok." : "Belum ada data karyawan."}
+                                 </span>
+                             </div>
+                        ) : (
+                            <table className="w-full text-left border-collapse min-w-[700px]">
+                                <thead className="sticky top-0 z-10 bg-surface-container-lowest shadow-sm">
                                     <tr className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant border-b border-outline-variant">
-                                        <th className="px-4 py-3 bg-surface-container whitespace-nowrap">ID Staf</th>
-                                        <th className="px-4 py-3 bg-surface-container w-[160px] whitespace-nowrap">Nama Karyawan</th>
-                                        <th className="px-4 py-3 bg-surface-container w-[120px] whitespace-nowrap">Jabatan</th>
-                                        <th className="px-4 py-3 bg-surface-container whitespace-nowrap">Telepon</th>
-                                        <th className="px-4 py-3 bg-surface-container whitespace-nowrap">Alamat Tinggal</th>
-                                        <th className="px-4 py-3 bg-surface-container whitespace-nowrap text-center">Status</th>
+                                        <th className="px-4 py-3 whitespace-nowrap w-12">No</th>
+                                        <th className="px-4 py-3 whitespace-nowrap">Nama Karyawan</th>
+                                        <th className="px-4 py-3 whitespace-nowrap w-48">Email Login</th>
+                                        <th className="px-4 py-3 whitespace-nowrap w-24">Jabatan</th>
+                                        <th className="px-4 py-3 whitespace-nowrap w-32">Telepon</th>
+                                        <th className="px-4 py-3 whitespace-nowrap text-center w-20">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-outline-variant text-sm text-on-surface bg-white">
-                                    {filteredEmployees.map((emp) => (
-                                        <tr key={emp.id} onClick={() => mode === "view" && initSelectEmployee(emp)}
-                                            className={`hover:bg-surface-container-low cursor-pointer transition-colors ${selectedEmp?.id === emp.id ? 'bg-apomacy-ice/30 font-medium' : ''} ${mode !== 'view' ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                                            <td className="px-4 py-3.5 text-apomacy-primary font-mono text-[11px] font-bold whitespace-nowrap">KRY-{String(emp.id).padStart(3, '0')}</td>
-                                            <td className="px-4 py-3.5 font-semibold text-apomacy-dark text-[12px] leading-tight whitespace-nowrap">{emp.name}</td>
-                                            <td className="px-4 py-3.5 text-on-surface-variant text-[12px] whitespace-nowrap">{emp.role}</td>
+                                <tbody className="divide-y divide-gray-100 text-sm text-on-surface bg-white">
+                                    {filteredEmployees.map((emp, idx) => (
+                                        <tr key={emp.id} onClick={() => { setMode("view"); initSelectEmployee(emp); }}
+                                            className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${selectedEmp?.id === emp.id ? 'bg-blue-50 border-l-4 border-l-apomacy-primary' : 'border-l-4 border-l-transparent'}`}>
+                                            <td className="px-4 py-3.5 text-gray-400">{idx + 1}</td>
+                                            <td className="px-4 py-3.5 font-semibold text-apomacy-dark text-[13px] whitespace-nowrap truncate max-w-[200px]">{emp.name}</td>
+                                            <td className="px-4 py-3.5 text-[12px] text-gray-500 whitespace-nowrap">{emp.email}</td>
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide border ${
+                                                    emp.role === 'Admin' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                }`}>
+                                                    {emp.role}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3.5 font-mono text-[12px] whitespace-nowrap">{emp.phone}</td>
-                                            <td className="px-4 py-3.5 text-on-surface-variant text-[12px] leading-tight max-w-[200px] truncate">{emp.address}</td>
                                             <td className="px-4 py-3.5 whitespace-nowrap text-center">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${emp.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{emp.status}</span>
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide border ${emp.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : emp.status === 'cuti' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                                    {emp.status}
+                                                </span>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
-                
-                <div className="flex gap-3 mt-6 border-t border-outline-variant pt-4 shrink-0">
-                    <button type="button" onClick={handleAddClick} disabled={mode !== "view"} className="flex items-center gap-2 rounded-xl bg-apomacy-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-apomacy-dark transition-all disabled:opacity-50">
-                        <Plus size={16} /> Tambah
-                    </button>
-                    <button type="button" onClick={handleEditClick} disabled={!selectedEmp || mode !== "view"} className="flex items-center gap-2 rounded-xl bg-white border border-outline px-5 py-2.5 text-sm font-bold text-on-surface hover:bg-surface-container-low transition-all disabled:opacity-50">
-                        <Edit2 size={16} className="text-apomacy-teal" /> Edit
-                    </button>
-                    <button type="button" onClick={handleDeleteClick} disabled={!selectedEmp || mode !== "view"} className="flex items-center gap-2 rounded-xl bg-white border border-error/30 px-5 py-2.5 text-sm font-bold text-error hover:bg-error-container/20 transition-all disabled:opacity-50">
-                        <Trash2 size={16} /> Hapus
-                    </button>
+                <div className="flex gap-3 mt-4 border-t border-outline-variant pt-4 shrink-0">
+                    <button type="button" onClick={handleAddClick} disabled={mode !== "view" || isSaving} className="flex items-center gap-2 rounded-xl bg-apomacy-primary px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-apomacy-dark transition-all disabled:opacity-50"><Plus size={16} /> Tambah</button>
+                    <button type="button" onClick={handleEditClick} disabled={!selectedEmp || mode !== "view" || isSaving} className="flex items-center gap-2 rounded-xl bg-white border border-outline px-5 py-2.5 text-sm font-bold text-on-surface hover:bg-surface-container-low transition-all disabled:opacity-50"><Edit2 size={16} className="text-apomacy-teal" /> Edit</button>
+                    <button type="button" onClick={handleDeleteClick} disabled={!selectedEmp || mode !== "view" || isSaving} className="flex items-center gap-2 rounded-xl bg-white border border-error/30 px-5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 transition-all disabled:opacity-50"><Trash2 size={16} /> Hapus</button>
                 </div>
             </div>
 
-{/* PANEL KANAN */}
-            <form onSubmit={handleSaveSubmit} className="lg:col-span-1 bg-white rounded-2xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between w-full">
+            {/* PANEL KANAN: FORM INPUT */}
+            <form onSubmit={handleSaveSubmit} className="lg:col-span-1 bg-white rounded-2xl border border-outline-variant p-6 shadow-sm flex flex-col justify-between w-full h-[calc(100vh-90px)] min-h-0">
                 <div className="flex flex-col flex-1 min-h-0">
-                    <div className="flex items-center gap-2.5 border-b border-outline-variant pb-4 mb-5 shrink-0">
+                    <div className="flex items-center gap-2.5 border-b border-outline-variant pb-4 mb-5 shrink-0 bg-surface-container-lowest">
                         <div className="p-2 bg-apomacy-ice rounded-xl text-apomacy-primary"><Briefcase size={20} /></div>
                         <div>
-                            <h2 className="text-lg font-bold text-apomacy-dark">{mode === "add" ? "Pendaftaran Staf" : mode === "edit" ? "Edit Data Staf" : "Detail Staf"}</h2>
-                            <p className="text-xs text-on-surface-variant">Parameter data internal apotek</p>
+                            <h2 className="text-lg font-bold text-apomacy-dark">{mode === "add" ? "Registrasi Akun Karyawan" : mode === "edit" ? "Edit Profil Akun" : "Detail Akun"}</h2>
+                            <p className="text-xs text-on-surface-variant">Data tersimpan di database</p>
                         </div>
                     </div>
 
-                    <div className="space-y-4 overflow-y-auto flex-1 pr-1 scrollbar-hide min-h-0">
-                        <div><label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">ID Karyawan</label><input type="text" value={formData.id} disabled className="w-full rounded-xl bg-surface-container py-2.5 px-4 text-sm font-mono text-on-surface-variant border border-outline-variant outline-none cursor-not-allowed" /></div>
-                        <div><label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Nama Lengkap</label><input type="text" required value={formData.name} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full rounded-xl bg-surface-container-lowest py-2.5 px-4 text-sm text-on-surface border border-outline outline-none focus:border-apomacy-primary disabled:bg-surface-container-low transition-all" /></div>
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Jabatan / Otoritas</label>
-                            <select value={formData.role} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, role: e.target.value })} className="w-full rounded-xl bg-surface-container-lowest py-2.5 px-4 text-sm text-on-surface border border-outline outline-none focus:border-apomacy-primary disabled:bg-surface-container-low transition-all">
-                                <option value="Apoteker">Apoteker</option>
-                                <option value="Asisten Apoteker">Asisten Apoteker</option>
-                                <option value="Kasir">Kasir</option>
-                            </select>
-                        </div>
-                        <div><label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">No. Telepon</label><input type="text" required value={formData.phone} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full rounded-xl bg-surface-container-lowest py-2.5 px-4 text-sm text-on-surface border border-outline outline-none focus:border-apomacy-primary disabled:bg-surface-container-low transition-all" /></div>
-                        <div><label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Email Staf</label><input type="email" required value={formData.email} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full rounded-xl bg-surface-container-lowest py-2.5 px-4 text-sm text-on-surface border border-outline outline-none focus:border-apomacy-primary disabled:bg-surface-container-low transition-all" /></div>
-                        <div><label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1.5">Alamat Tinggal</label><textarea rows={3} required value={formData.address} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full rounded-xl bg-surface-container-lowest py-2.5 px-4 text-sm text-on-surface border border-outline outline-none focus:border-apomacy-primary disabled:bg-surface-container-low transition-all resize-none" /></div>
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">Status Kontrak</label>
-                            <div className="flex gap-6">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-on-surface cursor-pointer"><input type="radio" name="status" value="Aktif" disabled={mode === "view"} checked={formData.status === "Aktif"} onChange={() => setFormData({ ...formData, status: "Aktif" })} className="h-4 w-4 text-apomacy-primary border-outline" />Aktif</label>
-                                <label className="flex items-center gap-2 text-sm font-semibold text-on-surface cursor-pointer"><input type="radio" name="status" value="Cuti" disabled={mode === "view"} checked={formData.status === "Cuti"} onChange={() => setFormData({ ...formData, status: "Cuti" })} className="h-4 w-4 text-apomacy-primary border-outline" />Cuti</label>
-                            </div>
-                        </div>
+                    <div className="space-y-4 overflow-y-auto flex-1 pr-1 custom-scrollbar min-h-0 pb-4">
+                        {!selectedEmp && mode === "view" ? (
+                             <div className="flex-1 flex flex-col items-center justify-center h-full text-gray-400 gap-3 min-h-[300px]">
+                                 <Briefcase size={48} className="opacity-20" />
+                                 <p className="text-sm text-center">Pilih staf dari tabel untuk melihat detail profil,<br />atau klik tombol Tambah.</p>
+                             </div>
+                        ) : (
+                            <>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Nama Lengkap</label>
+                                    <input type="text" required value={formData.name} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full rounded-xl bg-white py-2.5 px-4 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium" />
+                                </div>
+
+                                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-4">
+                                    <h3 className="text-xs font-black text-blue-800 uppercase flex items-center gap-1.5"><KeyRound size={14}/> Autentikasi Sistem</h3>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5"><Mail size={12}/> Email (Login)</label>
+                                        <input type="email" required value={formData.email} disabled={mode === "view" || mode === "edit"} onChange={(e) => setFormData({ ...formData, email: e.target.value.replace(/\s/g, "").toLowerCase() })} placeholder="nama@apomacy.com"
+                                            className="w-full rounded-xl bg-white py-2.5 px-4 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium" />
+                                        {mode === "edit" && (
+                                            <p className="text-[10px] text-blue-700">Email login tidak dapat diubah dari halaman ini.</p>
+                                        )}
+                                    </div>
+                                    {mode === "add" && (
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5"><KeyRound size={12}/> Password (Login)</label>
+                                            <input type="password" required minLength={8} autoComplete="new-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Minimal 8 karakter..."
+                                                className="w-full rounded-xl bg-white py-2.5 px-4 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary transition-all font-medium" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Jabatan Sistem</label>
+                                        <select value={formData.role} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                            className="w-full rounded-xl bg-white py-2.5 px-3 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium">
+                                            <option value="Admin">Admin</option>
+                                            <option value="Kasir">Kasir</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Status Akun</label>
+                                        <select value={formData.status} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                            className="w-full rounded-xl bg-white py-2.5 px-3 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium">
+                                            <option value="Aktif">Aktif</option>
+                                            <option value="cuti">Cuti</option>
+                                            <option value="Resign">Resign</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">No. Telepon</label>
+                                    <input type="tel" required value={formData.phone} disabled={mode === "view"} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="08xxxxxxxx"
+                                        className="w-full rounded-xl bg-white py-2.5 px-4 text-sm text-apomacy-dark border border-outline outline-none focus:border-apomacy-primary disabled:bg-gray-50 disabled:text-gray-500 transition-all font-medium" />
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex gap-3 mt-8 border-t border-outline-variant pt-4 shrink-0">
-                    <button type="submit" disabled={mode === "view"} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-apomacy-primary py-2.5 text-sm font-bold text-white shadow-sm hover:bg-apomacy-dark transition-all disabled:opacity-50"><Save size={16} /> Simpan</button>
-                    <button type="button" onClick={handleCancelClick} disabled={mode === "view"} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white border border-outline py-2.5 text-sm font-bold text-on-surface hover:bg-surface-container-low transition-all disabled:opacity-50"><XCircle size={16} className="text-on-surface-variant" /> Batal</button>
+                <div className="flex gap-3 mt-4 border-t border-outline-variant pt-4 shrink-0">
+                    <button type="submit" disabled={mode === "view" || isSaving} className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${ mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-apomacy-primary text-white shadow-sm hover:bg-apomacy-dark border-apomacy-primary" }`}><Save size={16} /> {isSaving ? "Menyimpan..." : "Simpan"}</button>
+                    <button type="button" onClick={handleCancelClick} disabled={mode === "view" || isSaving} className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-all border ${ mode === "view" ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : "bg-white text-apomacy-dark border-outline-variant hover:bg-surface-container-low" }`}><XCircle size={16} /> Batal</button>
                 </div>
             </form>
-            
-            {/* MODAL KONFIRMASI  */}
-            <ModalConfirm
-                isOpen={confirmModal.isOpen}
-                type={confirmModal.type}
-                title={confirmModal.title}
-                message={confirmModal.message}
-                onConfirm={() => {
-                    confirmModal.action();
-                    closeModal();
-                }}
-                onCancel={closeModal}
-            />
+
+            <ModalConfirm isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message} onConfirm={confirmModal.action} onCancel={closeModal} />
         </div>
     );
 }

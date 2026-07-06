@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
     Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
 import Cookies from "js-cookie";
+import ModalConfirm from "@/components/shared/ModalConfirm";
+import Toast from "@/components/shared/Toast";
+
 interface TransaksiItem {
     name: string;
     qty: number;
@@ -29,11 +33,18 @@ interface TransaksiDashboard {
     paymentMethod: string;
     status: StatusType;
     date: string;
-    // Tambahan Data Logistik
     deliveryMethod?: string;
     phone?: string;
     address?: string;
 }
+
+type PendingAction = {
+    trxId: string;
+    action: "kirim" | "ambil" | "selesai";
+    newStatus: StatusType;
+    title: string;
+    message: string;
+};
 
 // ─── PORTAL MODAL ───────────────────────────────────────────────────────────────
 function PortalModal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
@@ -46,7 +57,7 @@ function PortalModal({ children, onClose }: { children: React.ReactNode; onClose
                 @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
             `}</style>
             <div
-                className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-[mfadeIn_0.2s_ease]"
+                className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-[mfadeIn_0.2s_ease]"
                 onClick={onClose}
             >
                 <div className="max-h-[90vh] flex w-full justify-center" onClick={e => e.stopPropagation()}>
@@ -56,6 +67,23 @@ function PortalModal({ children, onClose }: { children: React.ReactNode; onClose
         </>,
         document.body
     );
+}
+
+const PROCESS_TIMER_KEY = "apomacy_diproses_timestamps";
+const AUTO_COMPLETE_MS = 60 * 60 * 1000; 
+
+function loadProcessTimers(): Record<string, number> {
+    if (typeof window === "undefined") return {};
+    try {
+        return JSON.parse(window.localStorage.getItem(PROCESS_TIMER_KEY) || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function saveProcessTimers(timers: Record<string, number>) {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(PROCESS_TIMER_KEY, JSON.stringify(timers));
 }
 
 const PAGE_SIZE = 25;
@@ -79,15 +107,36 @@ export default function KasirDashboardPage() {
     const [activeTab, setActiveTab] = useState<"Semua" | "Pesanan Baru" | "Diproses" | "Selesai">("Semua");
     const [toast, setToast] = useState<{ visible: boolean; message: string; id: string }>({ visible: false, message: "", id: "" });
     const [currentPage, setCurrentPage] = useState(1);
+    const [confirmModal, setConfirmModal] = useState<PendingAction | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [feedback, setFeedback] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+    // MENGINGAT ID TRANSAKSI SEBELUMNYA AGAR TIDAK BENTROK DENGAN RENDER REACT
+    const prevTxIds = useRef<Set<string>>(new Set());
+
+    const showFeedback = (message: string, type: "success" | "error") => {
+        setFeedback({ message, type });
+        setTimeout(() => setFeedback(null), 6000);
+    };
+
+    const searchParams = useSearchParams();
+    const router       = useRouter();
+
+    useEffect(() => {
+        const tabParam = searchParams.get("tab");
+        if (tabParam === "pesanan-baru") {
+            setActiveTab("Pesanan Baru");
+            setCurrentPage(1);
+
+            router.replace("/kasir", { scroll: false });
+        }
+    }, [searchParams]);
 
     useEffect(() => { setMounted(true); }, []);
 
-
     useEffect(() => {
-        // Tambahkan parameter isInitial agar tahu ini load pertama atau polling
         const fetchTransactions = async (isInitial = false) => {
             try {
-                // Hanya set loading (muter-muter) jika ini load pertama kali
                 if (isInitial) setIsLoading(true);
 
                 const API_URL = "/api/transaksi/all";
@@ -108,23 +157,24 @@ export default function KasirDashboardPage() {
                 // --- PROSES MAPPING DATA ---
                 const newData: TransaksiDashboard[] = rawData.map((t: any) => {
                     let formattedDate = t.tanggal_transaksi;
-                    // ... (logika format tanggal tetap sama)
+
+                    const isOnline = t.pengiriman != null;
+                    let statusPesanan: StatusType = t.status_pesanan || "Menunggu Pembayaran";
+
+                    if (!isOnline && statusPesanan === "Menunggu Pembayaran") {
+                        statusPesanan = "Selesai";
+                    }
 
                     return {
                         id: t.no_transaksi,
-                        type: t.id_user && t.id_user !== 0 ? "Online" : "Offline",
+                        type: isOnline ? "Online" : "Offline",
                         customerName: t.nama_customer || "Anonim",
                         subtotal: t.subtotal,
                         paymentMethod: t.metode_pembayaran || "-",
-
-                        // MENGGUNAKAN STATUS PESANAN (Bukan status pembayaran)
-                        status: t.status_pesanan || "Menunggu Pembayaran",
-
-                        // AMBIL DATA PENGIRIMAN (Jika ada)
-                        deliveryMethod: t.pengiriman?.metode_penerimaan || "Offline",
+                        status: statusPesanan,
+                        deliveryMethod: t.pengiriman?.metode_penerimaan || null,
                         phone: t.pengiriman?.no_hp_penerima || "-",
                         address: t.pengiriman?.alamat_pengiriman || "-",
-
                         date: formattedDate,
                         items: (t.details || t.Details || []).map((d: any) => ({
                             name: d.nama_obat,
@@ -134,45 +184,79 @@ export default function KasirDashboardPage() {
                     };
                 });
 
-                // Set state dan munculkan notifikasi jika ada data baru
-                setTransactions(prevTransactions => {
-                    if (prevTransactions.length > 0 && newData.length > 0) {
-                        const existingIds = new Set(prevTransactions.map(t => t.id));
-                        const incomingNewOrders = newData.filter(t => !existingIds.has(t.id));
+                // --- LACAK WAKTU MASUK TAB "DIPROSES" UNTUK AUTO-COMPLETE 1 JAM ---
+                const timers = loadProcessTimers();
+                let timersChanged = false;
+                const toAutoComplete: string[] = [];
+                const now = Date.now();
 
-                        if (incomingNewOrders.length > 0) {
-                            // Ini notifikasi agar kamu tahu ada transaksi masuk tanpa layar berkedip!
-                            setToast({
-                                visible: true,
-                                message: `Ada ${incomingNewOrders.length} pesanan baru masuk!`,
-                                id: incomingNewOrders[0].id
-                            });
-                            setTimeout(() => setToast({ visible: false, message: "", id: "" }), 5000);
+                newData.forEach(t => {
+                    const isDiproses = t.status === "Sedang Dikirim" || t.status === "Siap Diambil";
+
+                    if (isDiproses) {
+                        if (!timers[t.id]) {
+                            timers[t.id] = now;
+                            timersChanged = true;
+                        } else if (now - timers[t.id] >= AUTO_COMPLETE_MS) {
+                            toAutoComplete.push(t.id);
                         }
+                    } else if (timers[t.id]) {
+                        delete timers[t.id];
+                        timersChanged = true;
                     }
-                    return newData;
                 });
+
+                if (timersChanged) saveProcessTimers(timers);
+
+                if (toAutoComplete.length > 0) {
+                    toAutoComplete.forEach(trxId => {
+                        autoCompleteOrder(trxId);
+                        delete timers[trxId];
+                    });
+                    saveProcessTimers(timers);
+                    toAutoComplete.forEach(trxId => {
+                        const idx = newData.findIndex(t => t.id === trxId);
+                        if (idx !== -1) newData[idx] = { ...newData[idx], status: "Selesai" };
+                    });
+                }
+
+                // 1. Cek pesanan baru dengan membandingkan memori Ref, bukan State
+                const incomingNewOrders = newData.filter(t => !prevTxIds.current.has(t.id));
+
+                // 2. Jika bukan load pertama kali DAN ada pesanan baru, panggil Toast
+                if (prevTxIds.current.size > 0 && incomingNewOrders.length > 0) {
+                    setToast({
+                        visible: true,
+                        message: `Ada ${incomingNewOrders.length} pesanan baru masuk!`,
+                        id: incomingNewOrders[0].id
+                    });
+                    setTimeout(() => setToast({ visible: false, message: "", id: "" }), 5000);
+                }
+
+                // 3. Perbarui memori Ref dengan data terbaru
+                prevTxIds.current = new Set(newData.map(t => t.id));
+                
+                // 4. Update state secara aman (Pure Function)
+                setTransactions(newData);
 
             } catch (error) {
                 console.error("Koneksi API Error:", error);
             } finally {
-                // Matikan loading HANYA JIKA ini adalah proses load pertama
                 if (isInitial) setIsLoading(false);
             }
         };
 
-        // 1. Panggilan Pertama (Dengan Loading Spinner)
         fetchTransactions(true);
 
-        // 2. POLLING: Panggilan selanjutnya setiap 5 detik (Tanpa Loading Spinner / Silent)
         const intervalId = setInterval(() => {
             fetchTransactions(false);
-        }, 5000);
+        }, 30000);
 
         return () => clearInterval(intervalId);
     }, []);
 
-    const formatRupiah = (num: number) => "Rp " + num.toLocaleString("id-ID");
+    // KEBALKAN FUNGSI FORMAT RUPIAH AGAR TIDAK CRASH JIKA TERIMA STRING
+    const formatRupiah = (num: any) => "Rp " + Number(num).toLocaleString("id-ID");
 
     const getStatusStyle = (status: string): React.CSSProperties => {
         const map: Record<string, React.CSSProperties> = {
@@ -186,32 +270,7 @@ export default function KasirDashboardPage() {
         return map[status] ?? { background: "#f3f4f6", color: "#6b7280" };
     };
 
-    const handleConfirmOrder = async (trxId: string, action: "kirim" | "ambil") => {
-        const newStatus: StatusType = action === "kirim" ? "Sedang Dikirim" : "Siap Diambil";
-
-        try {
-            const token = Cookies.get('apomacy_token');
-            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                // Payload dikirim sesuai dengan validStatus di backend
-                body: JSON.stringify({ status_pesanan: newStatus })
-            });
-
-            if (!response.ok) throw new Error("Gagal update status di server");
-
-            // Update UI jika API sukses
-            setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: newStatus } : t));
-        } catch (error) {
-            console.error("Error:", error);
-            alert("Gagal mengubah status pesanan. Periksa koneksi.");
-        }
-    };
-
-    const handleCompleteOrder = async (trxId: string) => {
+    const autoCompleteOrder = async (trxId: string) => {
         try {
             const token = Cookies.get('apomacy_token');
             const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
@@ -223,12 +282,62 @@ export default function KasirDashboardPage() {
                 body: JSON.stringify({ status_pesanan: "Selesai" })
             });
 
+            if (!response.ok) throw new Error("Gagal auto-update status di server");
+
+            showFeedback(`Pesanan ${trxId} otomatis diselesaikan (lebih dari 1 jam diproses)`, "success");
+        } catch (error) {
+            console.error("Auto-complete error:", error);
+        }
+    };
+
+    const requestConfirm = (trxId: string, action: "kirim" | "ambil" | "selesai") => {
+        const map: Record<typeof action, { newStatus: StatusType; title: string; message: string }> = {
+            kirim: {
+                newStatus: "Sedang Dikirim",
+                title: "Konfirmasi Pengiriman",
+                message: `Tandai pesanan ${trxId} sebagai sudah dikirim ke customer?`,
+            },
+            ambil: {
+                newStatus: "Siap Diambil",
+                title: "Konfirmasi Siap Diambil",
+                message: `Tandai pesanan ${trxId} sebagai siap diambil oleh customer?`,
+            },
+            selesai: {
+                newStatus: "Selesai",
+                title: "Selesaikan Pesanan",
+                message: `Tandai pesanan ${trxId} sebagai selesai? Status ini akan langsung terlihat oleh customer.`,
+            },
+        };
+        setConfirmModal({ trxId, action, ...map[action] });
+    };
+
+    const handleConfirmedStatusUpdate = async () => {
+        if (!confirmModal) return;
+        const { trxId, newStatus } = confirmModal;
+
+        setIsSubmitting(true);
+        try {
+            const token = Cookies.get('apomacy_token');
+            const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status_pesanan: newStatus })
+            });
+
             if (!response.ok) throw new Error("Gagal update status di server");
 
-            setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: "Selesai" } : t));
+            setTransactions(prev => prev.map(t => t.id === trxId ? { ...t, status: newStatus } : t));
+            setSelectedDetail(prev => prev && prev.id === trxId ? { ...prev, status: newStatus } : prev);
+            showFeedback(`Status pesanan berhasil diubah menjadi "${newStatus}"`, "success");
         } catch (error) {
             console.error("Error:", error);
-            alert("Gagal menyelesaikan pesanan.");
+            showFeedback("Gagal mengubah status pesanan. Periksa koneksi.", "error");
+        } finally {
+            setIsSubmitting(false);
+            setConfirmModal(null);
         }
     };
 
@@ -275,21 +384,30 @@ export default function KasirDashboardPage() {
         }
 
         if (activeTab === "Pesanan Baru" && (trx.status === "Menunggu Diproses" || trx.status === "Sedang Diracik")) {
-            return (
-                <div className="flex gap-2 flex-wrap min-w-[200px]">
-                    <button onClick={() => handleConfirmOrder(trx.id, "kirim")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
+            if (trx.deliveryMethod === "delivery") {
+                return (
+                    <button onClick={() => requestConfirm(trx.id, "kirim")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold hover:bg-blue-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                         <Truck size={12} /> Sudah Dikirim
                     </button>
-                    <button onClick={() => handleConfirmOrder(trx.id, "ambil")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-bold hover:bg-purple-600 hover:text-white transition-all cursor-pointer">
+                );
+            }
+            if (trx.deliveryMethod === "pickup") {
+                return (
+                    <button onClick={() => requestConfirm(trx.id, "ambil")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 text-[10px] font-bold hover:bg-purple-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                         <Store size={12} /> Siap Diambil
                     </button>
-                </div>
+                );
+            }
+            return (
+                <span style={getStatusStyle(trx.status)} className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap">
+                    {trx.status}
+                </span>
             );
         }
 
         if (activeTab === "Diproses" && (trx.status === "Sedang Dikirim" || trx.status === "Siap Diambil")) {
             return (
-                <button onClick={() => handleCompleteOrder(trx.id)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold hover:bg-green-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
+                <button onClick={() => requestConfirm(trx.id, "selesai")} className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold hover:bg-green-600 hover:text-white transition-all cursor-pointer whitespace-nowrap">
                     <PackageCheck size={12} /> Selesaikan
                 </button>
             );
@@ -370,7 +488,6 @@ export default function KasirDashboardPage() {
 
                 <div className="w-full border border-outline-variant rounded-xl overflow-hidden bg-white shadow-xs flex-1 flex flex-col min-h-0">
 
-                    {/* HAPUS max-h-[...px] dan block, ganti dengan flex-1 */}
                     <div className="overflow-y-auto overflow-x-auto w-full flex-1 scrollbar-thin scrollbar-thumb-gray-300 relative">
 
                         {isLoading ? (
@@ -387,7 +504,7 @@ export default function KasirDashboardPage() {
                                         <th className="px-6 py-4 w-[15%] whitespace-nowrap">Waktu</th>
                                         <th className="px-6 py-4 w-[10%] text-center whitespace-nowrap">Jenis</th>
                                         <th className="px-6 py-4 w-[22%] whitespace-nowrap">Nama Pemesan</th>
-                                        <th className="px-6 py-4 w-[8%] text-center whitespace-nowrap">Data Obat</th>
+                                        <th className="px-6 py-4 w-[8%] text-center whitespace-nowrap">Detail</th>
                                         <th className="px-6 py-4 w-[14%] text-right whitespace-nowrap">Subtotal</th>
                                         <th className="px-6 py-4 w-[16%] whitespace-nowrap">Status Pesanan</th>
                                     </tr>
@@ -428,12 +545,10 @@ export default function KasirDashboardPage() {
                                                     {trx.customerName}
                                                 </td>
 
-
-
                                                 {/* Kolom Aksi Cek Obat */}
                                                 <td className="px-6 py-4 text-center">
                                                     <button type="button" onClick={() => setSelectedDetail(trx)} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-lg text-[12px] font-bold transition-all shadow-sm whitespace-nowrap">
-                                                        <Eye size={16} /> Cek Obat
+                                                        <Eye size={16} /> Cek Detail
                                                     </button>
                                                 </td>
 
@@ -522,90 +637,171 @@ export default function KasirDashboardPage() {
                 document.body
             )}
 
-            {/* ── MODAL DETAIL OBAT RESEP ── */}
+            {/* ── MODAL DETAIL PESANAN ── */}
             {mounted && selectedDetail && (
                 <PortalModal onClose={() => setSelectedDetail(null)}>
-                    <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 400, boxShadow: "0 24px 80px rgba(0,0,0,0.25)", overflow: "hidden", margin: "0 16px" }}>
-                        <div style={{ background: "var(--color-apomacy-primary, #0d6efd)", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px" }}>
+                    <div style={{
+                        background: "#fff",
+                        borderRadius: 20,
+                        width: "100%",
+                        maxWidth: 620,
+                        boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
+                        overflow: "hidden",
+                        margin: "0 16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        maxHeight: "88vh"
+                    }}>
+                        {/* Header */}
+                        <div style={{ background: "var(--color-apomacy-primary, #0d6efd)", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", flexShrink: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <ShoppingBag size={18} />
+                                <ShoppingBag size={20} />
                                 <div>
-                                    <p style={{ fontWeight: 700, fontSize: 12, letterSpacing: "0.08em", margin: 0 }}>DETAIL PESANAN</p>
-                                    <p style={{ fontFamily: "monospace", fontSize: 10, opacity: 0.75, margin: 0 }}>{selectedDetail.id}</p>
+                                    <p style={{ fontWeight: 700, fontSize: 13, letterSpacing: "0.08em", margin: 0 }}>DETAIL PESANAN</p>
+                                    <p style={{ fontFamily: "monospace", fontSize: 11, opacity: 0.75, margin: 0 }}>{selectedDetail.id}</p>
                                 </div>
                             </div>
                             <button onClick={() => setSelectedDetail(null)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", display: "flex" }}>
-                                <X size={20} />
+                                <X size={22} />
                             </button>
                         </div>
-                        <div style={{ padding: "14px 16px", borderBottom: "1px dashed #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                            <div style={{ overflow: "hidden", paddingRight: 8 }}>
+
+                        {/* Customer + Status */}
+                        <div style={{ padding: "14px 20px", borderBottom: "1px dashed #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexShrink: 0 }}>
+                            <div>
                                 <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 2 }}>Customer</p>
-                                <p style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selectedDetail.customerName}</p>
+                                <p style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", margin: 0 }}>{selectedDetail.customerName}</p>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-                                <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: selectedDetail.type === "Online" ? "#eef2ff" : "#f3f4f6", color: selectedDetail.type === "Online" ? "#4338ca" : "#6b7280" }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: selectedDetail.type === "Online" ? "#eef2ff" : "#f3f4f6", color: selectedDetail.type === "Online" ? "#4338ca" : "#6b7280" }}>
                                     {selectedDetail.type}
                                 </span>
-                                <span style={{ ...getStatusStyle(selectedDetail.status), fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4 }}>
+                                <span style={{ ...getStatusStyle(selectedDetail.status), fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6 }}>
                                     {selectedDetail.status}
                                 </span>
                             </div>
                         </div>
 
-                        {/* --- TAMBAHAN INFO PENGIRIMAN --- */}
+                        {/* Info Pengiriman — hanya tampil jika Online */}
                         {selectedDetail.type === "Online" && (
-                            <div style={{ background: "#f8fafc", padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
-                                <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>
-                                    Info Pengiriman ({selectedDetail.deliveryMethod})
+                            <div style={{ background: "#f8fafc", padding: "14px 20px", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
+                                <p style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 6, letterSpacing: "0.1em" }}>
+                                    Info Pengiriman ({selectedDetail.deliveryMethod === "delivery" ? "Dikirim" : selectedDetail.deliveryMethod === "pickup" ? "Ambil Sendiri" : selectedDetail.deliveryMethod})
                                 </p>
-                                <p style={{ fontSize: 12, fontWeight: 600, color: "#374151", margin: "0 0 4px 0" }}>
-                                    {selectedDetail.phone}
+                                <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", margin: "0 0 4px 0" }}>
+                                    📞 {selectedDetail.phone}
                                 </p>
                                 {selectedDetail.deliveryMethod === "delivery" && (
-                                    <p style={{ fontSize: 11, color: "#6b7280", margin: 0, lineHeight: 1.4 }}>
-                                        {selectedDetail.address}
+                                    <p style={{ fontSize: 12, color: "#6b7280", margin: 0, lineHeight: 1.6, wordBreak: "break-word" }}>
+                                        📍 {selectedDetail.address}
+                                    </p>
+                                )}
+                                {selectedDetail.deliveryMethod === "pickup" && (
+                                    <p style={{ fontSize: 12, color: "#7c3aed", margin: 0, fontWeight: 600 }}>
+                                        🏪 Customer akan mengambil langsung di apotek
                                     </p>
                                 )}
                             </div>
                         )}
 
-                        <div style={{ maxHeight: 240, overflowY: "auto", padding: "0 16px" }}>
+                        {/* Daftar Item — scrollable */}
+                        <div style={{ overflowY: "auto", padding: "0 20px", flex: 1, minHeight: 0 }}>
                             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                 <thead>
                                     <tr style={{ borderBottom: "1px solid #e5e7eb" }}>
                                         {["Item", "Qty", "Total"].map((h, i) => (
-                                            <th key={h} style={{ padding: "8px 0", fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", textAlign: i === 0 ? "left" : i === 1 ? "center" : "right" }}>{h}</th>
+                                            <th key={h} style={{ padding: "10px 0", fontSize: 10, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", textAlign: i === 0 ? "left" : i === 1 ? "center" : "right" }}>{h}</th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {selectedDetail.items.map((item, idx) => (
                                         <tr key={idx} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                                            <td style={{ padding: "10px 0", maxWidth: 140 }}>
-                                                <p style={{ fontSize: 11, fontWeight: 700, color: "#1f2937", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</p>
-                                                <p style={{ fontSize: 10, color: "#9ca3af", fontFamily: "monospace", margin: 0 }}>{formatRupiah(item.price)}</p>
+                                            <td style={{ padding: "11px 0" }}>
+                                                <p style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", margin: 0 }}>{item.name}</p>
+                                                <p style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace", margin: 0 }}>{formatRupiah(item.price)}</p>
                                             </td>
-                                            <td style={{ textAlign: "center", fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: "#374151" }}>{item.qty}x</td>
-                                            <td style={{ textAlign: "right", fontSize: 11, fontWeight: 700, fontFamily: "monospace", color: "#0d6efd" }}>{formatRupiah(item.qty * item.price)}</td>
+                                            <td style={{ textAlign: "center", fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: "#374151" }}>{item.qty}x</td>
+                                            <td style={{ textAlign: "right", fontSize: 12, fontWeight: 700, fontFamily: "monospace", color: "#0d6efd" }}>{formatRupiah(item.qty * item.price)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                        <div style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb", padding: "14px 16px" }}>
+
+                        {/* Footer: Subtotal + Tombol Aksi */}
+                        <div style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb", padding: "16px 20px", flexShrink: 0 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                <span style={{ fontSize: 11, color: "#6b7280" }}>Metode Pembayaran</span>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#1f2937" }}>{selectedDetail.paymentMethod}</span>
+                                <span style={{ fontSize: 12, color: "#6b7280" }}>Metode Pembayaran</span>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: "#1f2937" }}>{selectedDetail.paymentMethod}</span>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: "#1f2937", textTransform: "uppercase" }}>Subtotal</span>
-                                <span style={{ fontSize: 18, fontWeight: 800, fontFamily: "monospace", color: "#0d9488" }}>{formatRupiah(selectedDetail.subtotal)}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e5e7eb", marginTop: 8, paddingTop: 10 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "#1f2937", textTransform: "uppercase" }}>Subtotal</span>
+                                <span style={{ fontSize: 20, fontWeight: 800, fontFamily: "monospace", color: "#0d9488" }}>{formatRupiah(selectedDetail.subtotal)}</span>
                             </div>
+
+                            {/* ── TOMBOL AKSI BERDASARKAN STATUS & METODE PENGIRIMAN ── */}
+                            {selectedDetail.type === "Online" && (() => {
+                                const s = selectedDetail.status;
+                                const dm = selectedDetail.deliveryMethod;
+
+                                // Tab Pesanan Baru: tampilkan tombol sesuai metode pengiriman customer
+                                if (s === "Menunggu Diproses" || s === "Sedang Diracik") {
+                                    if (dm === "delivery") {
+                                        return (
+                                            <button
+                                                onClick={() => { requestConfirm(selectedDetail.id, "kirim"); }}
+                                                style={{ marginTop: 14, width: "100%", padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                                            >
+                                                <Truck size={16} /> Tandai Sudah Dikirim
+                                            </button>
+                                        );
+                                    }
+                                    if (dm === "pickup") {
+                                        return (
+                                            <button
+                                                onClick={() => { requestConfirm(selectedDetail.id, "ambil"); }}
+                                                style={{ marginTop: 14, width: "100%", padding: "12px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                                            >
+                                                <Store size={16} /> Tandai Siap Diambil
+                                            </button>
+                                        );
+                                    }
+                                }
+
+                                // Tab Diproses: tampilkan tombol selesaikan
+                                if (s === "Sedang Dikirim" || s === "Siap Diambil") {
+                                    return (
+                                        <button
+                                            onClick={() => { requestConfirm(selectedDetail.id, "selesai"); }}
+                                            style={{ marginTop: 14, width: "100%", padding: "12px", background: "#059669", color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                                        >
+                                            <PackageCheck size={16} /> Selesaikan Pesanan
+                                        </button>
+                                    );
+                                }
+
+                                return null;
+                            })()}
                         </div>
                     </div>
                 </PortalModal>
             )}
+
+            {/* ── MODAL KONFIRMASI PERUBAHAN STATUS PESANAN ── */}
+            {mounted && confirmModal && (
+                <ModalConfirm
+                    isOpen={!!confirmModal}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    type="edit"
+                    onConfirm={handleConfirmedStatusUpdate}
+                    onCancel={() => !isSubmitting && setConfirmModal(null)}
+                />
+            )}
+
+            {/* ── TOAST FEEDBACK SUKSES/GAGAL UNTUK SETIAP AKSI STATUS ── */}
+            {mounted && <Toast toast={feedback} />}
 
         </div>
     );

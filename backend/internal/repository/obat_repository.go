@@ -8,15 +8,14 @@ import (
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type obatRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
 // Constructor untuk inisialisasi repo
-func NewObatRepository(db *pgxpool.Pool) model.ObatRepository {
+func NewObatRepository(db DBTx) model.ObatRepository {
 	return &obatRepository{db: db}
 }
 

@@ -11,7 +11,7 @@ import Cookies from "js-cookie";
 const NAV_ITEMS = [
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/kasir" },
     { label: "Data Obat", icon: <Pill size={18} />, href: "/kasir/data-obat" },
-    { label: "Member", icon: <Users size={18} />, href: "/kasir/member" },
+    { label: "Customer", icon: <Users size={18} />, href: "/kasir/member" },
     { label: "Transaksi", icon: <Receipt size={18} />, href: "/kasir/transaksi" },
 ];
 
@@ -23,7 +23,8 @@ interface SidebarKasirProps {
 export default function SidebarKasir({ isOpen, setIsOpen }: SidebarKasirProps) {
     const pathname = usePathname();
     const handleLogout = () => {
-        Cookies.remove("apomacy_token");
+        Cookies.remove("apomacy_token", { path: "/" });
+        Cookies.remove("apomacy_role", { path: "/" });
         window.location.href = "/";
     };
 

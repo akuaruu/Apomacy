@@ -22,6 +22,8 @@ import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
 // Menggunakan interceptor custom milikmu (bukan axios bawaan)
 import api from "@/lib/api";
+import { getUserFriendlyError } from "@/lib/errors";
+import { isValidEmail, isValidIndonesianPhone, normalizeEmail, normalizePhone } from "@/lib/validation";
 
 export default function SupplierPage() {
   const [supplierList, setSupplierList] = useState<any[]>([]);
@@ -73,7 +75,7 @@ export default function SupplierPage() {
   const fetchSupplierData = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get("/supplier/");
+      const response = await api.get("/supplier");
       const data = response.data?.data || response.data || [];
 
       // Mapping response Golang (snake_case) ke format state frontend
@@ -189,9 +191,12 @@ export default function SupplierPage() {
     }
 
     // 2. Validasi Format Email Sederhana
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
+    if (!isValidEmail(formData.email)) {
       showToast("Gagal! Format email tidak valid.", "error");
+      return;
+    }
+    if (!isValidIndonesianPhone(formData.telepon)) {
+      showToast("Gagal! Nomor telepon Indonesia tidak valid.", "error");
       return;
     }
 
@@ -240,15 +245,15 @@ export default function SupplierPage() {
           kode_supplier: formData.kode,
           nama_supplier: formData.nama,
           contact_person: formData.cp,
-          no_telp: formData.telepon,
-          email: formData.email,
+          no_telp: normalizePhone(formData.telepon),
+          email: normalizeEmail(formData.email),
           kota: formData.kota,
           alamat: formData.alamat,
           status_kemitraan: formData.status
         };
 
         if (modalConfig.type === "tambah") {
-          await api.post("/supplier/", payload);
+          await api.post("/supplier", payload);
           showToast("Data supplier baru berhasil ditambahkan!", "success");
         } else if (modalConfig.type === "edit") {
           await api.put(`/supplier/${formData.id}`, payload);
@@ -263,9 +268,8 @@ export default function SupplierPage() {
       await fetchSupplierData();
       handleClearForm();
 
-    } catch (error: any) {
-      const errMsg = error.response?.data?.error || "Terjadi kesalahan server saat memproses data.";
-      showToast(errMsg, "error");
+    } catch (error: unknown) {
+      showToast(getUserFriendlyError(error, "Gagal memproses data supplier."), "error");
     }
   };
 

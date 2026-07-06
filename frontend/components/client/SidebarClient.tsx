@@ -74,7 +74,8 @@ export default function SidebarClient() {
   }, []);
 
   const handleLogout = () => {
-    Cookies.remove("apomacy_token");
+    Cookies.remove("apomacy_token", { path: "/" });
+    Cookies.remove("apomacy_role", { path: "/" });
     window.location.href = "/";
   };
 
@@ -83,7 +84,7 @@ export default function SidebarClient() {
 
       {/* Profil Pengguna */}
       <div className="px-6 pt-10 pb-6 flex items-center gap-4 mb-2">
-        
+
         {/* BAGIAN KIRI: Foto Profil */}
         <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-apomacy-teal bg-apomacy-white shrink-0 flex items-center justify-center bg-gray-50">
           {fotoProfil ? (
@@ -109,6 +110,15 @@ export default function SidebarClient() {
 
       {/* Menu Navigasi */}
       <nav className="flex-1 px-4 py-2 space-y-2 overflow-y-auto">
+        <Link
+          href="/katalog"
+          className={`block px-4 py-3 rounded-lg transition ${pathname === '/katalog'
+            ? 'bg-white/10 text-white font-medium'
+            : 'text-apomacy-light-blue hover:text-white hover:bg-apomacy-muted-blue/50'
+            }`}
+        >
+          Kembali ke Katalog
+        </Link>
 
         <Link
           href="/dasbor"

@@ -6,46 +6,67 @@ import (
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type customerRepository struct {
-	db *pgxpool.Pool
+	db DBTx
 }
 
-func NewCustomerRepository(db *pgxpool.Pool) model.CustomerRepository {
+func NewCustomerRepository(db DBTx) model.CustomerRepository {
 	return &customerRepository{db: db}
 }
 
 func (r *customerRepository) Create(ctx context.Context, customer *model.Customer) error {
-	query := `
-		INSERT INTO customer (
-			no_member, nama_customer, no_telp, alamat, tanggal_lahir, jenis_kelamin, email, tanggal_daftar
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
-		) RETURNING id_customer, created_at, updated_at
-	`
-
-	// Set tanggal daftar ke hari ini jika belum diisi
 	if customer.TanggalDaftar.IsZero() {
 		customer.TanggalDaftar = time.Now()
 	}
 
-	err := r.db.QueryRow(ctx, query,
-		customer.NoMember, customer.NamaCustomer, customer.NoTelp, customer.Alamat,
-		customer.TanggalLahir, customer.JenisKelamin, customer.Email, customer.TanggalDaftar,
-	).Scan(&customer.ID, &customer.CreatedAt, &customer.UpdatedAt)
+	query := `
+		INSERT INTO public.customer (
+			no_member,
+			nama_customer,
+			no_telp,
+			alamat,
+			tanggal_lahir,
+			jenis_kelamin,
+			email,
+			tanggal_daftar,
+			id_user
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
+		)
+		RETURNING id_customer, created_at, updated_at
+	`
+
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		customer.NoMember,
+		customer.NamaCustomer,
+		customer.NoTelp,
+		customer.Alamat,
+		customer.TanggalLahir,
+		customer.JenisKelamin,
+		customer.Email,
+		customer.TanggalDaftar,
+		customer.IDUser,
+	).Scan(
+		&customer.ID,
+		&customer.CreatedAt,
+		&customer.UpdatedAt,
+	)
 
 	if err != nil {
 		return fmt.Errorf("gagal insert customer: %v", err)
 	}
+
 	return nil
 }
 
 func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Customer, error) {
 	query := `
 		SELECT id_customer, no_member, nama_customer, no_telp, alamat, 
-		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at 
+		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at, id_user
 		FROM customer 
 		WHERE id_customer = $1
 	`
@@ -54,7 +75,7 @@ func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Custom
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&c.ID, &c.NoMember, &c.NamaCustomer, &c.NoTelp, &c.Alamat,
 		&c.TanggalLahir, &c.JenisKelamin, &c.Email, &c.TanggalDaftar,
-		&c.CreatedAt, &c.UpdatedAt,
+		&c.CreatedAt, &c.UpdatedAt, &c.IDUser,
 	)
 
 	if err != nil {
@@ -66,7 +87,7 @@ func (r *customerRepository) GetByID(ctx context.Context, id int) (*model.Custom
 func (r *customerRepository) GetAll(ctx context.Context) ([]model.Customer, error) {
 	query := `
 		SELECT id_customer, no_member, nama_customer, no_telp, alamat, 
-		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at 
+		       tanggal_lahir, jenis_kelamin, email, tanggal_daftar, created_at, updated_at, id_user
 		FROM customer 
 		ORDER BY nama_customer ASC
 	`
@@ -83,12 +104,15 @@ func (r *customerRepository) GetAll(ctx context.Context) ([]model.Customer, erro
 		err := rows.Scan(
 			&c.ID, &c.NoMember, &c.NamaCustomer, &c.NoTelp, &c.Alamat,
 			&c.TanggalLahir, &c.JenisKelamin, &c.Email, &c.TanggalDaftar,
-			&c.CreatedAt, &c.UpdatedAt,
+			&c.CreatedAt, &c.UpdatedAt, &c.IDUser,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("gagal scan data customer: %v", err)
 		}
 		customers = append(customers, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("gagal membaca data customer: %v", err)
 	}
 
 	return customers, nil
