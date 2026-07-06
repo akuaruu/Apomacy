@@ -202,10 +202,11 @@ export default function MemberPage() {
             action: async () => {
                 try {
                     await api.delete(`/customer/${member.id}`);
-                    fetchMembers();
+                    await fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
                     setSelectedMember(null);
+                    showToast(`Data member "${member.name}" berhasil dihapus.`, "success");
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menghapus member.");
                     console.error("Gagal menghapus:", message);
@@ -253,9 +254,15 @@ export default function MemberPage() {
                         await api.put(`/customer/${selectedMember.id}`, payload);
                     }
 
-                    fetchMembers();
+                    await fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
+                    showToast(
+                        mode === "add"
+                            ? `Member "${payload.nama_customer}" berhasil ditambahkan.`
+                            : `Data member "${payload.nama_customer}" berhasil diperbarui.`,
+                        "success"
+                    );
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menyimpan data member.");
                     console.error("Gagal menyimpan:", message);

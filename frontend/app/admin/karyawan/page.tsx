@@ -6,6 +6,7 @@ import {
     RefreshCw, ShieldCheck, AlertTriangle, Mail
 } from "lucide-react";
 import ModalConfirm from "@/components/shared/ModalConfirm";
+import Toast from "@/components/shared/Toast";
 import api from "@/lib/api";
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -44,14 +45,20 @@ export default function KaryawanPage() {
     const [selectedEmp, setSelectedEmp] = useState<Karyawan | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
     const [isSaving, setIsSaving] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
     const [confirmModal, setConfirmModal] = useState<{
-        isOpen: boolean; type: "tambah" | "edit" | "hapus"; title: string; message: string; action: () => void;
+        isOpen: boolean; type: "tambah" | "edit" | "hapus" | "batal"; title: string; message: string; action: () => void;
     }>({ isOpen: false, type: "tambah", title: "", message: "", action: () => {} });
 
     const [formData, setFormData] = useState({
         password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif"
     });
+
+    const showToast = (message: string, type: "success" | "error") => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+    };
 
     // Fetch data karyawan dari backend
     const fetchEmployees = useCallback(async () => {
@@ -125,12 +132,23 @@ export default function KaryawanPage() {
     const handleEditClick = () => { if (selectedEmp) setMode("edit"); };
 
     const handleCancelClick = () => {
-        setMode("view");
-        if (selectedEmp) initSelectEmployee(selectedEmp);
-        else {
-            setSelectedEmp(null);
-            setFormData({ password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif" });
-        }
+        if (mode === "view") return;
+
+        setConfirmModal({
+            isOpen: true,
+            type: "batal",
+            title: "Batalkan Perubahan",
+            message: "Perubahan yang belum disimpan akan dibatalkan. Apakah Anda ingin melanjutkan?",
+            action: () => {
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                setMode("view");
+                if (selectedEmp) initSelectEmployee(selectedEmp);
+                else {
+                    setSelectedEmp(null);
+                    setFormData({ password: "", name: "", role: "Kasir", phone: "", email: "", status: "Aktif" });
+                }
+            },
+        });
     };
 
     const handleDeleteClick = () => {
@@ -141,7 +159,7 @@ export default function KaryawanPage() {
             ? jwtDecode<TokenPayload>(token).id_user
             : undefined;
         if (currentUserId === selectedEmp.id) {
-            alert("Akun admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.");
+            showToast("Akun admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.", "error");
             return;
         }
 
@@ -156,14 +174,15 @@ export default function KaryawanPage() {
                     setSelectedEmp(null);
                     setMode("view");
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                    showToast(`Data karyawan "${selectedEmp.name}" berhasil dihapus.`, "success");
                 } catch (error: unknown) {
                     const status = getErrorStatus(error);
                     const message = getUserFriendlyError(error, "Gagal menghapus karyawan.");
                     console.error("Gagal menghapus:", message);
                     if (status === 409) {
-                        alert("Karyawan memiliki riwayat transaksi/restock dan tidak dapat dihapus. Ubah status akun menjadi Resign agar akses login dinonaktifkan.");
+                        showToast("Karyawan memiliki riwayat transaksi/restock. Ubah status akun menjadi Resign untuk menonaktifkan akses login.", "error");
                     } else {
-                        alert(message);
+                        showToast(message, "error");
                     }
                 } finally {
                     setIsSaving(false);
@@ -174,11 +193,11 @@ export default function KaryawanPage() {
 
     const handleSaveSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name.trim()) { alert("Nama wajib diisi!"); return; }
-        if (!isValidEmail(formData.email)) { alert("Masukkan alamat email login yang valid."); return; }
-        if (!isValidIndonesianPhone(formData.phone)) { alert("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890."); return; }
+        if (!formData.name.trim()) { showToast("Nama karyawan wajib diisi.", "error"); return; }
+        if (!isValidEmail(formData.email)) { showToast("Masukkan alamat email login yang valid.", "error"); return; }
+        if (!isValidIndonesianPhone(formData.phone)) { showToast("Masukkan nomor telepon Indonesia yang valid, misalnya 081234567890.", "error"); return; }
         if (mode === "add" && formData.password.length < 8) {
-            alert("Password wajib diisi (minimal 8 karakter)!");
+            showToast("Password wajib diisi minimal 8 karakter.", "error");
             return;
         }
 
@@ -230,6 +249,7 @@ export default function KaryawanPage() {
                         await fetchEmployees();
                         setMode("view");
                         setSelectedEmp(null);
+                        showToast(`Karyawan "${formData.name.trim()}" berhasil ditambahkan.`, "success");
 
                     } else if (mode === "edit" && selectedEmp) {
                         const editPayload = {
@@ -243,6 +263,7 @@ export default function KaryawanPage() {
                         await fetchEmployees();
                         setMode("view");
                         setSelectedEmp(null);
+                        showToast(`Data karyawan "${formData.name.trim()}" berhasil diperbarui.`, "success");
                     }
 
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
@@ -257,7 +278,7 @@ export default function KaryawanPage() {
 
                     const message = getUserFriendlyError(error, "Gagal memproses data karyawan. Periksa kembali data yang diisi.");
                     console.error("Error Backend:", message);
-                    alert(message);
+                    showToast(message, "error");
                 } finally {
                     setIsSaving(false);
                 }
@@ -458,6 +479,7 @@ export default function KaryawanPage() {
             </form>
 
             <ModalConfirm isOpen={confirmModal.isOpen} type={confirmModal.type} title={confirmModal.title} message={confirmModal.message} onConfirm={confirmModal.action} onCancel={closeModal} />
+            <Toast toast={toast} />
         </div>
     );
 }

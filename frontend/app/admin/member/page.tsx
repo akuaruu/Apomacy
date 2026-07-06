@@ -70,7 +70,7 @@ export default function MemberPage() {
         setTimeout(() => setToast(null), 3500);
     };
 
-    const canDelete = false;
+    const canDelete = true;
 
     const fetchMembers = useCallback(async () => {
         await Promise.resolve();
@@ -202,10 +202,11 @@ export default function MemberPage() {
             action: async () => {
                 try {
                     await api.delete(`/customer/${member.id}`);
-                    fetchMembers();
+                    await fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
                     setSelectedMember(null);
+                    showToast(`Data member "${member.name}" berhasil dihapus.`, "success");
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menghapus member.");
                     console.error("Gagal menghapus:", message);
@@ -253,9 +254,15 @@ export default function MemberPage() {
                         await api.put(`/customer/${selectedMember.id}`, payload);
                     }
 
-                    fetchMembers();
+                    await fetchMembers();
                     setConfirmModal(prev => ({ ...prev, isOpen: false }));
                     setMode("view");
+                    showToast(
+                        mode === "add"
+                            ? `Member "${payload.nama_customer}" berhasil ditambahkan.`
+                            : `Data member "${payload.nama_customer}" berhasil diperbarui.`,
+                        "success"
+                    );
                 } catch (error) {
                     const message = getApiErrorMessage(error, "Gagal menyimpan data member.");
                     console.error("Gagal menyimpan:", message);
@@ -289,7 +296,7 @@ export default function MemberPage() {
 
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shrink-0 bg-amber-50 text-amber-700 border-amber-200">
                     <ShieldAlert size={14} />
-                    Kasir · Tambah & Edit
+                    Admin · Tambah, Edit & Hapus
                 </div>
             </div>
 

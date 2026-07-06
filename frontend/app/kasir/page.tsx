@@ -70,7 +70,7 @@ function PortalModal({ children, onClose }: { children: React.ReactNode; onClose
 }
 
 const PROCESS_TIMER_KEY = "apomacy_diproses_timestamps";
-const AUTO_COMPLETE_MS = 60 * 60 * 1000; 
+const AUTO_COMPLETE_MS = 60 * 60 * 1000;
 
 function loadProcessTimers(): Record<string, number> {
     if (typeof window === "undefined") return {};
@@ -120,7 +120,7 @@ function KasirDashboardContent() {
     };
 
     const searchParams = useSearchParams();
-    const router       = useRouter();
+    const router = useRouter();
 
     useEffect(() => {
         const tabParam = searchParams.get("tab");
@@ -235,7 +235,7 @@ function KasirDashboardContent() {
 
                 // 3. Perbarui memori Ref dengan data terbaru
                 prevTxIds.current = new Set(newData.map(t => t.id));
-                
+
                 // 4. Update state secara aman (Pure Function)
                 setTransactions(newData);
 
@@ -250,7 +250,7 @@ function KasirDashboardContent() {
 
         const intervalId = setInterval(() => {
             fetchTransactions(false);
-        }, 30000);
+        }, 5000);
 
         return () => clearInterval(intervalId);
     }, []);
@@ -305,7 +305,7 @@ function KasirDashboardContent() {
             selesai: {
                 newStatus: "Selesai",
                 title: "Selesaikan Pesanan",
-                message: `Tandai pesanan ${trxId} sebagai selesai? Status ini akan langsung terlihat oleh customer.`,
+                message: `Tandai pesanan ${trxId} sebagai selesai?`,
             },
         };
         setConfirmModal({ trxId, action, ...map[action] });

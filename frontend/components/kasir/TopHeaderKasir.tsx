@@ -8,16 +8,16 @@ import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
 
 
-const API_URL  = "/api/transaksi/all";
-const POLL_MS  = 30_000;
+const API_URL = "/api/transaksi/all";
+const POLL_MS = 5_000;
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────────
 interface JWTPayload {
-    id_user?:  number;
-    role?:     string;
-    nama?:     string;
+    id_user?: number;
+    role?: string;
+    nama?: string;
     username?: string;
-    name?:     string;
+    name?: string;
 }
 
 interface TopHeaderProps {
@@ -25,28 +25,28 @@ interface TopHeaderProps {
 }
 
 interface Pengiriman {
-    id_pengiriman:      number;
-    id_transaksi:       number;
-    metode_penerimaan:  string;
-    nama_penerima?:     string;
-    no_hp_penerima?:    string;
+    id_pengiriman: number;
+    id_transaksi: number;
+    metode_penerimaan: string;
+    nama_penerima?: string;
+    no_hp_penerima?: string;
     alamat_pengiriman?: string;
     waktu_pesanan_sampai?: string;
 }
 
 interface TransaksiAPI {
-    id_transaksi:      number;
-    no_transaksi:      string;
+    id_transaksi: number;
+    no_transaksi: string;
     tanggal_transaksi: string;
-    nama_customer:     string | null;
-    status:            string;
-    status_pesanan:    string;
-    pengiriman?:       Pengiriman | null;
+    nama_customer: string | null;
+    status: string;
+    status_pesanan: string;
+    pengiriman?: Pengiriman | null;
 }
 
 interface GetAllResponse {
     message: string;
-    data:    TransaksiAPI[];
+    data: TransaksiAPI[];
 }
 
 type AktifStatusPesanan =
@@ -63,23 +63,23 @@ const AKTIF_STATUSES: AktifStatusPesanan[] = [
 ];
 
 const STATUS_CFG: Record<AktifStatusPesanan, {
-    bg:    string;
+    bg: string;
     color: string;
-    icon:  React.ReactNode;
+    icon: React.ReactNode;
     label: string;
 }> = {
-    "Menunggu Diproses": { bg: "#fef2f2", color: "#ef4444", icon: <Package size={13} />, label: "Perlu Diproses"  },
-    "Sedang Diracik":    { bg: "#fffbeb", color: "#d97706", icon: <Clock   size={13} />, label: "Sedang Diracik"  },
-    "Sedang Dikirim":    { bg: "#eff6ff", color: "#2563eb", icon: <Truck   size={13} />, label: "Sedang Dikirim"  },
-    "Siap Diambil":      { bg: "#f5f3ff", color: "#7c3aed", icon: <Store   size={13} />, label: "Siap Diambil"    },
+    "Menunggu Diproses": { bg: "#fef2f2", color: "#ef4444", icon: <Package size={13} />, label: "Perlu Diproses" },
+    "Sedang Diracik": { bg: "#fffbeb", color: "#d97706", icon: <Clock size={13} />, label: "Sedang Diracik" },
+    "Sedang Dikirim": { bg: "#eff6ff", color: "#2563eb", icon: <Truck size={13} />, label: "Sedang Dikirim" },
+    "Siap Diambil": { bg: "#f5f3ff", color: "#7c3aed", icon: <Store size={13} />, label: "Siap Diambil" },
 };
 
 interface PendingOrder {
-    id:           string;
+    id: string;
     customerName: string;
-    status:       AktifStatusPesanan;
-    time:         string;
-    isOnline:     boolean;
+    status: AktifStatusPesanan;
+    time: string;
+    isOnline: boolean;
     metodeKirim?: string;
 }
 
@@ -99,27 +99,27 @@ function isAktifStatus(s: string): s is AktifStatusPesanan {
 function mapToDisplay(trx: TransaksiAPI): PendingOrder | null {
     if (!isAktifStatus(trx.status_pesanan)) return null;
     return {
-        id:           trx.no_transaksi,
+        id: trx.no_transaksi,
         customerName: trx.nama_customer ?? "Customer",
-        status:       trx.status_pesanan,
-        time:         toWIBTime(trx.tanggal_transaksi),
-        isOnline:     !!trx.pengiriman,
-        metodeKirim:  trx.pengiriman?.metode_penerimaan,
+        status: trx.status_pesanan,
+        time: toWIBTime(trx.tanggal_transaksi),
+        isOnline: !!trx.pengiriman,
+        metodeKirim: trx.pengiriman?.metode_penerimaan,
     };
 }
 
 // ─── HOOK: usePendingOrders ───────────────────────────────────────────────────────
 function usePendingOrders() {
-    const [orders,    setOrders]    = useState<PendingOrder[]>([]);
-    const [readIds,   setReadIds]   = useState<Set<string>>(new Set());
-    const [loading,   setLoading]   = useState(true);
+    const [orders, setOrders] = useState<PendingOrder[]>([]);
+    const [readIds, setReadIds] = useState<Set<string>>(new Set());
+    const [loading, setLoading] = useState(true);
     const [lastFetch, setLastFetch] = useState<Date | null>(null);
 
     const fetchOrders = useCallback(async () => {
         try {
             const token = Cookies.get("apomacy_token") ?? "";
             const controller = new AbortController();
-            const timeoutId  = setTimeout(() => controller.abort(), 6000);
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
 
             const res = await fetch(API_URL, {
                 headers: {
@@ -153,7 +153,7 @@ function usePendingOrders() {
         return () => clearInterval(timer);
     }, [fetchOrders]);
 
-    const markRead    = useCallback((id: string) => setReadIds(prev => new Set([...prev, id])), []);
+    const markRead = useCallback((id: string) => setReadIds(prev => new Set([...prev, id])), []);
     const markAllRead = useCallback(() => setReadIds(new Set(orders.map(o => o.id))), [orders]);
     const unreadCount = orders.filter(o => !readIds.has(o.id)).length;
 
@@ -165,18 +165,18 @@ function NotificationDropdown({
     orders, unreadCount, readIds, loading, lastFetch,
     onMarkRead, onMarkAllRead, onRefetch,
 }: {
-    orders:        PendingOrder[];
-    unreadCount:   number;
-    readIds:       Set<string>;
-    loading:       boolean;
-    lastFetch:     Date | null;
-    onMarkRead:    (id: string) => void;
+    orders: PendingOrder[];
+    unreadCount: number;
+    readIds: Set<string>;
+    loading: boolean;
+    lastFetch: Date | null;
+    onMarkRead: (id: string) => void;
     onMarkAllRead: () => void;
-    onRefetch:     () => void;
+    onRefetch: () => void;
 }) {
     const [open, setOpen] = useState(false);
-    const ref             = useRef<HTMLDivElement>(null);
-    const router          = useRouter();
+    const ref = useRef<HTMLDivElement>(null);
+    const router = useRouter();
 
     useEffect(() => {
         const clickOut = (e: MouseEvent) => {
@@ -224,7 +224,7 @@ function NotificationDropdown({
                     strokeWidth={2}
                     style={{
                         animation: unreadCount > 0 && !open ? "bellShake 2.5s ease infinite" : "none",
-                        color:     unreadCount > 0 ? "#d97706" : undefined,
+                        color: unreadCount > 0 ? "#d97706" : undefined,
                     }}
                 />
                 {unreadCount > 0 && (
@@ -308,7 +308,7 @@ function NotificationDropdown({
                             </div>
                         ) : (
                             orders.map((order, idx) => {
-                                const cfg    = STATUS_CFG[order.status];
+                                const cfg = STATUS_CFG[order.status];
                                 const isRead = readIds.has(order.id);
                                 return (
                                     <button
@@ -318,7 +318,7 @@ function NotificationDropdown({
                                         className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
                                         style={{
                                             borderBottom: idx < orders.length - 1 ? "1px solid #f3f4f6" : "none",
-                                            background:   !isRead ? "rgba(239,246,255,0.5)" : undefined,
+                                            background: !isRead ? "rgba(239,246,255,0.5)" : undefined,
                                         }}
                                     >
                                         {/* Status icon */}
@@ -374,7 +374,7 @@ function NotificationDropdown({
                                 ? <>Diperbarui <span className="font-semibold text-gray-600">{fmtTime(lastFetch)}</span></>
                                 : "Memuat..."}
                         </p>
-                       
+
                         <button
                             type="button"
                             onClick={handleViewAll}
@@ -391,7 +391,7 @@ function NotificationDropdown({
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────────
 export default function TopHeader({ onMenuClick }: TopHeaderProps) {
-    const [time,         setTime]         = useState("");
+    const [time, setTime] = useState("");
     const [namaKaryawan, setNamaKaryawan] = useState("Kasir");
 
     const {
