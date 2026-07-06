@@ -87,13 +87,40 @@ export default function RegisterPage() {
 
     try {
       const normalizedEmail = normalizeEmail(email);
+      const normalizedPhone = normalizePhone(phone);
+
       await api.post("/users/register", {
         nama_lengkap: name.trim(),
         email: normalizedEmail,
         username: normalizedEmail,
-        no_telp: normalizePhone(phone),
+        no_telp: normalizedPhone,
         password,
       });
+
+      const loginResponse = await api.post("/users/login", {
+        username: normalizedEmail,
+        password,
+      });
+      const temporaryToken = loginResponse.data?.token;
+
+      if (!temporaryToken) {
+        throw new Error("Akun berhasil dibuat, tetapi tanggal lahir belum dapat disimpan. Silakan lengkapi profil setelah login.");
+      }
+
+      await api.put(
+        "/users/profile",
+        {
+          nama_lengkap: name.trim(),
+          no_telp: normalizedPhone,
+          tanggal_lahir: birthDate,
+          alamat: "",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${temporaryToken}`,
+          },
+        }
+      );
 
       setSuccess("Pendaftaran berhasil! Silakan masuk ke akun Anda.");
 
