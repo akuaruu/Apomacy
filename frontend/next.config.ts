@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const DEFAULT_BACKEND_API_URL = "http://159.223.82.138:8080/api";
+const REPO_ROOT = path.resolve(process.cwd(), "..");
 
 function getBackendApiUrl() {
   const value = (process.env.API_URL || DEFAULT_BACKEND_API_URL).replace(/\/+$/, "");
@@ -37,7 +39,7 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
   },
   turbopack: {
-    root: process.cwd(),
+    root: REPO_ROOT,
   },
 };
 

@@ -14,7 +14,7 @@ function getRedirectPath(role: UserRole) {
     return "/katalog";
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     if (isRoute(pathname, "/api")) {
