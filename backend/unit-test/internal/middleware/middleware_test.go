@@ -116,3 +116,73 @@ func TestRequestLoggerGeneratesRequestID(t *testing.T) {
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	assert.Len(t, response.Header().Get("X-Request-ID"), 32)
 }
+
+func TestRateLimiterAllowsUntilLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/login", middleware.RateLimiter(middleware.RateLimitConfig{
+		Limit:  2,
+		Window: time.Minute,
+	}), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	for range 2 {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/login", nil))
+		assert.Equal(t, http.StatusNoContent, response.Code)
+		assert.Equal(t, "2", response.Header().Get("X-RateLimit-Limit"))
+	}
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/login", nil))
+
+	assert.Equal(t, http.StatusTooManyRequests, response.Code)
+	assert.Equal(t, "0", response.Header().Get("X-RateLimit-Remaining"))
+	assert.NotEmpty(t, response.Header().Get("Retry-After"))
+	assert.Contains(t, response.Body.String(), "Terlalu banyak permintaan")
+}
+
+func TestRateLimiterSeparatesRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	limiter := middleware.RateLimiter(middleware.RateLimitConfig{
+		Limit:  1,
+		Window: time.Minute,
+	})
+	router := gin.New()
+	router.POST("/login", limiter, func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	router.POST("/register", limiter, func(c *gin.Context) { c.Status(http.StatusCreated) })
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/login", nil))
+	assert.Equal(t, http.StatusNoContent, response.Code)
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/register", nil))
+	assert.Equal(t, http.StatusCreated, response.Code)
+}
+
+func TestRateLimiterResetsAfterWindow(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/limited", middleware.RateLimiter(middleware.RateLimitConfig{
+		Limit:  1,
+		Window: 10 * time.Millisecond,
+	}), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/limited", nil))
+	assert.Equal(t, http.StatusNoContent, response.Code)
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/limited", nil))
+	assert.Equal(t, http.StatusTooManyRequests, response.Code)
+
+	time.Sleep(15 * time.Millisecond)
+
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/limited", nil))
+	assert.Equal(t, http.StatusNoContent, response.Code)
+}
