@@ -61,18 +61,23 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 	migrationHandler := NewMigrationHandler(dbPool)
 
+	authLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 5, Window: time.Minute})
+	uploadLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 10, Window: time.Minute})
+	checkoutLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 20, Window: time.Minute})
+	migrationLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 1, Window: time.Hour})
+
 	api := r.Group("/api")
 	{
 		publicUsers := api.Group("/users")
 		{
-			publicUsers.POST("/register", userHandler.Register)
-			publicUsers.POST("/login", userHandler.Login)
+			publicUsers.POST("/register", authLimiter, userHandler.Register)
+			publicUsers.POST("/login", authLimiter, userHandler.Login)
 		}
 
 		protectedUsers := api.Group("/users")
 		protectedUsers.Use(middleware.RequireAuth())
 		{
-			protectedUsers.PUT("/foto", userHandler.UploadFotoProfil)
+			protectedUsers.PUT("/foto", uploadLimiter, userHandler.UploadFotoProfil)
 			protectedUsers.PUT("/profile", userHandler.UpdateProfile)
 			protectedUsers.GET("/profile", userHandler.GetProfile)
 		}
@@ -109,7 +114,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		transaksi := api.Group("/transaksi")
 		transaksi.Use(middleware.RequireAuth())
 		{
-			transaksi.POST("", transaksiHandler.Checkout)
+			transaksi.POST("", checkoutLimiter, transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.GET("", transaksiHandler.GetRiwayatUser)
 		}
@@ -125,11 +130,11 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 		payment := api.Group("/checkout")
 		{
-			payment.POST("", paymentHandler.Checkout)
+			payment.POST("", checkoutLimiter, paymentHandler.Checkout)
 			payment.POST("/notification", paymentHandler.WebhookNotification)
 		}
 		api.POST("/restock", restockHandler.CreateRestock)
-		api.GET("/migrate-images", migrationHandler.RunImageMigration)
+		api.GET("/migrate-images", migrationLimiter, migrationHandler.RunImageMigration)
 
 		// Endpoint khusus Admin untuk manajemen karyawan (staff)
 		adminUsers := api.Group("/users")
