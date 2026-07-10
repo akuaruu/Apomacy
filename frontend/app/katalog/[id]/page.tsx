@@ -7,7 +7,6 @@ import { useCart } from "@/context/CartContext";
 import { formatRupiah } from "@/lib/Data";
 import ProductCard, { ExtendedProduct } from "@/components/shared/ProductCard";
 import api from "@/lib/api";
-import Cookies from "js-cookie";
 
 interface ProductDetail {
     id: string;
@@ -28,9 +27,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const [product, setProduct] = useState<ProductDetail | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<ExtendedProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     const [activeTab, setActiveTab] = useState<'description' | 'specifications'>('description');
     const [quantity, setQuantity] = useState(1);
+
+    useEffect(() => {
+        api.get("/users/session")
+            .then(() => setIsLoggedIn(true))
+            .catch(() => setIsLoggedIn(false));
+    }, []);
 
     const handleQuantityChange = (type: 'plus' | 'minus') => {
         if (type === 'plus') {
@@ -41,7 +47,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     };
 
     const handleAddToCart_related = (relProduct: ExtendedProduct) => {
-        if (!Cookies.get("apomacy_token")) {
+        if (!isLoggedIn) {
             window.dispatchEvent(new Event("openLoginModal"));
             return;
         }
@@ -51,7 +57,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     };
 
     const handleAddToCart = (product: ExtendedProduct) => {
-        if (!Cookies.get("apomacy_token")) {
+        if (!isLoggedIn) {
             window.dispatchEvent(new Event("openLoginModal"));
             return;
         }

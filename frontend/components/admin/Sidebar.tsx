@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Cookies from "js-cookie";
+import api from "@/lib/api";
 import {
   LayoutDashboard,
   Pill,
@@ -35,9 +35,8 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
 
-  const handleLogout = () => {
-    Cookies.remove("apomacy_token", { path: "/" });
-    Cookies.remove("apomacy_role", { path: "/" });
+  const handleLogout = async () => {
+    await api.post("/users/logout").catch(() => undefined);
     window.location.href = "/";
   };
 

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import { formatRupiah } from "@/lib/Data";
 import { useCart } from "@/context/CartContext";
 import CheckoutButton from "@/components/client/CheckoutButton";
@@ -35,20 +34,11 @@ export default function CheckoutPage() {
         if (profileEffectHandledRef.current) return;
         profileEffectHandledRef.current = true;
 
-        const token = Cookies.get("apomacy_token");
-        if (!token) {
-            router.replace("/login?redirect=/checkout");
-        }
-
         // Fetch data profil user secara otomatis
         const fetchProfile = async () => {
             try {
                 // Gunakan relative path (Proxy Vercel)
-                const res = await fetch("/api/users/profile", {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                const res = await fetch("/api/users/profile");
 
                 if (res.ok) {
                     const json = await res.json();
@@ -62,6 +52,8 @@ export default function CheckoutPage() {
                         pickupName: profileData.nama || "",
                         pickupPhone: profileData.telepon || "",
                     }));
+                } else if (res.status === 401) {
+                    router.replace("/login?redirect=/checkout");
                 }
             } catch (error) {
                 console.error("Gagal memuat profil", error);

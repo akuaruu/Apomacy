@@ -5,7 +5,6 @@ import { User, Mail, Phone, Calendar, Lock, Zap, ArrowLeft, Eye, EyeOff } from "
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import api from "@/lib/api";
-import Cookies from "js-cookie";
 import { getUserFriendlyError } from "@/lib/errors";
 import { isValidEmail, isValidIndonesianPhone, isValidPastDate, normalizeEmail, normalizePhone } from "@/lib/validation";
 
@@ -33,10 +32,11 @@ export default function RegisterPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    const token = Cookies.get("apomacy_token");
-    if (token) {
-      window.location.href = "/dasbor";
-    }
+    api.get("/users/session")
+      .then(() => {
+        window.location.href = "/dasbor";
+      })
+      .catch(() => undefined);
 
     const fetchProducts = async () => {
       try {
@@ -97,15 +97,10 @@ export default function RegisterPage() {
         password,
       });
 
-      const loginResponse = await api.post("/users/login", {
+      await api.post("/users/login", {
         username: normalizedEmail,
         password,
       });
-      const temporaryToken = loginResponse.data?.token;
-
-      if (!temporaryToken) {
-        throw new Error("Akun berhasil dibuat, tetapi tanggal lahir belum dapat disimpan. Silakan lengkapi profil setelah login.");
-      }
 
       await api.put(
         "/users/profile",
@@ -114,13 +109,10 @@ export default function RegisterPage() {
           no_telp: normalizedPhone,
           tanggal_lahir: birthDate,
           alamat: "",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${temporaryToken}`,
-          },
         }
       );
+
+      await api.post("/users/logout").catch(() => undefined);
 
       setSuccess("Pendaftaran berhasil! Silakan masuk ke akun Anda.");
 

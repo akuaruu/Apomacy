@@ -14,7 +14,6 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
-import Cookies from "js-cookie";
 
 import StatCard from "@/components/admin/StatCard";
 // Pastikan komponen SalesAnalytics ini sudah kamu update dengan kode yang aku kasih sebelumnya
@@ -68,20 +67,10 @@ export default function DashboardPage() {
       setError(null);
 
       try {
-        const token = Cookies.get("apomacy_token");
-
-        if (!token) {
-          throw new Error("Sesi tidak valid. Silakan login kembali.");
-        }
-
-        const headers = {
-          Authorization: `Bearer ${token}`,
-        };
-
         // Fetch API Transaksi dan Obat secara bersamaan
         const [resTrx, resObat] = await Promise.all([
-          fetch(`/api/transaksi/all`, { headers }),
-          fetch(`/api/obat`, { headers }),
+          fetch(`/api/transaksi/all`),
+          fetch(`/api/obat`),
         ]);
 
         if (!resTrx.ok) {

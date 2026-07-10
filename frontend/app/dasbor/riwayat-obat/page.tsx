@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Cookies from "js-cookie";
 import { getUserFriendlyError } from "@/lib/errors";
 
 // --- INTERFACE DATA DARI API ---
@@ -45,13 +44,9 @@ export default function PesananPage() {
   useEffect(() => {
     const fetchRiwayat = async () => {
       try {
-        const token = Cookies.get('apomacy_token');
-        if (!token) throw new Error("Anda belum login. Silakan login terlebih dahulu.");
-
         const res = await fetch('/api/transaksi', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
@@ -80,11 +75,8 @@ export default function PesananPage() {
     setSelectedTransaksi(null);
 
     try {
-      const token = Cookies.get('apomacy_token');
       // Memanggil endpoint GetDetail yang sudah ada di Golang
-      const res = await fetch(`/api/transaksi/${idTransaksi}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch(`/api/transaksi/${idTransaksi}`);
 
       if (!res.ok) throw new Error("Gagal mengambil detail transaksi");
 

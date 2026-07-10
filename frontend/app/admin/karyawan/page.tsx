@@ -8,8 +8,6 @@ import {
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
 import api from "@/lib/api";
-import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
 import { getErrorStatus, getUserFriendlyError } from "@/lib/errors";
 import { isValidEmail, isValidIndonesianPhone, normalizeEmail, normalizePhone } from "@/lib/validation";
 
@@ -31,12 +29,6 @@ interface StaffApiItem {
     status?: string;
 }
 
-interface TokenPayload {
-    id_user?: number;
-    role?: string;
-    Role?: string;
-}
-
 export default function KaryawanPage() {
     const [employees, setEmployees] = useState<Karyawan[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -45,6 +37,7 @@ export default function KaryawanPage() {
     const [selectedEmp, setSelectedEmp] = useState<Karyawan | null>(null);
     const [mode, setMode] = useState<"view" | "add" | "edit">("view");
     const [isSaving, setIsSaving] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
     const [confirmModal, setConfirmModal] = useState<{
@@ -97,6 +90,12 @@ export default function KaryawanPage() {
     useEffect(() => {
         const timer = window.setTimeout(() => {
             void fetchEmployees();
+            api.get("/users/session")
+                .then((response) => {
+                    const id = Number(response.data?.user?.id_user);
+                    setCurrentUserId(Number.isFinite(id) && id > 0 ? id : null);
+                })
+                .catch(() => setCurrentUserId(null));
         }, 0);
 
         return () => window.clearTimeout(timer);
@@ -154,10 +153,6 @@ export default function KaryawanPage() {
     const handleDeleteClick = () => {
         if (!selectedEmp) return;
 
-        const token = Cookies.get("apomacy_token");
-        const currentUserId = token
-            ? jwtDecode<TokenPayload>(token).id_user
-            : undefined;
         if (currentUserId === selectedEmp.id) {
             showToast("Akun admin yang sedang digunakan tidak dapat menghapus dirinya sendiri.", "error");
             return;
@@ -221,22 +216,11 @@ export default function KaryawanPage() {
                             no_telp: normalizedPhone,
                             password: formData.password
                         };
-                        await api.post("/users/register", addPayload);
-
-                        const loginResponse = await api.post("/users/login", {
-                            username: normalizedEmail,
-                            password: formData.password,
-                        });
-                        const temporaryToken = loginResponse.data?.token;
-                        if (!temporaryToken) {
+                        const registerResponse = await api.post("/users/register", addPayload);
+                        createdUserId = registerResponse.data?.user?.id_user;
+                        if (!createdUserId) {
                             throw new Error("ID akun baru tidak dapat diverifikasi.");
                         }
-
-                        const decodedNewUser = jwtDecode<TokenPayload>(temporaryToken);
-                        if (!decodedNewUser.id_user) {
-                            throw new Error("ID akun baru tidak ditemukan pada token.");
-                        }
-                        createdUserId = decodedNewUser.id_user;
 
                         await api.put(`/users/staff/${createdUserId}`, {
                             nama_lengkap: formData.name.trim(),

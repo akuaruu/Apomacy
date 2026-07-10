@@ -1,23 +1,14 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
 // Buat instance axios dengan konfigurasi default
 const api = axios.create({
   baseURL: '/api', // Menyesuaikan base URL backend
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-});
-
-// Request Interceptor: Otomatis lampirkan token Authorization jika tersedia
-api.interceptors.request.use((config) => {
-  const token = Cookies.get("apomacy_token"); // ← sesuai handleLogin
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 api.interceptors.response.use(
@@ -26,15 +17,13 @@ api.interceptors.response.use(
     const requestUrl = String(error.config?.url || "");
     const isAuthenticationRequest =
       requestUrl.includes("/users/login") ||
-      requestUrl.includes("/users/register");
+      requestUrl.includes("/users/register") ||
+      requestUrl.includes("/users/session");
 
     if (
       error.response?.status === 401 &&
-      !isAuthenticationRequest &&
-      Cookies.get("apomacy_token")
+      !isAuthenticationRequest
     ) {
-      Cookies.remove("apomacy_token", { path: "/" });
-      Cookies.remove("apomacy_role", { path: "/" });
       if (typeof window !== "undefined") window.location.assign('/login');
     }
     return Promise.reject(error);

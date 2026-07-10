@@ -4,8 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
 import api from "@/lib/api";
 import { getUserFriendlyError } from "@/lib/errors";
 import { isValidEmail, normalizeEmail } from "@/lib/validation";
@@ -24,17 +22,6 @@ const navCategories: NavCategory[] = [
 interface NavbarProps {
     cartTotal?: number;
     cartCount?: number;
-}
-
-interface MyTokenPayload {
-    id_user?: number;
-    user_id?: number;
-    id?: number;
-    role?: string;
-    nama?: string;
-    name?: string;
-    username?: string;
-    exp?: number;
 }
 
 export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
@@ -57,16 +44,18 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
     const [isLoggingIn, setIsLoggingIn] = useState(false);
 
     useEffect(() => {
-        const token = Cookies.get("apomacy_token");
-        if (token) {
+        const loadSession = async () => {
             try {
-                const decoded = jwtDecode<MyTokenPayload>(token);
+                const response = await api.get("/users/session");
                 setIsLoggedIn(true);
-                setUserName(decoded.nama || decoded.name || decoded.username || "Akun Saya");
-            } catch (error) {
+                setUserName(response.data?.user?.nama || "Akun Saya");
+            } catch {
                 setIsLoggedIn(false);
+                setUserName(null);
             }
-        }
+        };
+
+        loadSession();
 
         const handleOpenModal = () => setShowLoginModal(true);
         window.addEventListener("openLoginModal", handleOpenModal);
@@ -117,15 +106,7 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                 password: loginPassword,
             });
 
-            const token = response.data?.token;
-
-            if (!token) {
-                throw new Error("Token tidak ditemukan pada respons login.");
-            }
-
-            const decoded = jwtDecode<MyTokenPayload>(token);
-
-            const normalizedRole = decoded.role
+            const normalizedRole = response.data?.user?.role
                 ?.trim()
                 .toLowerCase();
 
@@ -135,28 +116,8 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
                     ? normalizedRole
                     : "member";
 
-            Cookies.remove("apomacy_token", { path: "/" });
-            Cookies.remove("apomacy_role", { path: "/" });
-
-            Cookies.set("apomacy_token", token, {
-                expires: 1,
-                path: "/",
-                sameSite: "lax",
-            });
-
-            Cookies.set("apomacy_role", userRole, {
-                expires: 1,
-                path: "/",
-                sameSite: "lax",
-            });
-
             setIsLoggedIn(true);
-            setUserName(
-                decoded.nama ||
-                decoded.name ||
-                decoded.username ||
-                "Akun Saya"
-            );
+            setUserName(response.data?.user?.nama || "Akun Saya");
 
             setShowLoginModal(false);
             setLoginPassword("");

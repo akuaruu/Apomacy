@@ -4,8 +4,6 @@ import Link from "next/link";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck, ArrowLeft } from "lucide-react";
 import React, { useState } from "react";
 import api from "@/lib/api";
-import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
 import { useRouter } from "next/navigation";
 import { getUserFriendlyError } from "@/lib/errors";
 import { isValidEmail, normalizeEmail } from "@/lib/validation";
@@ -38,34 +36,12 @@ export default function LoginPage() {
         password,
       });
 
-      const token = response.data?.token;
-
-      if (!token) {
-        throw new Error("Token tidak ditemukan pada respons login.");
-      }
-
-      const decoded = jwtDecode<{ role?: string }>(token);
-      const normalizedRole = decoded.role?.trim().toLowerCase();
+      const normalizedRole = response.data?.user?.role?.trim().toLowerCase();
 
       const userRole =
         normalizedRole === "admin" || normalizedRole === "kasir"
           ? normalizedRole
           : "member";
-
-      Cookies.remove("apomacy_token", { path: "/" });
-      Cookies.remove("apomacy_role", { path: "/" });
-
-      Cookies.set("apomacy_token", token, {
-        expires: 1,
-        path: "/",
-        sameSite: "lax",
-      });
-
-      Cookies.set("apomacy_role", userRole, {
-        expires: 1,
-        path: "/",
-        sameSite: "lax",
-      });
 
       setSuccess("Login berhasil! Mengalihkan...");
 

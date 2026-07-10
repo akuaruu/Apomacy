@@ -9,7 +9,6 @@ import {
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
 import api from "@/lib/api";
-import Cookies from "js-cookie";
 import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
 import { isValidIndonesianPhone, normalizePhone } from "@/lib/validation";
 
@@ -129,11 +128,6 @@ export default function MemberPage() {
     }, []);
 
     useEffect(() => {
-        if (!Cookies.get("apomacy_token")) {
-            router.replace("/login");
-            return;
-        }
-
         const timer = window.setTimeout(() => {
             void fetchMembers();
         }, 0);
