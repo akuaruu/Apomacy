@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import {
     Search, Eye, X, Receipt, ShoppingBag, Clock, Truck, Store, Bell, CheckCircle2, ChevronLeft, ChevronRight, PackageCheck, Loader2
 } from "lucide-react";
-import Cookies from "js-cookie";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import Toast from "@/components/shared/Toast";
 
@@ -140,11 +139,9 @@ function KasirDashboardContent() {
                 if (isInitial) setIsLoading(true);
 
                 const API_URL = "/api/transaksi/all";
-                const token = Cookies.get('apomacy_token');
 
                 const response = await fetch(API_URL, {
                     headers: {
-                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -272,11 +269,9 @@ function KasirDashboardContent() {
 
     const autoCompleteOrder = async (trxId: string) => {
         try {
-            const token = Cookies.get('apomacy_token');
             const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
                 method: 'PATCH',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ status_pesanan: "Selesai" })
@@ -317,11 +312,9 @@ function KasirDashboardContent() {
 
         setIsSubmitting(true);
         try {
-            const token = Cookies.get('apomacy_token');
             const response = await fetch(`/api/transaksi/${trxId}/status-pesanan`, {
                 method: 'PATCH',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ status_pesanan: newStatus })

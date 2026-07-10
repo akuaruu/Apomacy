@@ -144,22 +144,6 @@ function PaymentNotification({
     );
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-    try {
-        const base64Url = token.split(".")[1];
-        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        const json = decodeURIComponent(
-            atob(base64)
-                .split("")
-                .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
-                .join("")
-        );
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
-
 export default function CheckoutButton({
     grossAmount,
     paymentMethod,
@@ -189,21 +173,6 @@ export default function CheckoutButton({
         setIsLoading(true);
 
         try {
-            const Cookies = (await import("js-cookie")).default;
-            const token = Cookies.get("apomacy_token");
-
-            if (!token) {
-                router.push("/login?redirect=/checkout");
-                return;
-            }
-
-            const payload = decodeJwtPayload(token);
-            const idUser = payload?.id_user as number | undefined;
-
-            if (!idUser) {
-                throw new Error("Token tidak valid, silakan login ulang");
-            }
-
             const generatedOrderId = `TRX-${Date.now()}`;
             setOrderId(generatedOrderId);
 
@@ -225,7 +194,6 @@ export default function CheckoutButton({
             const alamatCustomer = isDelivery ? deliveryData.address : "";
 
             const transaksiPayload = {
-                id_user: idUser,
                 no_transaksi: generatedOrderId,
                 nama_customer: namaCustomer || null,
                 total_item: details.reduce((acc, d) => acc + d.qty, 0),

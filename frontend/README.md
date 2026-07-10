@@ -153,7 +153,7 @@ Aplikasi akan berjalan di **`http://localhost:3000`**.
 
 ### API Call
 
-Pemanggilan API utama menggunakan Axios instance di `lib/api.ts`. Instance tersebut memakai base URL `/api` dan menambahkan JWT dari cookie `apomacy_token` melalui request interceptor.
+Pemanggilan API utama menggunakan Axios instance di `lib/api.ts`. Instance tersebut memakai base URL `/api` dan mengirim cookie sesi `HttpOnly` secara otomatis melalui `withCredentials`. Frontend tidak membaca JWT dari JavaScript.
 
 ```typescript
 // ✅ Benar

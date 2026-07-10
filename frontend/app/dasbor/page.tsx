@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Cookies from 'js-cookie';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -82,15 +81,7 @@ export default function DasborPage() {
   // FETCH DATA SAAT HALAMAN DIMUAT
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // 1. Ambil Token dengan nama kunci yang benar
-      const token = Cookies.get('apomacy_token');
-      if (!token) {
-        setLoadingTransaksi(false);
-        return;
-      }
-
       const headers = {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       };
 

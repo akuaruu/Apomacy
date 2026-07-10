@@ -4,22 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, UserCircle2, Bell, Plus, Menu, Clock, Truck, Store, Package, X, RefreshCw } from "lucide-react";
-import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
+import api from "@/lib/api";
 
 
 const API_URL = "/api/transaksi/all";
 const POLL_MS = 5_000;
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────────
-interface JWTPayload {
-    id_user?: number;
-    role?: string;
-    nama?: string;
-    username?: string;
-    name?: string;
-}
-
 interface TopHeaderProps {
     onMenuClick: () => void;
 }
@@ -117,15 +108,14 @@ function usePendingOrders() {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const token = Cookies.get("apomacy_token") ?? "";
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 6000);
 
             const res = await fetch(API_URL, {
                 headers: {
-                    Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
+                credentials: "same-origin",
                 signal: controller.signal,
             });
             clearTimeout(timeoutId);
@@ -400,14 +390,12 @@ export default function TopHeader({ onMenuClick }: TopHeaderProps) {
     } = usePendingOrders();
 
     useEffect(() => {
-        const token = Cookies.get("apomacy_token");
-        if (token) {
-            try {
-                const decoded = jwtDecode<JWTPayload>(token);
-                const nama = decoded.nama || decoded.username || decoded.name;
+        api.get("/users/session")
+            .then((response) => {
+                const nama = response.data?.user?.nama;
                 if (nama) setNamaKaryawan(nama);
-            } catch { /* silent */ }
-        }
+            })
+            .catch(() => undefined);
 
         const tick = () =>
             setTime(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));

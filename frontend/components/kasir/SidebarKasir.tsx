@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
     LayoutDashboard, Pill, Users, Receipt, LogOut, X
 } from "lucide-react";
-import Cookies from "js-cookie";
+import api from "@/lib/api";
 
 const NAV_ITEMS = [
     { label: "Dashboard", icon: <LayoutDashboard size={18} />, href: "/kasir" },
@@ -22,9 +22,8 @@ interface SidebarKasirProps {
 
 export default function SidebarKasir({ isOpen, setIsOpen }: SidebarKasirProps) {
     const pathname = usePathname();
-    const handleLogout = () => {
-        Cookies.remove("apomacy_token", { path: "/" });
-        Cookies.remove("apomacy_role", { path: "/" });
+    const handleLogout = async () => {
+        await api.post("/users/logout").catch(() => undefined);
         window.location.href = "/";
     };
 

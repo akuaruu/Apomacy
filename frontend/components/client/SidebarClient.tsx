@@ -3,17 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import Cookies from "js-cookie";
-import { jwtDecode } from "jwt-decode";
-
-// Interface untuk membaca isi Token
-interface MyTokenPayload {
-  id_user?: number;
-  role?: string;
-  nama?: string;
-  name?: string;
-  username?: string;
-}
+import api from "@/lib/api";
 
 export default function SidebarClient() {
   const pathname = usePathname();
@@ -27,42 +17,21 @@ export default function SidebarClient() {
 
   useEffect(() => {
     const fetchSidebarData = async () => {
-      const token = Cookies.get("apomacy_token");
-      if (!token) {
-        setUserName("Pengguna");
-        return;
-      }
-
       try {
-        // 1. Ekstrak Role dari Token 
-        const decoded = jwtDecode<MyTokenPayload>(token);
-        setUserRole(decoded.role || "Member");
+        const session = await api.get("/users/session");
+        setUserRole(session.data?.user?.role || "Member");
+        setUserName(session.data?.user?.nama || "Pengguna");
 
-        // Pasang nama dari token sebagai nama awal (fallback)
-        setUserName(decoded.nama || decoded.name || decoded.username || "Pengguna");
+        const res = await api.get("/users/profile");
+        const data = res.data?.data;
 
-        // 2. Lakukan Fetch ke Backend
-        const res = await fetch(`/api/users/profile`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (res.ok) {
-          const responseData = await res.json();
-          const data = responseData.data;
-
-          // Sesuai dengan API Profil: Ambil data nama atau username
-          const validName = data.nama || data.username || decoded.nama || decoded.username || "Pengguna";
+        if (data) {
+          const validName = data.nama || data.username || session.data?.user?.nama || "Pengguna";
           setUserName(validName);
 
           if (data.fotoProfil && data.fotoProfil !== "") {
             setFotoProfil(`${data.fotoProfil}?t=${new Date().getTime()}`);
           }
-        } else {
-          setUserName(decoded.nama || decoded.username || "Pengguna");
         }
       } catch (error) {
         console.error("Gagal memuat data profil sidebar:", error);
@@ -73,9 +42,8 @@ export default function SidebarClient() {
     fetchSidebarData();
   }, []);
 
-  const handleLogout = () => {
-    Cookies.remove("apomacy_token", { path: "/" });
-    Cookies.remove("apomacy_role", { path: "/" });
+  const handleLogout = async () => {
+    await api.post("/users/logout").catch(() => undefined);
     window.location.href = "/";
   };
 

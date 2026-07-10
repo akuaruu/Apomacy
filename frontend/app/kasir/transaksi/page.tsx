@@ -5,7 +5,6 @@ import api from "@/lib/api";
 import {
     Search, Plus, Trash2, ShoppingCart, User, Pill, CreditCard, Banknote, QrCode, Receipt, XCircle, Loader2, AlertTriangle
 } from "lucide-react";
-import Cookies from "js-cookie";
 import Toast from "@/components/shared/Toast";
 import ModalConfirm from "@/components/shared/ModalConfirm";
 import { getUserFriendlyError as getApiErrorMessage } from "@/lib/errors";
@@ -249,11 +248,6 @@ export default function TransaksiOfflinePage() {
             else if (cart.length === 0) showToast("Keranjang masih kosong!", "error");
             else if (cartHasObatKeras && noResep.trim() === "") showToast("Keranjang berisi obat keras. No. Resep dokter wajib diisi!", "error");
             else showToast("Nominal pembayaran belum mencukupi total tagihan!", "error");
-            return;
-        }
-
-        if (!Cookies.get("apomacy_token")) {
-            showToast("Sesi login tidak valid. Silakan login ulang untuk memproses transaksi.", "error");
             return;
         }
 

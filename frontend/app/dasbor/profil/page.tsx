@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import Cookies from "js-cookie";
 import { getUserFriendlyError } from "@/lib/errors";
 import { getImageUploadError, IMAGE_UPLOAD_ACCEPT, isValidIndonesianPhone, isValidPastDate, normalizePhone } from "@/lib/validation";
 
@@ -45,14 +44,10 @@ export default function ProfilPage() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        // Ambil token dari Cookies sesuai dengan nama yang diset di halaman Login
-        const token = Cookies.get('apomacy_token');
-
         // Memanggil endpoint GET /api/users/profile (Sesuai dengan router.go Anda!)
         const res = await fetch(`/api/users/profile`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
@@ -162,9 +157,6 @@ export default function ProfilPage() {
     setIsLoading(true);
 
     try {
-      // Ambil token dari Cookies sesuai dengan nama yang diset di halaman Login
-      const token = Cookies.get('apomacy_token');
-
       // --- A. Upload Foto Profil ---
       // (Sesuai endpoint PUT /api/users/:id/foto di router.go)
       if (selectedFile) {
@@ -174,9 +166,6 @@ export default function ProfilPage() {
 
         const resFoto = await fetch("/api/users/foto", {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
           body: formDataFoto,
         });
 
@@ -194,7 +183,6 @@ export default function ProfilPage() {
       const resData = await fetch(`/api/users/profile`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         // Pastikan key JSON di bawah ini (nama, telepon, dll) sesuai
