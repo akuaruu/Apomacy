@@ -170,15 +170,17 @@ backend/docs/swagger.yaml
 
 ### Ringkasan Endpoint dari `internal/handler/http/router.go`
 
-Base URL lokal: `http://localhost:8080/api`. Endpoint bertanda **JWT** memerlukan header `Authorization: Bearer <token>`.
+Base URL lokal: `http://localhost:8080/api`. Endpoint bertanda **Auth** menerima cookie `apomacy_token` `HttpOnly` dari browser. Header `Authorization: Bearer <token>` masih diterima sebagai fallback kompatibilitas untuk Postman/test lama.
 
 | Grup | Method | Endpoint | Akses | Deskripsi |
 |------|--------|----------|-------|-----------|
 | Auth | POST | `/api/users/register` | Publik | Registrasi user/member |
-| Auth | POST | `/api/users/login` | Publik | Login dan memperoleh JWT |
-| Profil | GET | `/api/users/profile` | JWT | Mengambil profil user aktif |
-| Profil | PUT | `/api/users/profile` | JWT | Memperbarui profil user |
-| Profil | PUT | `/api/users/foto` | JWT | Mengunggah foto profil |
+| Auth | POST | `/api/users/login` | Publik | Login dan memasang cookie sesi `HttpOnly` |
+| Auth | POST | `/api/users/logout` | Publik | Menghapus cookie sesi |
+| Auth | GET | `/api/users/session` | Auth | Mengecek session user aktif |
+| Profil | GET | `/api/users/profile` | Auth | Mengambil profil user aktif |
+| Profil | PUT | `/api/users/profile` | Auth | Memperbarui profil user |
+| Profil | PUT | `/api/users/foto` | Auth | Mengunggah foto profil |
 | Obat | GET | `/api/obat` | Publik | Daftar seluruh obat |
 | Obat | POST | `/api/obat` | Publik* | Membuat data obat |
 | Obat | GET | `/api/obat/{id}` | Publik | Detail obat berdasarkan ID |
