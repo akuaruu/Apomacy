@@ -72,11 +72,13 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		{
 			publicUsers.POST("/register", authLimiter, userHandler.Register)
 			publicUsers.POST("/login", authLimiter, userHandler.Login)
+			publicUsers.POST("/logout", userHandler.Logout)
 		}
 
 		protectedUsers := api.Group("/users")
 		protectedUsers.Use(middleware.RequireAuth())
 		{
+			protectedUsers.GET("/session", userHandler.Session)
 			protectedUsers.PUT("/foto", uploadLimiter, userHandler.UploadFotoProfil)
 			protectedUsers.PUT("/profile", userHandler.UpdateProfile)
 			protectedUsers.GET("/profile", userHandler.GetProfile)

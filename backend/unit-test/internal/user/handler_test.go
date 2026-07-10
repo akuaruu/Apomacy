@@ -9,10 +9,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	delivery "github.com/akuaruu/apomacy/backend/internal/handler/http"
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +59,8 @@ func userRouter(stub *userUsecaseStub) *gin.Engine {
 	router := gin.New()
 	router.POST("/register", handler.Register)
 	router.POST("/login", handler.Login)
+	router.POST("/logout", handler.Logout)
+	router.GET("/session", claimMiddleware(float64(4)), handler.Session)
 	router.GET("/profile", claimMiddleware(float64(4)), handler.GetProfile)
 	router.PUT("/profile", claimMiddleware(float64(4)), handler.UpdateProfile)
 	router.POST("/profile/photo", claimMiddleware(float64(4)), handler.UploadFotoProfil)
@@ -85,12 +89,22 @@ func userJSON(t *testing.T, router http.Handler, method, path string, payload an
 
 func successfulUserStub(t *testing.T) *userUsecaseStub {
 	t.Helper()
+	t.Setenv("JWT_SECRET", "handler-test-secret")
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id_user": 4,
+		"role":    model.RoleAdmin,
+		"nama":    "Budi",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	}).SignedString([]byte("handler-test-secret"))
+	require.NoError(t, err)
+
 	return &userUsecaseStub{
 		registerFn: func(_ context.Context, user *model.User) error {
+			user.ID = 4
 			assert.Equal(t, model.RoleMember, user.Role)
 			return nil
 		},
-		loginFn: func(context.Context, string, string) (string, error) { return "jwt", nil },
+		loginFn: func(context.Context, string, string) (string, error) { return token, nil },
 		profileFn: func(context.Context, int) (*model.UserProfile, error) {
 			return &model.UserProfile{NamaLengkap: "Budi"}, nil
 		},

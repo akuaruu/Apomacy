@@ -5,8 +5,10 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/akuaruu/apomacy/backend/internal/auth"
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/gin-gonic/gin"
 )
@@ -57,7 +59,14 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Registrasi berhasil"})
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Registrasi berhasil",
+		"user": gin.H{
+			"id_user": user.ID,
+			"role":    user.Role,
+			"nama":    user.NamaLengkap,
+		},
+	})
 }
 
 // Login (terima usernam & pass), mengembalikan JWT Token
@@ -79,10 +88,65 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
+	claims, err := auth.ValidateToken(token)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat sesi login"})
+		return
+	}
+
+	setAuthCookies(c, token, claims["role"])
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login berhasil",
-		"token":   token,
+		"user": gin.H{
+			"id_user": claims["id_user"],
+			"role":    claims["role"],
+			"nama":    claims["nama"],
+		},
 	})
+}
+
+func (h *UserHandler) Session(c *gin.Context) {
+	userID, _ := c.Get("id_user")
+	role, _ := c.Get("role")
+	name, _ := c.Get("nama")
+
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"id_user": userID,
+			"role":    role,
+			"nama":    name,
+		},
+	})
+}
+
+func (h *UserHandler) Logout(c *gin.Context) {
+	clearAuthCookies(c)
+	c.JSON(http.StatusOK, gin.H{"message": "Logout berhasil"})
+}
+
+func setAuthCookies(c *gin.Context, token string, role any) {
+	secure := isSecureRequest(c)
+	maxAge := int((24 * time.Hour).Seconds())
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("apomacy_token", token, maxAge, "/", "", secure, true)
+	c.SetCookie("apomacy_role", strings.ToLower(fmt.Sprint(role)), maxAge, "/", "", secure, true)
+}
+
+func clearAuthCookies(c *gin.Context) {
+	secure := isSecureRequest(c)
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("apomacy_token", "", -1, "/", "", secure, true)
+	c.SetCookie("apomacy_role", "", -1, "/", "", secure, true)
+}
+
+func isSecureRequest(c *gin.Context) bool {
+	if c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
 }
 
 func (h *UserHandler) UploadFotoProfil(c *gin.Context) {

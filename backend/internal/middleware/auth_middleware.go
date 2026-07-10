@@ -15,9 +15,12 @@ func RequireAuth() gin.HandlerFunc {
 		// 1. Ekstrak token
 		tokenString, err := auth.ExtractBearerToken(authHeader)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-			c.Abort() // WAJIB: Hentikan request agar tidak tembus ke Handler
-			return
+			tokenString, err = c.Cookie("apomacy_token")
+			if err != nil || tokenString == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+				c.Abort() // WAJIB: Hentikan request agar tidak tembus ke Handler
+				return
+			}
 		}
 
 		// 2. Validasi token
@@ -31,6 +34,7 @@ func RequireAuth() gin.HandlerFunc {
 		// 3. Simpan data krusial ke Gin Context
 		c.Set("id_user", claims["id_user"])
 		c.Set("role", claims["role"])
+		c.Set("nama", claims["nama"])
 
 		c.Next()
 	}

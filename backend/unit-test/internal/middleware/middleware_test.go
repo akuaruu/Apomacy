@@ -58,6 +58,25 @@ func TestRequireAuth(t *testing.T) {
 	}
 }
 
+func TestRequireAuthAcceptsHttpOnlyCookieToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("JWT_SECRET", "middleware-secret")
+	router := gin.New()
+	router.GET("/private", middleware.RequireAuth(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/private", nil)
+	request.AddCookie(&http.Cookie{
+		Name:  "apomacy_token",
+		Value: middlewareToken(t, "middleware-secret", "Member"),
+	})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusNoContent, response.Code)
+}
+
 func TestRequireRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
