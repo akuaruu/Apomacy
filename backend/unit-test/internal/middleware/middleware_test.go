@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	delivery "github.com/akuaruu/apomacy/backend/internal/handler/http"
 	"github.com/akuaruu/apomacy/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -204,4 +205,67 @@ func TestRateLimiterResetsAfterWindow(t *testing.T) {
 	response = httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/limited", nil))
 	assert.Equal(t, http.StatusNoContent, response.Code)
+}
+
+func TestIdempotencyGuardRejectsRepeatedSuccessfulRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/checkout", func(c *gin.Context) {
+		c.Set("id_user", 9)
+		c.Next()
+	}, middleware.IdempotencyGuard(time.Minute), func(c *gin.Context) {
+		c.Status(http.StatusCreated)
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/checkout", nil)
+	request.Header.Set("Idempotency-Key", "checkout-key")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusCreated, response.Code)
+
+	request = httptest.NewRequest(http.MethodPost, "/checkout", nil)
+	request.Header.Set("Idempotency-Key", "checkout-key")
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusConflict, response.Code)
+	assert.Contains(t, response.Body.String(), "Permintaan checkout")
+}
+
+func TestIdempotencyGuardAllowsRetryAfterFailedRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	attempts := 0
+	router.POST("/checkout", middleware.IdempotencyGuard(time.Minute), func(c *gin.Context) {
+		attempts++
+		if attempts == 1 {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		c.Status(http.StatusCreated)
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/checkout", nil)
+	request.Header.Set("Idempotency-Key", "retry-key")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+
+	request = httptest.NewRequest(http.MethodPost, "/checkout", nil)
+	request.Header.Set("Idempotency-Key", "retry-key")
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusCreated, response.Code)
+}
+
+func TestRouterRejectsKasirForObatMutation(t *testing.T) {
+	t.Setenv("JWT_SECRET", "router-secret")
+	router := delivery.SetupRouter(nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/obat", nil)
+	request.Header.Set("Authorization", "Bearer "+middlewareToken(t, "router-secret", "Kasir"))
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	assert.Contains(t, response.Body.String(), "tidak memiliki izin")
 }
