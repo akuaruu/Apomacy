@@ -161,9 +161,18 @@ function KatalogContent() {
     const { addToCart } = useCart();
 
     useEffect(() => {
-        api.get("/users/session")
+        const loadSession = () => {
+            api.get("/users/session")
             .then(() => setIsLoggedIn(true))
             .catch(() => setIsLoggedIn(false));
+        };
+
+        loadSession();
+        window.addEventListener("authChanged", loadSession);
+
+        return () => {
+            window.removeEventListener("authChanged", loadSession);
+        };
     }, []);
 
     const fetchCatalogData = async () => {

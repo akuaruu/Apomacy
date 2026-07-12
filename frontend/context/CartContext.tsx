@@ -51,10 +51,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
                             setSelectedIds(parsed.map((item: CartItem) => item.product.id));
                         } else {
                             localStorage.removeItem(storageKey);
+                            setCartItems([]);
+                            setSelectedIds([]);
                         }
                     } catch {
                         localStorage.removeItem(storageKey);
+                        setCartItems([]);
+                        setSelectedIds([]);
                     }
+                } else {
+                    setCartItems([]);
+                    setSelectedIds([]);
                 }
             } else {
                 setCartItems([]);
@@ -64,6 +71,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         };
 
         loadCart();
+        window.addEventListener("authChanged", loadCart);
+
+        return () => {
+            window.removeEventListener("authChanged", loadCart);
+        };
     }, []);
 
     useEffect(() => {
@@ -103,7 +115,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const clearCart = () => {
         setCartItems([]);
-        localStorage.removeItem("apomacy_cart");
+        if (userId) {
+            localStorage.removeItem(`apomacy_cart_${userId}`);
+        }
     };
 
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);

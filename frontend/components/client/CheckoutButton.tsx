@@ -19,6 +19,7 @@ interface CheckoutButtonProps {
     paymentMethod: string;
     items: ItemDetail[];
     onValidate: () => boolean;
+    disabled?: boolean;
     deliveryData: {
         method: "delivery" | "pickup";
         name: string;
@@ -149,6 +150,7 @@ export default function CheckoutButton({
     paymentMethod,
     items,
     onValidate,
+    disabled = false,
     deliveryData,
 }: CheckoutButtonProps) {
     const router = useRouter();
@@ -166,14 +168,24 @@ export default function CheckoutButton({
 
     const handleCheckout = async () => {
         if (!onValidate()) {
-            alert("Pemesanan ditolak: Harap lengkapi seluruh data pengiriman terlebih dahulu!");
             return;
         }
 
         setIsLoading(true);
+        let shouldResetLoading = true;
 
         try {
             const generatedOrderId = `TRX-${Date.now()}`;
+            const idempotencyKey =
+                typeof crypto !== "undefined" && "randomUUID" in crypto
+                    ? crypto.randomUUID()
+                    : `${generatedOrderId}-${Math.random().toString(36).slice(2)}`;
+            const requestConfig = {
+                headers: {
+                    "Idempotency-Key": idempotencyKey,
+                },
+            };
+
             setOrderId(generatedOrderId);
 
             const details = items
@@ -210,14 +222,14 @@ export default function CheckoutButton({
                 }
             };
 
-            await api.post("/transaksi", transaksiPayload);
+            await api.post("/transaksi", transaksiPayload, requestConfig);
 
             const snapRes = await api.post("/checkout", {
                 order_id: generatedOrderId,
                 gross_amount: grossAmount,
                 payment_method: paymentMethod,
                 items,
-            });
+            }, requestConfig);
 
             const snapToken = snapRes.data.token;
 
@@ -226,6 +238,7 @@ export default function CheckoutButton({
             }
 
             snapCallbackHandledRef.current = false;
+            shouldResetLoading = false;
             window.snap.pay(snapToken, {
                 onSuccess: function (result: any) {
                     if (snapCallbackHandledRef.current) return;
@@ -282,7 +295,9 @@ export default function CheckoutButton({
                 setNotifStatus("error");
             }
         } finally {
-            setIsLoading(false);
+            if (shouldResetLoading) {
+                setIsLoading(false);
+            }
         }
     };
 
@@ -302,7 +317,7 @@ export default function CheckoutButton({
 
             <button
                 onClick={handleCheckout}
-                disabled={isLoading}
+                disabled={disabled || isLoading}
                 className="w-full bg-apomacy-primary text-white py-4 rounded-2xl font-bold mt-8 hover:bg-apomacy-dark transition-all shadow-lg shadow-apomacy-primary/20 tracking-wider uppercase text-sm disabled:opacity-50"
             >
                 {isLoading ? "Menyiapkan Pembayaran..." : "Selesaikan Pesanan"}
@@ -319,6 +334,6 @@ function mapPaymentMethod(method: string): string {
         case "mandiri":
             return "Transfer";
         default:
-            return "QRIS";
+            return "";
     }
 }

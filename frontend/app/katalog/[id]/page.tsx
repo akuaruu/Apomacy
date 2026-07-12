@@ -33,9 +33,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const [quantity, setQuantity] = useState(1);
 
     useEffect(() => {
-        api.get("/users/session")
+        const loadSession = () => {
+            api.get("/users/session")
             .then(() => setIsLoggedIn(true))
             .catch(() => setIsLoggedIn(false));
+        };
+
+        loadSession();
+        window.addEventListener("authChanged", loadSession);
+
+        return () => {
+            window.removeEventListener("authChanged", loadSession);
+        };
     }, []);
 
     const handleQuantityChange = (type: 'plus' | 'minus') => {
