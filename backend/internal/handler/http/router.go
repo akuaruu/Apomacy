@@ -25,7 +25,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 			"https://apomacy.vercel.app",
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Idempotency-Key"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
@@ -65,6 +65,7 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	uploadLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 10, Window: time.Minute})
 	checkoutLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 20, Window: time.Minute})
 	migrationLimiter := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 1, Window: time.Hour})
+	checkoutIdempotency := middleware.IdempotencyGuard(10 * time.Minute)
 
 	api := r.Group("/api")
 	{
@@ -86,37 +87,52 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 		obat := api.Group("/obat")
 		{
-			obat.POST("", obatHandler.CreateObat)
 			obat.GET("", obatHandler.GetAllObat)
 			obat.GET("/:id", obatHandler.GetObatByID)
-			obat.PUT("/:id", obatHandler.UpdateObat)
-			obat.DELETE("/:id", obatHandler.DeleteObat)
+			obatStaff := obat.Group("")
+			obatStaff.Use(middleware.RequireAuth(), middleware.RequireRole("Admin"))
+			{
+				obatStaff.POST("", obatHandler.CreateObat)
+				obatStaff.PUT("/:id", obatHandler.UpdateObat)
+				obatStaff.DELETE("/:id", obatHandler.DeleteObat)
+			}
 		}
 
 		customer := api.Group("/customer")
+		customer.Use(middleware.RequireAuth(), middleware.RequireRole("Kasir", "Admin"))
 		{
 			customer.POST("", customerHandler.CreateCustomer)
 			customer.GET("", customerHandler.GetAllCustomers)
 			customer.GET("/:id", customerHandler.GetCustomerByID)
 			customer.PUT("/:id", customerHandler.UpdateCustomer)
-			customer.DELETE("/:id", customerHandler.DeleteCustomer)
 
+			customerAdmin := customer.Group("")
+			customerAdmin.Use(middleware.RequireRole("Admin"))
+			{
+				customerAdmin.DELETE("/:id", customerHandler.DeleteCustomer)
+			}
 		}
 
 		supplier := api.Group("/supplier")
+		supplier.Use(middleware.RequireAuth(), middleware.RequireRole("Kasir", "Admin"))
 		{
-			supplier.POST("", supplierHandler.CreateSupplier)
 			supplier.GET("", supplierHandler.GetAllSuppliers)
 			supplier.GET("/:id", supplierHandler.GetSupplierByID)
-			supplier.PUT("/:id", supplierHandler.UpdateSupplier)
-			supplier.DELETE("/:id", supplierHandler.DeleteSupplier)
+
+			supplierAdmin := supplier.Group("")
+			supplierAdmin.Use(middleware.RequireRole("Admin"))
+			{
+				supplierAdmin.POST("", supplierHandler.CreateSupplier)
+				supplierAdmin.PUT("/:id", supplierHandler.UpdateSupplier)
+				supplierAdmin.DELETE("/:id", supplierHandler.DeleteSupplier)
+			}
 		}
 
 		// Endpoint yang boleh diakses semua role terautentikasi (customer, kasir, admin)
 		transaksi := api.Group("/transaksi")
 		transaksi.Use(middleware.RequireAuth())
 		{
-			transaksi.POST("", checkoutLimiter, transaksiHandler.Checkout)
+			transaksi.POST("", checkoutLimiter, checkoutIdempotency, transaksiHandler.Checkout)
 			transaksi.GET("/:id", transaksiHandler.GetDetail)
 			transaksi.GET("", transaksiHandler.GetRiwayatUser)
 		}
@@ -132,11 +148,12 @@ func SetupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 
 		payment := api.Group("/checkout")
 		{
-			payment.POST("", checkoutLimiter, paymentHandler.Checkout)
+			payment.POST("", middleware.RequireAuth(), checkoutLimiter, checkoutIdempotency, paymentHandler.Checkout)
 			payment.POST("/notification", paymentHandler.WebhookNotification)
 		}
-		api.POST("/restock", restockHandler.CreateRestock)
-		api.GET("/migrate-images", migrationLimiter, migrationHandler.RunImageMigration)
+		api.POST("/restock", middleware.RequireAuth(), middleware.RequireRole("Admin"), restockHandler.CreateRestock)
+		api.GET("/migrate-images", middleware.RequireAuth(), middleware.RequireRole("Admin"), migrationLimiter, migrationHandler.RunImageMigration)
+		api.POST("/migrate-images", middleware.RequireAuth(), middleware.RequireRole("Admin"), migrationLimiter, migrationHandler.RunImageMigration)
 
 		// Endpoint khusus Admin untuk manajemen karyawan (staff)
 		adminUsers := api.Group("/users")
