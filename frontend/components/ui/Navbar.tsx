@@ -58,10 +58,13 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
         loadSession();
 
         const handleOpenModal = () => setShowLoginModal(true);
+        const handleAuthChanged = () => loadSession();
         window.addEventListener("openLoginModal", handleOpenModal);
+        window.addEventListener("authChanged", handleAuthChanged);
 
         return () => {
             window.removeEventListener("openLoginModal", handleOpenModal);
+            window.removeEventListener("authChanged", handleAuthChanged);
         };
     }, []);
 
@@ -121,12 +124,13 @@ export default function Navbar({ cartTotal = 0, cartCount = 0 }: NavbarProps) {
 
             setShowLoginModal(false);
             setLoginPassword("");
+            window.dispatchEvent(new Event("authChanged"));
 
             if (
                 userRole === "member" &&
-                /^\/katalog\/[^/]+$/.test(pathname)
+                (pathname === "/katalog" || /^\/katalog\/[^/]+$/.test(pathname))
             ) {
-                window.location.reload();
+                router.refresh();
                 return;
             }
 
