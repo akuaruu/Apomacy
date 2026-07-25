@@ -28,20 +28,22 @@ func TestCreateWithDetails_Success_TanpaPengiriman(t *testing.T) {
 	tx := &model.Transaksi{
 		IDUser:           1,
 		NoTransaksi:      "TRX-001",
-		Subtotal:         50000,
-		TotalBayar:       50000,
+		TotalBayar:       10000,
 		MetodePembayaran: model.MetodeQRIS,
 		Details: []model.DetailTransaksi{
-			{IDObat: 10, NamaObat: "Paracetamol", HargaSatuan: 5000, Qty: 2, Subtotal: 10000},
+			{IDObat: 10, NamaObat: "Harga Client", HargaSatuan: 1, Qty: 2, Subtotal: 2},
 		},
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(10).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Paracetamol", 5000.0, 10))
 
 	mock.ExpectQuery("INSERT INTO transaksi").
 		WithArgs(
 			tx.IDCustomer, tx.IDUser, tx.NoTransaksi, pgxmock.AnyArg(), tx.NamaCustomer,
-			tx.TotalItem, tx.Subtotal, tx.TotalBayar, tx.MetodePembayaran,
+			2, 10000.0, 10000.0, tx.MetodePembayaran,
 			tx.ResepRequired, tx.NoResep, model.TxPending, "Menunggu Pembayaran",
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id_transaksi"}).AddRow(1))
@@ -62,6 +64,9 @@ func TestCreateWithDetails_Success_TanpaPengiriman(t *testing.T) {
 	assert.Equal(t, 1, tx.ID)
 	assert.Equal(t, model.TxPending, tx.Status)
 	assert.Equal(t, "Menunggu Pembayaran", tx.StatusPesanan)
+	assert.Equal(t, 2, tx.TotalItem)
+	assert.Equal(t, 10000.0, tx.Subtotal)
+	assert.Equal(t, "Paracetamol", tx.Details[0].NamaObat)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -79,11 +84,10 @@ func TestCreateWithDetails_Success_DenganPengiriman(t *testing.T) {
 	tx := &model.Transaksi{
 		IDUser:           2,
 		NoTransaksi:      "TRX-002",
-		Subtotal:         20000,
-		TotalBayar:       20000,
+		TotalBayar:       35000,
 		MetodePembayaran: model.MetodeTransfer,
 		Details: []model.DetailTransaksi{
-			{IDObat: 11, NamaObat: "Vitamin C", HargaSatuan: 20000, Qty: 1, Subtotal: 20000},
+			{IDObat: 11, NamaObat: "Harga Client", HargaSatuan: 1, Qty: 1, Subtotal: 1},
 		},
 		Pengiriman: &model.Pengiriman{
 			MetodePenerimaan: "delivery",
@@ -94,12 +98,15 @@ func TestCreateWithDetails_Success_DenganPengiriman(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(11).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Vitamin C", 20000.0, 10))
 
 	mock.ExpectQuery("INSERT INTO transaksi").
 		WithArgs(
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
+			tx.IDCustomer, tx.IDUser, tx.NoTransaksi, pgxmock.AnyArg(), tx.NamaCustomer,
+			1, 20000.0, 35000.0, tx.MetodePembayaran,
+			tx.ResepRequired, tx.NoResep, model.TxPending, "Menunggu Pembayaran",
 		).
 		WillReturnRows(pgxmock.NewRows([]string{"id_transaksi"}).AddRow(5))
 
@@ -142,26 +149,9 @@ func TestCreateWithDetails_StokTidakCukup_Rollback(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-
-	mock.ExpectQuery("INSERT INTO transaksi").
-		WithArgs(
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-		).
-		WillReturnRows(pgxmock.NewRows([]string{"id_transaksi"}).AddRow(7))
-
-	mock.ExpectExec("INSERT INTO detail_transaksi").
-		WithArgs(
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
-		).
-		WillReturnResult(pgxmock.NewResult("INSERT", 1))
-
-	// Stok tidak mencukupi: RowsAffected = 0
-	mock.ExpectExec("UPDATE obat SET stok").
-		WithArgs(100, 12).
-		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(12).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Antasida", 8000.0, 5))
 
 	mock.ExpectRollback()
 
@@ -180,14 +170,19 @@ func TestCreateWithDetails_GagalInsertTransaksi_Rollback(t *testing.T) {
 	repo := repository.NewTransaksiRepository(mock)
 
 	tx := &model.Transaksi{
-		IDUser:      4,
-		NoTransaksi: "TRX-004",
+		IDUser:           4,
+		NoTransaksi:      "TRX-004",
+		TotalBayar:       12000,
+		MetodePembayaran: model.MetodeQRIS,
 		Details: []model.DetailTransaksi{
 			{IDObat: 13, NamaObat: "Amoxicillin", HargaSatuan: 12000, Qty: 1, Subtotal: 12000},
 		},
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(13).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Amoxicillin", 12000.0, 10))
 
 	mock.ExpectQuery("INSERT INTO transaksi").
 		WithArgs(
@@ -565,13 +560,15 @@ func TestCreateWithDetails_GagalInsertDetail(t *testing.T) {
 
 	repo := repository.NewTransaksiRepository(mock)
 	tx := &model.Transaksi{
-		IDUser: 1, NoTransaksi: "TRX-ERR-1",
+		IDUser: 1, NoTransaksi: "TRX-ERR-1", TotalBayar: 10000, MetodePembayaran: model.MetodeQRIS,
 		Details: []model.DetailTransaksi{{IDObat: 10, Qty: 2}},
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(10).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Paracetamol", 5000.0, 10))
 
-	// PERBAIKAN: Tambahkan WithArgs dengan 13 AnyArg()
 	mock.ExpectQuery("INSERT INTO transaksi").
 		WithArgs(
 			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
@@ -582,7 +579,7 @@ func TestCreateWithDetails_GagalInsertDetail(t *testing.T) {
 
 	// Simulasi gagal saat insert detail
 	mock.ExpectExec("INSERT INTO detail_transaksi").
-		WithArgs(1, 10, "", 0.0, 2, 0.0).
+		WithArgs(1, 10, "Paracetamol", 5000.0, 2, 10000.0).
 		WillReturnError(errors.New("db disconnect"))
 	mock.ExpectRollback()
 
@@ -598,13 +595,15 @@ func TestCreateWithDetails_GagalUpdateStokFatal(t *testing.T) {
 
 	repo := repository.NewTransaksiRepository(mock)
 	tx := &model.Transaksi{
-		IDUser: 1, NoTransaksi: "TRX-ERR-2",
+		IDUser: 1, NoTransaksi: "TRX-ERR-2", TotalBayar: 10000, MetodePembayaran: model.MetodeQRIS,
 		Details: []model.DetailTransaksi{{IDObat: 10, Qty: 2}},
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(10).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Paracetamol", 5000.0, 10))
 
-	// PERBAIKAN: Tambahkan WithArgs
 	mock.ExpectQuery("INSERT INTO transaksi").
 		WithArgs(
 			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),
@@ -631,14 +630,16 @@ func TestCreateWithDetails_GagalInsertPengiriman(t *testing.T) {
 	repo := repository.NewTransaksiRepository(mock)
 	metode := "delivery"
 	tx := &model.Transaksi{
-		IDUser: 1, NoTransaksi: "TRX-ERR-3",
+		IDUser: 1, NoTransaksi: "TRX-ERR-3", TotalBayar: 25000, MetodePembayaran: model.MetodeQRIS,
 		Details:    []model.DetailTransaksi{{IDObat: 10, Qty: 2}},
 		Pengiriman: &model.Pengiriman{MetodePenerimaan: metode},
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT nama_obat, harga_jual, stok FROM obat").
+		WithArgs(10).
+		WillReturnRows(pgxmock.NewRows([]string{"nama_obat", "harga_jual", "stok"}).AddRow("Paracetamol", 5000.0, 10))
 
-	// PERBAIKAN: Tambahkan WithArgs
 	mock.ExpectQuery("INSERT INTO transaksi").
 		WithArgs(
 			pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(), pgxmock.AnyArg(),

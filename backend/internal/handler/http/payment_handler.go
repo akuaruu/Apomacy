@@ -5,8 +5,11 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
 	"github.com/gin-gonic/gin"
@@ -22,9 +25,9 @@ type ItemReq struct {
 
 type CheckoutRequest struct {
 	OrderID       string    `json:"order_id" binding:"required"`
-	GrossAmount   int64     `json:"gross_amount" binding:"required"`
+	GrossAmount   int64     `json:"gross_amount"`
 	PaymentMethod string    `json:"payment_method" binding:"required"`
-	Items         []ItemReq `json:"items" binding:"required"`
+	Items         []ItemReq `json:"items"`
 }
 
 type MidtransNotification struct {
@@ -59,17 +62,35 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	var midtransItems []midtrans.ItemDetails
-	for _, item := range req.Items {
-		midtransItems = append(midtransItems, midtrans.ItemDetails{
-			ID:    item.ID,
-			Price: item.Price,
-			Qty:   item.Quantity,
-			Name:  item.Name,
-		})
+	idUser, ok := contextUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+		return
 	}
 
-	token, err := h.paymentUsecase.GenerateSnapToken(req.OrderID, req.GrossAmount, req.PaymentMethod, midtransItems)
+	trx, err := h.transaksiUsecase.GetByNoTransaksi(c.Request.Context(), req.OrderID)
+	if err != nil {
+		slog.WarnContext(c.Request.Context(), "checkout order lookup failed", "error", err, "order_id", req.OrderID, "request_id", requestID(c))
+		c.JSON(http.StatusNotFound, gin.H{"error": "Transaksi tidak ditemukan"})
+		return
+	}
+	if trx.IDUser != idUser {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak memiliki izin untuk transaksi ini"})
+		return
+	}
+	if trx.Status != model.TxPending {
+		c.JSON(http.StatusConflict, gin.H{"error": "Transaksi tidak dapat diproses ulang"})
+		return
+	}
+
+	grossAmount := int64(math.Round(trx.TotalBayar))
+	midtransItems, err := midtransItemsFromTransaction(trx, grossAmount)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+
+	token, err := h.paymentUsecase.GenerateSnapToken(trx.NoTransaksi, grossAmount, req.PaymentMethod, midtransItems)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat transaksi Midtrans"})
 		return
@@ -79,6 +100,44 @@ func (h *PaymentHandler) Checkout(c *gin.Context) {
 		"message": "Berhasil membuat Snap Token",
 		"token":   token,
 	})
+}
+
+func midtransItemsFromTransaction(trx *model.Transaksi, grossAmount int64) ([]midtrans.ItemDetails, error) {
+	if len(trx.Details) == 0 {
+		return nil, fmt.Errorf("detail transaksi tidak ditemukan")
+	}
+
+	items := make([]midtrans.ItemDetails, 0, len(trx.Details)+1)
+	itemsTotal := int64(0)
+	for _, detail := range trx.Details {
+		price := int64(math.Round(detail.HargaSatuan))
+		if detail.IDObat <= 0 || detail.Qty <= 0 || price <= 0 {
+			return nil, fmt.Errorf("detail transaksi tidak valid")
+		}
+		qty := int32(detail.Qty)
+		items = append(items, midtrans.ItemDetails{
+			ID:    strconv.Itoa(detail.IDObat),
+			Price: price,
+			Qty:   qty,
+			Name:  detail.NamaObat,
+		})
+		itemsTotal += price * int64(qty)
+	}
+
+	remaining := grossAmount - itemsTotal
+	if remaining < 0 {
+		return nil, fmt.Errorf("total transaksi tidak valid")
+	}
+	if remaining > 0 {
+		items = append(items, midtrans.ItemDetails{
+			ID:    "ONGKIR-01",
+			Price: remaining,
+			Qty:   1,
+			Name:  "Biaya Pengiriman",
+		})
+	}
+
+	return items, nil
 }
 
 // WebhookNotification menerima notifikasi dari Midtrans dan mengupdate status transaksi di DB
@@ -114,16 +173,18 @@ func (h *PaymentHandler) WebhookNotification(c *gin.Context) {
 	case txStatus == "deny", txStatus == "expire", txStatus == "cancel":
 		newStatus = model.TxBatal
 	default:
-		// Status pending atau lainnya — tidak perlu update
+		// Status pending atau lainnya
 		c.Status(http.StatusOK)
 		return
 	}
 
 	// Update status transaksi di database
-	if err := h.transaksiUsecase.UpdateStatusByNoTransaksi(context.Background(), notification.OrderID, newStatus); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	if err := h.transaksiUsecase.UpdateStatusByNoTransaksi(ctx, notification.OrderID, newStatus); err != nil {
 		slog.ErrorContext(c.Request.Context(), "midtrans webhook update failed", "error", err, "order_id", notification.OrderID, "request_id", requestID(c))
-		// Tetap return 200 agar Midtrans tidak retry terus-menerus
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses webhook"})
 		return
 	}
 

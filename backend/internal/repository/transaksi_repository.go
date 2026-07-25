@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sort"
 	"time"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
@@ -11,6 +13,12 @@ import (
 
 type transaksiRepository struct {
 	db DBTx
+}
+
+type checkoutObatInfo struct {
+	nama  string
+	harga float64
+	stok  int
 }
 
 func NewTransaksiRepository(db DBTx) model.TransaksiRepository {
@@ -31,6 +39,49 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 	if tx.StatusPesanan == "" {
 		tx.StatusPesanan = "Menunggu Pembayaran"
 	}
+
+	orderedIDs, qtyByObat, err := aggregateCheckoutItems(tx.Details)
+	if err != nil {
+		return err
+	}
+
+	obatByID := make(map[int]checkoutObatInfo, len(orderedIDs))
+	queryObat := `SELECT nama_obat, harga_jual, stok FROM obat WHERE id_obat = $1 FOR UPDATE`
+	for _, idObat := range orderedIDs {
+		var info checkoutObatInfo
+		err = dbTx.QueryRow(ctx, queryObat, idObat).Scan(&info.nama, &info.harga, &info.stok)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("obat tidak ditemukan: %d", idObat)
+			}
+			return err
+		}
+		if info.stok < qtyByObat[idObat] {
+			return errors.New("stok obat tidak mencukupi untuk item: " + info.nama)
+		}
+		obatByID[idObat] = info
+	}
+
+	totalItem := 0
+	subtotal := 0.0
+	normalizedDetails := make([]model.DetailTransaksi, len(tx.Details))
+	for i, detail := range tx.Details {
+		info := obatByID[detail.IDObat]
+		detail.NamaObat = info.nama
+		detail.HargaSatuan = info.harga
+		detail.Subtotal = info.harga * float64(detail.Qty)
+		normalizedDetails[i] = detail
+		totalItem += detail.Qty
+		subtotal += detail.Subtotal
+	}
+
+	minimumBayar := subtotal + ongkirFor(tx.Pengiriman, subtotal)
+	if tx.TotalBayar < minimumBayar {
+		return errors.New("total bayar tidak mencukupi")
+	}
+	tx.Details = normalizedDetails
+	tx.TotalItem = totalItem
+	tx.Subtotal = subtotal
 
 	queryTrx := `
 		INSERT INTO transaksi (
@@ -64,13 +115,15 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 		if err != nil {
 			return err
 		}
+	}
 
-		res, err := dbTx.Exec(ctx, queryUpdateStok, detail.Qty, detail.IDObat)
+	for _, idObat := range orderedIDs {
+		res, err := dbTx.Exec(ctx, queryUpdateStok, qtyByObat[idObat], idObat)
 		if err != nil {
 			return err
 		}
 		if res.RowsAffected() == 0 {
-			return errors.New("stok obat tidak mencukupi untuk item: " + detail.NamaObat)
+			return errors.New("stok obat tidak mencukupi untuk item: " + obatByID[idObat].nama)
 		}
 	}
 
@@ -96,8 +149,47 @@ func (r *transaksiRepository) CreateWithDetails(ctx context.Context, tx *model.T
 	return dbTx.Commit(ctx)
 }
 
+func aggregateCheckoutItems(details []model.DetailTransaksi) ([]int, map[int]int, error) {
+	if len(details) == 0 {
+		return nil, nil, errors.New("keranjang belanja tidak boleh kosong")
+	}
+
+	qtyByObat := make(map[int]int)
+	for _, detail := range details {
+		if detail.IDObat <= 0 {
+			return nil, nil, errors.New("item obat tidak valid")
+		}
+		if detail.Qty <= 0 {
+			return nil, nil, errors.New("jumlah item harus lebih dari nol")
+		}
+		qtyByObat[detail.IDObat] += detail.Qty
+	}
+
+	orderedIDs := make([]int, 0, len(qtyByObat))
+	for idObat := range qtyByObat {
+		orderedIDs = append(orderedIDs, idObat)
+	}
+	sort.Ints(orderedIDs)
+	return orderedIDs, qtyByObat, nil
+}
+
+func ongkirFor(pengiriman *model.Pengiriman, subtotal float64) float64 {
+	if pengiriman == nil || pengiriman.MetodePenerimaan != "delivery" || subtotal <= 0 || subtotal >= 150000 {
+		return 0
+	}
+	return 15000
+}
+
 // GetByID mengambil transaksi beserta detail item dan data pengiriman (jika ada) dalam query gabungan
 func (r *transaksiRepository) GetByID(ctx context.Context, id int) (*model.Transaksi, error) {
+	return r.getBy(ctx, `WHERE t.id_transaksi = $1`, id)
+}
+
+func (r *transaksiRepository) GetByNoTransaksi(ctx context.Context, noTransaksi string) (*model.Transaksi, error) {
+	return r.getBy(ctx, `WHERE t.no_transaksi = $1`, noTransaksi)
+}
+
+func (r *transaksiRepository) getBy(ctx context.Context, whereClause string, arg any) (*model.Transaksi, error) {
 	var t model.Transaksi
 	var pIDPengiriman *int
 	var pMetode *string
@@ -113,9 +205,9 @@ func (r *transaksiRepository) GetByID(ctx context.Context, id int) (*model.Trans
 			p.alamat_pengiriman, p.waktu_pesanan_sampai
 		FROM transaksi t
 		LEFT JOIN transaksi_pengiriman p ON p.id_transaksi = t.id_transaksi
-		WHERE t.id_transaksi = $1`
+		` + whereClause
 
-	err := r.db.QueryRow(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, arg).Scan(
 		&t.ID, &t.IDCustomer, &t.IDUser, &t.NoTransaksi, &t.TanggalTransaksi, &t.NamaCustomer,
 		&t.TotalItem, &t.Subtotal, &t.TotalBayar, &t.MetodePembayaran, &t.ResepRequired,
 		&t.NoResep, &t.Status, &t.StatusPesanan,
@@ -145,7 +237,7 @@ func (r *transaksiRepository) GetByID(ctx context.Context, id int) (*model.Trans
 	queryDetails := `SELECT id_detail_trx, id_transaksi, id_obat, nama_obat, harga_satuan, qty, subtotal 
 	                 FROM detail_transaksi WHERE id_transaksi = $1`
 
-	rows, err := r.db.Query(ctx, queryDetails, id)
+	rows, err := r.db.Query(ctx, queryDetails, t.ID)
 	if err != nil {
 		return nil, err
 	}

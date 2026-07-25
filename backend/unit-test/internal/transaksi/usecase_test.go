@@ -28,6 +28,13 @@ func (m *MockTransaksiRepository) GetByID(ctx context.Context, id int) (*model.T
 	}
 	return nil, args.Error(1)
 }
+func (m *MockTransaksiRepository) GetByNoTransaksi(ctx context.Context, noTransaksi string) (*model.Transaksi, error) {
+	args := m.Called(ctx, noTransaksi)
+	if args.Get(0) != nil {
+		return args.Get(0).(*model.Transaksi), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
 func (m *MockTransaksiRepository) UpdateStatus(ctx context.Context, id int, status model.StatusTransaksi) error {
 	args := m.Called(ctx, id, status)
 	return args.Error(0)
@@ -64,9 +71,10 @@ func TestUsecase_Checkout_Success(t *testing.T) {
 	uc := usecase.NewTransaksiUsecase(mockRepo)
 
 	tx := &model.Transaksi{
-		Subtotal:   50000,
-		TotalBayar: 50000,
-		Details:    []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
+		Subtotal:         50000,
+		TotalBayar:       50000,
+		MetodePembayaran: model.MetodeQRIS,
+		Details:          []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
 	}
 
 	mockRepo.On("CreateWithDetails", mock.Anything, tx).Return(nil)
@@ -94,9 +102,10 @@ func TestUsecase_Checkout_Gagal_BayarKurang(t *testing.T) {
 	uc := usecase.NewTransaksiUsecase(mockRepo)
 
 	tx := &model.Transaksi{
-		Subtotal:   50000,
-		TotalBayar: 40000,
-		Details:    []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
+		Subtotal:         50000,
+		TotalBayar:       40000,
+		MetodePembayaran: model.MetodeQRIS,
+		Details:          []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
 	}
 
 	err := uc.Checkout(context.Background(), tx)
@@ -111,10 +120,11 @@ func TestUsecase_Checkout_Gagal_DeliveryTanpaAlamat(t *testing.T) {
 
 	alamatKosong := ""
 	tx := &model.Transaksi{
-		Subtotal:   50000,
-		TotalBayar: 50000,
-		Details:    []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
-		Pengiriman: &model.Pengiriman{MetodePenerimaan: "delivery", AlamatPengiriman: &alamatKosong},
+		Subtotal:         50000,
+		TotalBayar:       50000,
+		MetodePembayaran: model.MetodeQRIS,
+		Details:          []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
+		Pengiriman:       &model.Pengiriman{MetodePenerimaan: "delivery", AlamatPengiriman: &alamatKosong},
 	}
 
 	err := uc.Checkout(context.Background(), tx)
@@ -129,10 +139,11 @@ func TestUsecase_Checkout_Gagal_PickupTanpaNama(t *testing.T) {
 
 	namaKosong := ""
 	tx := &model.Transaksi{
-		Subtotal:   50000,
-		TotalBayar: 50000,
-		Details:    []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
-		Pengiriman: &model.Pengiriman{MetodePenerimaan: "pickup", NamaPenerima: &namaKosong},
+		Subtotal:         50000,
+		TotalBayar:       50000,
+		MetodePembayaran: model.MetodeQRIS,
+		Details:          []model.DetailTransaksi{{IDObat: 1, Qty: 1}},
+		Pengiriman:       &model.Pengiriman{MetodePenerimaan: "pickup", NamaPenerima: &namaKosong},
 	}
 
 	err := uc.Checkout(context.Background(), tx)

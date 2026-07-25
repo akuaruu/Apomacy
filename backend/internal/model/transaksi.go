@@ -67,6 +67,7 @@ type Pengiriman struct {
 type TransaksiRepository interface {
 	CreateWithDetails(ctx context.Context, tx *Transaksi) error
 	GetByID(ctx context.Context, id int) (*Transaksi, error)
+	GetByNoTransaksi(ctx context.Context, noTransaksi string) (*Transaksi, error)
 	UpdateStatus(ctx context.Context, id int, status StatusTransaksi) error
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetByUserID(ctx context.Context, idUser int) ([]*Transaksi, error)
@@ -77,6 +78,7 @@ type TransaksiRepository interface {
 type TransaksiUsecase interface {
 	Checkout(ctx context.Context, tx *Transaksi) error
 	GetDetailTransaksi(ctx context.Context, idUser int, isStaff bool, id int) (*Transaksi, error)
+	GetByNoTransaksi(ctx context.Context, noTransaksi string) (*Transaksi, error)
 	BatalkanTransaksi(ctx context.Context, id int) error
 	UpdateStatusByNoTransaksi(ctx context.Context, noTransaksi string, status StatusTransaksi) error
 	GetRiwayatByUser(ctx context.Context, idUser int) ([]*Transaksi, error)

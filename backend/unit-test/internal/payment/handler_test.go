@@ -28,12 +28,16 @@ func (s *paymentUsecaseStub) GenerateSnapToken(orderID string, amount int64, met
 }
 
 type paymentTransactionStub struct {
-	updateFn func(context.Context, string, model.StatusTransaksi) error
+	updateFn  func(context.Context, string, model.StatusTransaksi) error
+	getByNoFn func(context.Context, string) (*model.Transaksi, error)
 }
 
 func (s *paymentTransactionStub) Checkout(context.Context, *model.Transaksi) error { return nil }
 func (s *paymentTransactionStub) GetDetailTransaksi(context.Context, int, bool, int) (*model.Transaksi, error) {
 	return nil, nil
+}
+func (s *paymentTransactionStub) GetByNoTransaksi(ctx context.Context, noTransaksi string) (*model.Transaksi, error) {
+	return s.getByNoFn(ctx, noTransaksi)
 }
 func (s *paymentTransactionStub) BatalkanTransaksi(context.Context, int) error { return nil }
 func (s *paymentTransactionStub) UpdateStatusByNoTransaksi(ctx context.Context, number string, status model.StatusTransaksi) error {
@@ -51,7 +55,10 @@ func paymentRouter(payment *paymentUsecaseStub, transaction *paymentTransactionS
 	gin.SetMode(gin.TestMode)
 	handler := delivery.NewPaymentHandler(payment, transaction)
 	router := gin.New()
-	router.POST("/checkout", handler.Checkout)
+	router.POST("/checkout", func(c *gin.Context) {
+		c.Set("id_user", float64(4))
+		handler.Checkout(c)
+	})
 	router.POST("/webhook", handler.WebhookNotification)
 	return router
 }
@@ -74,11 +81,22 @@ func TestPaymentCheckoutHandler(t *testing.T) {
 			assert.Equal(t, int64(25000), amount)
 			assert.Equal(t, "qris", method)
 			require.Len(t, items, 1)
+			assert.Equal(t, int64(12500), items[0].Price)
 			assert.Equal(t, int32(2), items[0].Qty)
 			return "snap-token", nil
 		}}
-		router := paymentRouter(payment, &paymentTransactionStub{})
-		response := paymentRequest(t, router, "/checkout", map[string]any{"order_id": "TRX-1", "gross_amount": 25000, "payment_method": "qris", "items": []map[string]any{{"id": "1", "price": 12500, "quantity": 2, "name": "Obat"}}})
+		transaction := &paymentTransactionStub{getByNoFn: func(_ context.Context, noTransaksi string) (*model.Transaksi, error) {
+			assert.Equal(t, "TRX-1", noTransaksi)
+			return &model.Transaksi{
+				IDUser:      4,
+				NoTransaksi: "TRX-1",
+				TotalBayar:  25000,
+				Status:      model.TxPending,
+				Details:     []model.DetailTransaksi{{IDObat: 1, NamaObat: "Obat", HargaSatuan: 12500, Qty: 2}},
+			}, nil
+		}}
+		router := paymentRouter(payment, transaction)
+		response := paymentRequest(t, router, "/checkout", map[string]any{"order_id": "TRX-1", "gross_amount": 1, "payment_method": "qris", "items": []map[string]any{{"id": "1", "price": 1, "quantity": 2, "name": "Obat"}}})
 		assert.Equal(t, http.StatusOK, response.Code)
 		assert.Contains(t, response.Body.String(), "snap-token")
 	})
@@ -93,8 +111,25 @@ func TestPaymentCheckoutHandler(t *testing.T) {
 		payment := &paymentUsecaseStub{generateFn: func(string, int64, string, []midtrans.ItemDetails) (string, error) {
 			return "", errors.New("midtrans unavailable")
 		}}
-		response := paymentRequest(t, paymentRouter(payment, &paymentTransactionStub{}), "/checkout", map[string]any{"order_id": "TRX-1", "gross_amount": 25000, "payment_method": "qris", "items": []any{}})
+		transaction := &paymentTransactionStub{getByNoFn: func(context.Context, string) (*model.Transaksi, error) {
+			return &model.Transaksi{
+				IDUser:      4,
+				NoTransaksi: "TRX-1",
+				TotalBayar:  25000,
+				Status:      model.TxPending,
+				Details:     []model.DetailTransaksi{{IDObat: 1, NamaObat: "Obat", HargaSatuan: 25000, Qty: 1}},
+			}, nil
+		}}
+		response := paymentRequest(t, paymentRouter(payment, transaction), "/checkout", map[string]any{"order_id": "TRX-1", "payment_method": "qris"})
 		assert.Equal(t, http.StatusInternalServerError, response.Code)
+	})
+
+	t.Run("rejects order owned by another user", func(t *testing.T) {
+		transaction := &paymentTransactionStub{getByNoFn: func(context.Context, string) (*model.Transaksi, error) {
+			return &model.Transaksi{IDUser: 99, NoTransaksi: "TRX-1", TotalBayar: 25000, Status: model.TxPending}, nil
+		}}
+		response := paymentRequest(t, paymentRouter(&paymentUsecaseStub{}, transaction), "/checkout", map[string]any{"order_id": "TRX-1", "payment_method": "qris"})
+		assert.Equal(t, http.StatusForbidden, response.Code)
 	})
 }
 
@@ -121,7 +156,7 @@ func TestPaymentWebhookHandler(t *testing.T) {
 		{name: "canceled", transactionStatus: "cancel", signatureValid: true, wantStatus: http.StatusOK, wantUpdate: true, wantTransactionStatus: model.TxBatal},
 		{name: "pending does not update", transactionStatus: "pending", signatureValid: true, wantStatus: http.StatusOK},
 		{name: "invalid signature", transactionStatus: "settlement", wantStatus: http.StatusUnauthorized},
-		{name: "update failure still acknowledges webhook", transactionStatus: "settlement", signatureValid: true, updateError: errors.New("database failed"), wantStatus: http.StatusOK, wantUpdate: true, wantTransactionStatus: model.TxSelesai},
+		{name: "update failure requests webhook retry", transactionStatus: "settlement", signatureValid: true, updateError: errors.New("database failed"), wantStatus: http.StatusInternalServerError, wantUpdate: true, wantTransactionStatus: model.TxSelesai},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

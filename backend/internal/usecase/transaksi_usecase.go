@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/akuaruu/apomacy/backend/internal/model"
 )
@@ -18,6 +19,17 @@ func NewTransaksiUsecase(repo model.TransaksiRepository) model.TransaksiUsecase 
 func (t *transaksiUsecase) Checkout(ctx context.Context, tx *model.Transaksi) error {
 	if len(tx.Details) == 0 {
 		return errors.New("keranjang belanja tidak boleh kosong")
+	}
+	if !validMetodePembayaran(tx.MetodePembayaran) {
+		return errors.New("metode pembayaran tidak valid")
+	}
+	for _, detail := range tx.Details {
+		if detail.IDObat <= 0 {
+			return errors.New("item obat tidak valid")
+		}
+		if detail.Qty <= 0 {
+			return errors.New("jumlah item harus lebih dari nol")
+		}
 	}
 
 	if tx.TotalBayar < tx.Subtotal {
@@ -39,6 +51,15 @@ func (t *transaksiUsecase) Checkout(ctx context.Context, tx *model.Transaksi) er
 	return t.repo.CreateWithDetails(ctx, tx)
 }
 
+func validMetodePembayaran(method model.MetodePembayaran) bool {
+	switch method {
+	case model.MetodeTunai, model.MetodeDebit, model.MetodeQRIS, model.MetodeTransfer:
+		return true
+	default:
+		return false
+	}
+}
+
 // GetDetailTransaksi memastikan hanya pemilik transaksi atau staff (kasir/admin) yang dapat mengakses data
 func (t *transaksiUsecase) GetDetailTransaksi(ctx context.Context, idUser int, isStaff bool, id int) (*model.Transaksi, error) {
 	trx, err := t.repo.GetByID(ctx, id)
@@ -51,6 +72,14 @@ func (t *transaksiUsecase) GetDetailTransaksi(ctx context.Context, idUser int, i
 	}
 
 	return trx, nil
+}
+
+func (t *transaksiUsecase) GetByNoTransaksi(ctx context.Context, noTransaksi string) (*model.Transaksi, error) {
+	noTransaksi = strings.TrimSpace(noTransaksi)
+	if noTransaksi == "" {
+		return nil, errors.New("nomor transaksi wajib diisi")
+	}
+	return t.repo.GetByNoTransaksi(ctx, noTransaksi)
 }
 
 func (t *transaksiUsecase) BatalkanTransaksi(ctx context.Context, id int) error {

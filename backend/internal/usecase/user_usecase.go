@@ -131,7 +131,7 @@ func (u *userUsecase) UploadFotoProfil(ctx context.Context, userID int, fileByte
 	req.Header.Set("Content-Type", contentType)
 
 	// 3. Eksekusi Request ke Supabase
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", errors.New("gagal menghubungi supabase storage")

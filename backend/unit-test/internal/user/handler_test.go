@@ -205,7 +205,7 @@ func TestUserHandlerUploadPhoto(t *testing.T) {
 	writer := multipart.NewWriter(&body)
 	part, err := writer.CreateFormFile("foto", "profile.png")
 	require.NoError(t, err)
-	_, err = part.Write([]byte("image"))
+	_, err = part.Write([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 	request := httptest.NewRequest(http.MethodPost, "/profile/photo", &body)

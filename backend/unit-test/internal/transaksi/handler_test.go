@@ -32,6 +32,13 @@ func (m *MockTransaksiUsecase) GetDetailTransaksi(ctx context.Context, idUser in
 	}
 	return nil, args.Error(1)
 }
+func (m *MockTransaksiUsecase) GetByNoTransaksi(ctx context.Context, noTransaksi string) (*model.Transaksi, error) {
+	args := m.Called(ctx, noTransaksi)
+	if args.Get(0) != nil {
+		return args.Get(0).(*model.Transaksi), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
 func (m *MockTransaksiUsecase) BatalkanTransaksi(ctx context.Context, id int) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)

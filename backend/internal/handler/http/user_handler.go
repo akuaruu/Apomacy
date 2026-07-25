@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,11 @@ import (
 type UserHandler struct {
 	usecase model.UserUsecase
 }
+
+const (
+	maxProfilePhotoBytes        = 2 << 20
+	maxProfilePhotoRequestBytes = maxProfilePhotoBytes + 512<<10
+)
 
 // NewUserHandler menginisialisasi handler untuk User
 func NewUserHandler(usecase model.UserUsecase) *UserHandler {
@@ -150,20 +156,13 @@ func isSecureRequest(c *gin.Context) bool {
 }
 
 func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
-	// 1. Tangkap ID User langsung dari claim JWT Middleware (Aman & Dinamis)
-	userIDRaw, exists := c.Get("id_user")
-	if !exists {
+	userID, ok := contextUserID(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid, harap login kembali"})
 		return
 	}
 
-	// Konversi tipe data float64 dari JWT ke integer
-	userIDFloat, ok := userIDRaw.(float64)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format ID user tidak valid"})
-		return
-	}
-	userID := int(userIDFloat)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxProfilePhotoRequestBytes)
 
 	// 2. Tangkap file dengan key "foto" dari form-data
 	file, header, err := c.Request.FormFile("foto")
@@ -174,16 +173,29 @@ func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
 	defer file.Close()
 
 	// 3. Baca file menjadi bentuk byte
-	fileBytes, err := io.ReadAll(file)
+	fileBytes, err := io.ReadAll(io.LimitReader(file, maxProfilePhotoBytes+1))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membaca file"})
+		return
+	}
+	if len(fileBytes) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File foto tidak boleh kosong"})
+		return
+	}
+	if len(fileBytes) > maxProfilePhotoBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Ukuran foto maksimal 2 MB"})
+		return
+	}
+
+	contentType := http.DetectContentType(fileBytes)
+	if !allowedProfilePhotoContentType(contentType) {
+		c.JSON(http.StatusUnsupportedMediaType, gin.H{"error": "Format foto harus JPG, PNG, atau WebP"})
 		return
 	}
 
 	// 4. Buat nama file unik (Mencegah file tertimpa jika namanya sama)
 	timestamp := time.Now().Unix()
-	fileName := fmt.Sprintf("user_%d_%d_%s", userID, timestamp, header.Filename)
-	contentType := header.Header.Get("Content-Type")
+	fileName := fmt.Sprintf("user_%d_%d_%s", userID, timestamp, filepath.Base(header.Filename))
 
 	// 5. Panggil Usecase
 	fotoURL, err := h.usecase.UploadFotoProfil(c.Request.Context(), userID, fileBytes, fileName, contentType)
@@ -196,6 +208,15 @@ func (h *UserHandler) UploadFotoProfil(c *gin.Context) {
 		"message": "Foto profil berhasil diperbarui",
 		"url":     fotoURL,
 	})
+}
+
+func allowedProfilePhotoContentType(contentType string) bool {
+	switch contentType {
+	case "image/jpeg", "image/png", "image/webp":
+		return true
+	default:
+		return false
+	}
 }
 
 // GetProfile menangani request pengambilan data gabungan profil

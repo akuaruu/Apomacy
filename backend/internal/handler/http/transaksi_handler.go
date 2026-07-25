@@ -63,7 +63,8 @@ func (h *TransaksiHandler) Checkout(c *gin.Context) {
 
 	if err := h.usecase.Checkout(c.Request.Context(), &req); err != nil {
 		slog.ErrorContext(c.Request.Context(), "checkout failed", "error", err, "request_id", requestID(c))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses transaksi", "detail": err.Error()})
+		status, message := checkoutErrorResponse(err)
+		c.JSON(status, gin.H{"error": message})
 		return
 	}
 
@@ -80,6 +81,23 @@ func requestID(c *gin.Context) string {
 	value, _ := c.Get(middleware.RequestIDKey)
 	requestID, _ := value.(string)
 	return requestID
+}
+
+func checkoutErrorResponse(err error) (int, string) {
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "stok obat tidak mencukupi"):
+		return http.StatusConflict, message
+	case strings.Contains(message, "tidak valid"),
+		strings.Contains(message, "wajib"),
+		strings.Contains(message, "kosong"),
+		strings.Contains(message, "harus lebih dari nol"),
+		strings.Contains(message, "tidak mencukupi"),
+		strings.Contains(message, "tidak ditemukan"):
+		return http.StatusBadRequest, message
+	default:
+		return http.StatusInternalServerError, "Gagal memproses transaksi"
+	}
 }
 
 // GetDetail mengambil riwayat spesifik transaksi beserta rincian obat dan pengiriman
