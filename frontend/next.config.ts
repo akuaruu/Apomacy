@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-const DEFAULT_BACKEND_API_URL = "http://159.223.82.138:8080/api";
+const DEFAULT_BACKEND_API_URL = "http://4.252.0.85:8080/api";
 const REPO_ROOT = path.resolve(process.cwd(), "..");
 
 function getBackendApiUrl() {
